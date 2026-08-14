@@ -66,8 +66,7 @@ namespace MogwaiNano
         {
             if (message.Function == "RUN")
             {
-                byte[] decoded = Convert.FromBase64String(message.Parameters[0]);
-                string code = Encoding.UTF8.GetString(decoded, 0, decoded.Length);
+                var code = message.Parameters[0];
 
                 Debug.WriteLine("RUN command received");
                 Debug.WriteLine(code);
@@ -80,8 +79,7 @@ namespace MogwaiNano
                 // On stocke le code dans I:\autorun.mogwai pour qu'il soit exécuté au démarrage
                 // Le code est encodé en base64 pour éviter les problèmes d'encodage
 
-                byte[] decoded = Convert.FromBase64String(message.Parameters[0]);
-                string code = Encoding.UTF8.GetString(decoded, 0, decoded.Length);
+                var code = message.Parameters[0];
 
                 File.WriteAllText(@"I:\autorun.mog", code);
                 Debug.WriteLine($"autorun.mog written.");
@@ -93,10 +91,7 @@ namespace MogwaiNano
                 if (File.Exists(@"I:\autorun.mog"))
                 {
                     string code = File.ReadAllText(@"I:\autorun.mog");
-                    byte[] encoded = Encoding.UTF8.GetBytes(code);
-                    string base64 = Convert.ToBase64String(encoded);
-
-                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.GET", base64));
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.GET", code));
                 }
                 else
                 {
@@ -160,13 +155,7 @@ namespace MogwaiNano
             {
                 Debug.WriteLine();
                 Debug.WriteLine("Aucune configuration WiFi trouvée ou échec de connexion.");
-
-                var configs = Wireless80211Configuration.GetAllWireless80211Configurations();
                 
-                foreach (var config in configs)
-                    Debug.WriteLine($"SSID: {config.Ssid}, Password: {config.Password}");
-
-
                 return false;
             }
             else

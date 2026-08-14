@@ -214,11 +214,12 @@ namespace MogwaiNano.Engine
         }
 
         private void SendMessage(NetworkStream stream, ServerMessage message)
-        {         
+        {
             string json = JsonConvert.SerializeObject(message);
-            byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-            int length = jsonBytes.Length;
+            string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+            byte[] payloadBytes = Encoding.UTF8.GetBytes(base64);
 
+            int length = payloadBytes.Length;
             byte[] lengthBytes = new byte[4];
             lengthBytes[0] = (byte)(length >> 24);
             lengthBytes[1] = (byte)(length >> 16);
@@ -228,31 +229,28 @@ namespace MogwaiNano.Engine
             lock (_sendLock)
             {
                 stream.Write(lengthBytes, 0, 4);
-                stream.Write(jsonBytes, 0, jsonBytes.Length);
+                stream.Write(payloadBytes, 0, payloadBytes.Length);
             }
         }
 
         private string ReadMessage(NetworkStream stream)
         {
             byte[] lengthBuffer = new byte[4];
-
             if (!ReadExactly(stream, lengthBuffer, 4))
                 return null;
 
             int messageLength = (lengthBuffer[0] << 24) | (lengthBuffer[1] << 16) | (lengthBuffer[2] << 8) | lengthBuffer[3];
 
             if (messageLength <= 0 || messageLength > MAX_MESSAGE_SIZE)
-            {
-                Debug.WriteLine($"Message length {messageLength} out of bounds, rejecting.");
-                return null; // traité comme une connexion fermée -> HandleClient sort proprement
-            }
-
-            byte[] messageBuffer = new byte[messageLength];
-
-            if (!ReadExactly(stream, messageBuffer, messageLength))
                 return null;
 
-            return Encoding.UTF8.GetString(messageBuffer, 0, messageLength);
+            byte[] payloadBuffer = new byte[messageLength];
+            if (!ReadExactly(stream, payloadBuffer, messageLength))
+                return null;
+
+            string base64 = Encoding.UTF8.GetString(payloadBuffer, 0, messageLength);
+            byte[] jsonBytes = Convert.FromBase64String(base64);
+            return Encoding.UTF8.GetString(jsonBytes, 0, jsonBytes.Length);
         }
 
         private bool ReadExactly(NetworkStream stream, byte[] buffer, int count)

@@ -81,10 +81,11 @@ namespace MogwaiNanoStudio
             try
             {
                 string json = JsonSerializer.Serialize(message);
-                byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-                byte[] lengthBytes = new byte[4];
+                string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+                byte[] payloadBytes = Encoding.UTF8.GetBytes(base64);
 
-                int length = jsonBytes.Length;
+                byte[] lengthBytes = new byte[4];
+                int length = payloadBytes.Length;
                 lengthBytes[0] = (byte)(length >> 24);
                 lengthBytes[1] = (byte)(length >> 16);
                 lengthBytes[2] = (byte)(length >> 8);
@@ -93,7 +94,7 @@ namespace MogwaiNanoStudio
                 lock (stream)
                 {
                     stream.Write(lengthBytes, 0, 4);
-                    stream.Write(jsonBytes, 0, jsonBytes.Length);
+                    stream.Write(payloadBytes, 0, payloadBytes.Length);
                 }
             }
             catch (Exception ex)
@@ -101,7 +102,6 @@ namespace MogwaiNanoStudio
                 _running = false;
                 ConnectionError?.Invoke(this, ex);
                 Disconnected?.Invoke(this, EventArgs.Empty);
-                // on ne relance pas l'exception : l'appelant est notifié via les événements, pas par une exception qui remonte
             }
         }
 
@@ -150,18 +150,18 @@ namespace MogwaiNanoStudio
         private string? ReadMessage()
         {
             byte[] lengthBuffer = new byte[4];
-
             if (!ReadExactly(lengthBuffer, 4))
                 return null;
 
             int messageLength = (lengthBuffer[0] << 24) | (lengthBuffer[1] << 16) | (lengthBuffer[2] << 8) | lengthBuffer[3];
 
-            byte[] messageBuffer = new byte[messageLength];
-
-            if (!ReadExactly(messageBuffer, messageLength))
+            byte[] payloadBuffer = new byte[messageLength];
+            if (!ReadExactly(payloadBuffer, messageLength))
                 return null;
 
-            return Encoding.UTF8.GetString(messageBuffer, 0, messageLength);
+            string base64 = Encoding.UTF8.GetString(payloadBuffer, 0, messageLength);
+            byte[] jsonBytes = Convert.FromBase64String(base64);
+            return Encoding.UTF8.GetString(jsonBytes, 0, jsonBytes.Length);
         }
 
         private bool ReadExactly(byte[] buffer, int count)

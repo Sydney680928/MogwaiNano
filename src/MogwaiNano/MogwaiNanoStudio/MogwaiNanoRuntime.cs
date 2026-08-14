@@ -43,6 +43,10 @@ namespace MogwaiNanoStudio
 
         public bool ListenMessages { get; set; } = false;
 
+        public bool ViewMode { get; private set; } = false; 
+
+        public bool ExitViewModeRequested { get; set; } = false;    
+
         public MogwaiNanoRuntime(MogwaiEngine engine)
         {
             _engine = engine;
@@ -73,30 +77,27 @@ namespace MogwaiNanoStudio
 
         private void NanoClient_MessageReceived(object? sender, ServerMessage message)
         {
-            if (true) // _listenMessages)
+            if (message.Function == "PROGRAM.DID.START")
             {
-                if (message.Function == "PROGRAM.DID.START")
-                {
-                    IsRunning = true;
-                    NanoProgramDidStart?.Invoke();
-                }
-                else if (message.Function == "PROGRAM.DID.END")
-                {
-                    IsRunning = false;
-                    NanoProgramDidEnd?.Invoke(message.Parameters[0]);
-                }
-                else if (message.Function == "DEBUG.WRITE")
-                {
-                    NanoDebugWrite?.Invoke(message.Parameters[0]);
-                }
-                else if (message.Function == "CONSOLE.PRINT")
-                {
-                    NanoPrint?.Invoke(message.Parameters[0]);
-                }
-                else if (message.Function == "ALIVE")
-                {
-                    _lastAliveReceived = DateTime.Now;
-                }
+                IsRunning = true;
+                NanoProgramDidStart?.Invoke();
+            }
+            else if (message.Function == "PROGRAM.DID.END")
+            {
+                IsRunning = false;
+                NanoProgramDidEnd?.Invoke(message.Parameters[0]);
+            }
+            else if (message.Function == "DEBUG.WRITE")
+            {
+                NanoDebugWrite?.Invoke(message.Parameters[0]);
+            }
+            else if (message.Function == "CONSOLE.PRINT")
+            {
+                NanoPrint?.Invoke(message.Parameters[0]);
+            }
+            else if (message.Function == "ALIVE")
+            {
+                _lastAliveReceived = DateTime.Now;
             }
         }
 
@@ -119,7 +120,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var messageState = new ServerMessage(SOURCE_NAME, "STATE.GET");
-            var responseState = await SendMessageAndWaitResponse(messageState, 1000);
+            var responseState = await SendMessageAndWaitResponse(messageState, 2000);
 
             if (responseState == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -131,13 +132,9 @@ namespace MogwaiNanoStudio
 
             IsRunning = false;
 
-            // On passe le code en base64 pour éviter le bug json coté nano avec les \"
-
-            var code64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(code));
-
             try
             {
-                var message = new ServerMessage(SOURCE_NAME, "RUN", code64);
+                var message = new ServerMessage(SOURCE_NAME, "RUN", code);
                 AppGlobal.NanoClient.SendMessage(message);
             }
             catch
@@ -150,9 +147,7 @@ namespace MogwaiNanoStudio
             var startResponse = await WaitResponse("PROGRAM.DID.START");
 
             if (startResponse == null)
-            {
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
-            }
 
             return EvalResult.NoError;
         }
@@ -172,34 +167,42 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceIsNotRunningError);
 
             Console.WriteLine();
-            Console.WriteLine("──── Start view mode (press ESC to exit) ─────────────");
+            Console.WriteLine("──── Start view mode (press CTRL-C to exit) ─────────────");
             Console.WriteLine();
 
+            IsRunning = true;   
+            ExitViewModeRequested = false;
             ListenMessages = true;
-            IsRunning = true;
+            ViewMode = true;
 
             // On attend que le programme se termine
 
-            if (!await WaitNanoProgramDidEnd())
+            if (! await WaitNanoProgramDidEnd())
             {
                 ListenMessages = false;
+                ViewMode = false;
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
             }
 
-            // On affiche le résultat final du programme
+            // On affiche le résultat final du programme si on n'est pas simplement sorti du mode view
 
-            var messageLastResult = new ServerMessage(SOURCE_NAME, "LAST.RESULT.GET");
-            var responseLastResult = await SendMessageAndWaitResponse(messageLastResult, 2000);
+            if (!ExitViewModeRequested)
+            {
+                var messageLastResult = new ServerMessage(SOURCE_NAME, "LAST.RESULT.GET");
+                var responseLastResult = await SendMessageAndWaitResponse(messageLastResult, 2000);
 
-            if (responseLastResult == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                if (responseLastResult == null)
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
 
-            Console.WriteLine();
-            Console.WriteLine(responseLastResult.Parameters[0]);    
+                Console.WriteLine();
+                Console.WriteLine(responseLastResult.Parameters[0]);
+            }
 
             Console.WriteLine();
             Console.WriteLine("──── Exit view mode ──────────────────────────────────");
             Console.WriteLine();
+
+            ViewMode = false;
 
             return EvalResult.NoError;
         }
@@ -209,11 +212,7 @@ namespace MogwaiNanoStudio
             if (!AppGlobal.NanoClient.IsConnected)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
-            // On passe le code en base64 pour éviter le bug json coté nano avec les \"
-
-            var code64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(code));
-
-            var message = new ServerMessage(SOURCE_NAME, "AUTORUN.SET", code64);
+            var message = new ServerMessage(SOURCE_NAME, "AUTORUN.SET", code);
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
@@ -351,21 +350,19 @@ namespace MogwaiNanoStudio
 
             while (IsRunning)
             {
-                if (_engine.HaltRequested)
+                await Task.Delay(100);
+
+                if (ExitViewModeRequested)
                 {
                     ListenMessages = false;
                     return true;
                 }
 
-                var key = Console.ReadKey(true);
-
-                if (key.Key == ConsoleKey.Escape)
+                if (_engine.HaltRequested)
                 {
-                    IsRunning = false;
+                    ListenMessages = false;
                     return true;
                 }
-                
-                await Task.Delay(100);
 
                 var r = await _engine.Yield();
 

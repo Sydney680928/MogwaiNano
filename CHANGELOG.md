@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
- 
-
 ### Added
 
 **Open Source Release**
@@ -48,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Networking**
 
 - UDP-based device discovery (fixed port `1968`) — devices respond with their name, version and platform details
-- Reliable TCP protocol (fixed port `9597`) for remote code execution — length-prefixed JSON messages, single active client
+- Reliable TCP protocol (fixed port `9597`) for remote code execution — length-prefixed, Base64-encoded JSON messages, single active client
 - Automatic disconnection detection via periodic `ALIVE` heartbeat during long-running executions
 - Clean recovery on device reboot or unexpected disconnection, with no lingering blocked state on either side
 
@@ -74,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `nano.state`, `nano.isRunning` — query the connected device's current execution state
   - `nano.autorun.set`, `nano.autorun.get`, `nano.autorun.purge` — manage code stored on the device for automatic execution on every boot
   - `nano.halt`, `nano.reboot` — force an immediate halt/reboot on the device, bypassing the `MOGWAI.onReboot` hook. `nano.halt` stops whatever is currently running (whether started via `nano.run` or as a stored autorun program) and returns the device's state from `RUNNING` to `IDLE`, ready for a new `nano.run`
-  - `nano.view` — attaches to the currently running program on the device and displays its live console output (`?`/`console.print`, `debug.write`) in real time; exit with `Escape`. Without `nano.view` active, output from a `nano.run` or an autorun program is not displayed at all — `nano.run` itself only waits for confirmation that the program has started, it doesn't wait for it to finish or show anything. Like `nano.run`, failure raises an `MW.xx` error rather than returning a boolean
+  - `nano.view` — attaches to the currently running program on the device and displays its live console output (`?`/`console.print`, `debug.write`) in real time; exit with `Ctrl+C`. Without `nano.view` active, output from a `nano.run` or an autorun program is not displayed at all — `nano.run` itself only waits for confirmation that the program has started, it doesn't wait for it to finish or show anything. Like `nano.run`, failure raises an `MW.xx` error rather than returning a boolean
 - Zero-modification compatibility with the existing [MOGWAI VS Code extension](https://github.com/Sydney680928/mogwai) — canonical NANO primitives are declared as no-op stubs on the desktop engine purely so the extension can recognize and highlight them; using them outside of a `nano.run` context on the desktop engine simply raises an "unknown word" error, with no other consequence
 
 ### Known Limitations

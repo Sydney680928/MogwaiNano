@@ -198,9 +198,7 @@ namespace MogwaiNanoStudio
                     // run { ... }
 
                     var code = engine.StackPopCode();
-                    var result = await AppGlobal.NanoRuntime.RunAsync(code.ToStringCode());
-
-                    return result;
+                    return await AppGlobal.NanoRuntime.RunAsync(code.ToStringCode());
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);

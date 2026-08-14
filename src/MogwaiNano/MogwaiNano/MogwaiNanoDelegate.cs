@@ -21,7 +21,7 @@ namespace MogwaiNano
             Debug.WriteLine(result.ToString());
             Debug.WriteLine($"MEM={GC.Run(false)}");
 
-            var msg = new ServerMessage("MogwaiNanoDevice", "PROGRAM.DID.END", result.ToString());
+            var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "PROGRAM.DID.END", result.ToString());
             AppGlobal.TcpServer.EnqueueMessage(msg);
         }
 
@@ -29,7 +29,7 @@ namespace MogwaiNano
         {
             Debug.WriteLine("Program did start");
 
-            var msg = new ServerMessage("MogwaiNanoDevice", "PROGRAM.DID.START");
+            var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "PROGRAM.DID.START");
             AppGlobal.TcpServer.EnqueueMessage(msg);
 
         }
@@ -40,7 +40,7 @@ namespace MogwaiNano
 
             if (AppGlobal.TcpServer.IsClientConnected)
             {
-                var msg = new ServerMessage("MogwaiNanoDevice", "DEBUG.WRITE", message);
+                var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "DEBUG.WRITE", message);
                 AppGlobal.TcpServer.EnqueueMessage(msg);
             }
 
@@ -51,20 +51,8 @@ namespace MogwaiNano
         {
             if (AppGlobal.TcpServer.IsClientConnected)
             {
-                var msg = new ServerMessage("MogwaiNanoDevice", "CONSOLE.PRINT", message);
+                var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "CONSOLE.PRINT", message);
                 AppGlobal.TcpServer.EnqueueMessage(msg);
-            }
-
-            return EvalResult.NoError;
-        }
-
-        public EvalResult MessageReceivedFromRuntime(MogwaiNanoEngine engine, string message, MOGObject parameter)
-        {
-            Debug.WriteLine($"Message received from runtime: {message}");
-
-            if (message == "GO!")
-            {
-                AppGlobal.ComPort.WriteLine("HELLO FROM MOGWAI NANO!");
             }
 
             return EvalResult.NoError;
