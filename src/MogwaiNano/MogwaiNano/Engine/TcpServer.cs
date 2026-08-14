@@ -1,0 +1,275 @@
+﻿using nanoFramework.Json;
+using System;
+using System.Collections;
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+namespace MogwaiNano.Engine
+{
+    public class TcpServer
+    {
+        private const int MAX_MESSAGE_SIZE = 16384; // 16 Ko, largement suffisant pour du code RPN + JSON
+
+        private Thread _tcpThread;
+        private TcpListener _tcpListener;
+        private TcpClient _tcpClient;
+        private readonly object _sendLock = new();
+        private bool _clientConnected = false;
+        private bool _shuttingDown = false;
+        private Stopwatch _lastMessageStopwatch = new Stopwatch();
+        private Queue _outgoingQueue = new();
+        private object _outgoingLock = new();
+        private Thread _senderThread;
+        private bool _pauseSending = false;
+        private bool _disconnectRequested = false;
+
+        public delegate void MessageReceivedHandler(ServerMessage message);
+        public event MessageReceivedHandler MessageReceived;
+
+        public bool IsClientConnected => _clientConnected;
+
+        public int ActualPort => _tcpListener != null ? ((IPEndPoint)_tcpListener.LocalEndpoint).Port : -1;
+
+        public void StartTcpServer()
+        {
+            _tcpThread = new Thread(TcpListenLoop);
+            _tcpThread.Start();
+
+            _senderThread = new Thread(SenderLoop);
+            _senderThread.Start();
+        }
+
+        public void StopTcpServer()
+        {
+            Debug.WriteLine("Stopping TCP server...");  
+
+            _shuttingDown = true;
+            _tcpClient?.Close();    // <-- ajout indispensable : débloque le stream.Read() en cours, envoie un vrai FIN/RST
+            _tcpListener?.Stop(); // débloque AcceptTcpClient() en cours -> lève une exception
+            _tcpThread.Join(2000); // attend que le thread se termine proprement, timeout de sécurité
+
+            Debug.WriteLine("TCP server stopped."); 
+        }
+
+        public void EnqueueMessage(ServerMessage message)
+        {
+            lock (_outgoingLock)
+            {
+                _outgoingQueue.Enqueue(message);
+            }
+        }
+
+        private void TcpListenLoop()
+        {
+            try
+            {
+                _tcpListener = new TcpListener(IPAddress.Any, AppGlobal.TCP_PORT);
+                _tcpListener.Start(1);
+
+                while (!_shuttingDown)
+                {
+                    try
+                    {
+                        using (TcpClient client = _tcpListener.AcceptTcpClient())
+                        {
+                            _tcpClient = client;
+                            _clientConnected = true;
+
+                            HandleClient(client);
+
+                            _clientConnected = false;
+                            _tcpClient = null;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (_shuttingDown)
+                            break; // fermeture volontaire, pas une vraie erreur -> sortie propre
+
+                        Debug.WriteLine($"TCP client error: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!_shuttingDown)
+                {
+                    Debug.WriteLine($"TCP server fatal error: {ex.Message}");
+                }
+                else
+                {
+                    Debug.WriteLine("TCP server shutting down.");
+                }
+            }
+        }
+
+        private void SenderLoop()
+        {
+            while (true)
+            {
+                if (_pauseSending)
+                {
+                    Thread.Sleep(50);
+                    continue; // on laisse la file s'accumuler plutôt que de tenter d'écrire
+                }
+
+                ServerMessage message = null;
+
+                lock (_outgoingLock)
+                {
+                    if (_outgoingQueue.Count > 0)
+                        message = (ServerMessage)_outgoingQueue.Dequeue();
+                }
+
+                if (message != null)
+                {
+                    AppGlobal.TcpServer.SendMessage(message);
+                    // même si SendMessage plante ici, seul SenderLoop meurt -> jamais le thread d'exécution
+                }
+                else
+                {
+                    Thread.Sleep(50);
+                }
+            }
+        }
+
+        private void HandleClient(TcpClient client)
+        {
+            NetworkStream stream = client.GetStream();
+            
+            var idleStopwatch = Stopwatch.StartNew();
+
+            _disconnectRequested = false;
+
+            while (!_shuttingDown && !_disconnectRequested)
+            {
+                int available = client.Available;
+
+                if (available > 0)
+                {
+                    string json = ReadMessage(stream);
+                    if (json == null)
+                        break;
+
+                    idleStopwatch.Restart();
+                    ProcessMessage(json, stream);
+                }
+                else
+                {
+                    if (idleStopwatch.ElapsedMilliseconds > 30000)
+                        break;
+
+                    Thread.Sleep(100);
+                }
+            }
+
+            client.Close();
+
+            _pauseSending = false;
+            _outgoingQueue.Clear();
+        }
+
+        private void ProcessMessage(string json, NetworkStream stream)
+        {
+            try
+            {
+                var message = (ServerMessage)JsonConvert.DeserializeObject(json, typeof(ServerMessage));
+
+                Debug.WriteLine($"Received TCP message - Source: {message.Source}, Function: {message.Function}");
+
+                if (message.Function == "BYE")
+                {
+                    _pauseSending = true;
+                    _disconnectRequested = true; // fait sortir HandleClient immédiatement, pas dans 30s
+                }
+
+                MessageReceived?.Invoke(message);               
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ProcessMessage error: {ex.Message}");
+            }
+        }
+
+        private void SendMessage(ServerMessage message)
+        {
+            var stream = _tcpClient?.GetStream();
+
+            if (stream == null)
+                return;
+
+            try
+            {
+                SendMessage(stream, message);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SendMessage failed (client probably disconnected): {ex.Message}");
+                // on avale l'erreur : un échec d'envoi ne doit jamais faire tomber le thread appelant,
+                // qu'il s'agisse du thread réseau ou du thread d'exécution du moteur
+            }
+        }
+
+        private void SendMessage(NetworkStream stream, ServerMessage message)
+        {         
+            string json = JsonConvert.SerializeObject(message);
+            byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
+            int length = jsonBytes.Length;
+
+            byte[] lengthBytes = new byte[4];
+            lengthBytes[0] = (byte)(length >> 24);
+            lengthBytes[1] = (byte)(length >> 16);
+            lengthBytes[2] = (byte)(length >> 8);
+            lengthBytes[3] = (byte)length;
+
+            lock (_sendLock)
+            {
+                stream.Write(lengthBytes, 0, 4);
+                stream.Write(jsonBytes, 0, jsonBytes.Length);
+            }
+        }
+
+        private string ReadMessage(NetworkStream stream)
+        {
+            byte[] lengthBuffer = new byte[4];
+
+            if (!ReadExactly(stream, lengthBuffer, 4))
+                return null;
+
+            int messageLength = (lengthBuffer[0] << 24) | (lengthBuffer[1] << 16) | (lengthBuffer[2] << 8) | lengthBuffer[3];
+
+            if (messageLength <= 0 || messageLength > MAX_MESSAGE_SIZE)
+            {
+                Debug.WriteLine($"Message length {messageLength} out of bounds, rejecting.");
+                return null; // traité comme une connexion fermée -> HandleClient sort proprement
+            }
+
+            byte[] messageBuffer = new byte[messageLength];
+
+            if (!ReadExactly(stream, messageBuffer, messageLength))
+                return null;
+
+            return Encoding.UTF8.GetString(messageBuffer, 0, messageLength);
+        }
+
+        private bool ReadExactly(NetworkStream stream, byte[] buffer, int count)
+        {
+            int totalRead = 0;
+
+            while (totalRead < count)
+            {
+                int bytesRead = stream.Read(buffer, totalRead, count - totalRead);
+
+                if (bytesRead == 0)
+                    return false; // connexion fermée avant d'avoir tout reçu
+
+                totalRead += bytesRead;
+            }
+
+            return true;
+        }
+    }
+}

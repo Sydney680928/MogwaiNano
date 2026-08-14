@@ -1,0 +1,2551 @@
+﻿
+using MogwaiNano.Interfaces;
+using MogwaiNano.Objects;
+using nanoFramework.Runtime.Native;
+using System;
+using System.Collections;
+using System.Device.Gpio;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using System.Threading;
+using GC = nanoFramework.Runtime.Native.GC;
+
+namespace MogwaiNano.Engine
+{
+    public class MogwaiNanoEngine
+    {
+        private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
+
+        private delegate EvalResult PrimitiveDelegate(string name);
+
+        private Hashtable _primitives = new();
+        private ArrayList _stacks = new();
+        private ArrayList _currentStack = new();
+        private Hashtable _timers = new();
+        private Hashtable _events = new(); 
+        private Hashtable _types = new(12);
+        private ArrayList _varsContext = new();
+        private Queue _fireObjectsQueue = new();
+        private object _fireObjectsQueueLock = new();
+        private object _fireEventLock = new();
+        private bool _disableInterrupts;
+        private VarContext _currentLocalVarsContext;
+        private Hashtable _functions = new(3);
+        private AutoResetEvent _runSignal = new(false);
+        private string _pendingRunCode;
+        private bool _pendingDebugMode;
+        private Thread _runThread;
+        private Thread _aliveThread;  
+        private Hashtable _openPins = new(3);
+        private GpioController _gpioController = new();
+
+        public readonly MOGType TypeNumber;
+        public readonly MOGType TypeString;
+        public readonly MOGType TypeBoolean;
+        public readonly MOGType TypeName;
+        public readonly MOGType TypeList;
+        public readonly MOGType TypeRecord;
+        public readonly MOGType TypeData;  
+        public readonly MOGType TypeKey;
+        public readonly MOGType TypeCode;
+        public readonly MOGType TypeFunction;
+        public readonly MOGType TypePrimitive;
+        public readonly MOGType TypeType;
+        public readonly MOGType TypeWord;
+        public readonly MOGType TypeNull;
+        public readonly MOGType TypeReference;
+        public readonly MOGType TypeAny;
+
+        public Error LastError { get; set; } = Error.None;
+
+        public MOGObject CurrentEvalObject { get; set; }
+
+        public IDelegate Delegate { get; set; }
+
+        public bool IsRunning { get; private set; }
+
+        public bool BreakRequested { get; private set; }
+
+        public bool HaltRequested { get; private set; }
+
+        public Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
+
+        public EvalResult LastResult { get; private set; } = EvalResult.NoError;    
+
+        public MogwaiNanoEngine()
+        {
+            // load types
+
+            TypeNumber = new MOGType(this, "number");
+            TypeString = new MOGType(this, "string");
+            TypeBoolean = new MOGType(this, "boolean");
+            TypeName = new MOGType(this, "name");
+            TypeList = new MOGType(this, "list");
+            TypeRecord = new MOGType(this, "record");
+            TypeData = new MOGType(this, "data");
+            TypeKey = new MOGType(this, "key");
+            TypeCode = new MOGType(this, "code");
+            TypeFunction = new MOGType(this, "function");
+            TypePrimitive = new MOGType(this, "primitive");
+            TypeType = new MOGType(this, "type");
+            TypeWord = new MOGType(this, "word");
+            TypeNull = new MOGType(this, "null");
+            TypeReference = new MOGType(this, "ref");
+            TypeAny = new MOGType(this, "any");
+
+            _types.Add("number", TypeNumber);
+            _types.Add("string", TypeString);
+            _types.Add("boolean", TypeBoolean);
+            _types.Add("name", TypeName);
+            _types.Add("list", TypeList);
+            _types.Add("record", TypeRecord);
+            _types.Add("data", TypeData);
+            _types.Add("key", TypeKey);
+            _types.Add("code", TypeCode);
+            _types.Add("function", TypeFunction);
+            _types.Add("primitive", TypePrimitive);
+            _types.Add("type", TypeType);
+            _types.Add("word", TypeWord);
+            _types.Add("ref", TypeReference);
+            _types.Add("any", TypeAny);
+
+            // load primitives
+
+            RegisterPrimitives();
+
+            // Create vars context
+            // Context zéro = Global vars
+
+            _varsContext.Add(new VarContext("GLOBAL"));
+
+            // Create and start running thread
+
+            _runThread = new Thread(RunLoop);
+            _runThread.Start();
+
+            // Create and start is alive thread 
+
+            _aliveThread = new Thread(AliveLoop); 
+            _aliveThread.Start();
+        }
+
+        public bool IsPrimitive(string name) => _primitives.Contains(name);
+
+        public MOGType GetType(string name)
+        {
+            if (_types.Contains(name))
+                return _types[name] as MOGType;
+
+            return null;
+        }
+
+        public EvalResult ExecutePrimitive(string name)
+        {
+            var p = _primitives[name] as PrimitiveDelegate;
+
+            if (p == null)
+                return EvalResult.Failure(this, Error.UnknownWordError, name);
+
+            return p(name);
+        }
+
+        private void RegisterPrimitives()
+        {
+            _primitives.Add("->type", new PrimitiveDelegate(PrimitiveGetType));
+
+            _primitives.Add("+", new PrimitiveDelegate(PrimitivePlus));
+            _primitives.Add("-", new PrimitiveDelegate(PrimitiveMathSubstraction));
+            _primitives.Add("*", new PrimitiveDelegate(PrimitiveMathMultiplication));
+            _primitives.Add("/", new PrimitiveDelegate(PrimitiveMathDivision));
+
+            _primitives.Add("->data", new PrimitiveDelegate(PrimitiveToData));
+
+            _primitives.Add("clear", new PrimitiveDelegate(PrimitiveStackClear));
+            _primitives.Add("swap", new PrimitiveDelegate(PrimitiveStackSwap));
+            _primitives.Add("dup", new PrimitiveDelegate(PrimitiveStackDup));
+            _primitives.Add("drop", new PrimitiveDelegate(PrimitiveStackDrop));
+
+            _primitives.Add("break", new PrimitiveDelegate(PrimitiveBreak));
+
+            _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
+            _primitives.Add("wait", new PrimitiveDelegate(PrimitiveWait));
+            _primitives.Add("get", new PrimitiveDelegate(PrimitiveGet));
+            _primitives.Add("set", new PrimitiveDelegate(PrimitiveSet));
+            _primitives.Add("size", new PrimitiveDelegate(PrimitiveSize));
+
+            _primitives.Add("DI", new PrimitiveDelegate(PrimitiveDI));
+            _primitives.Add("EI", new PrimitiveDelegate(PrimitiveEI));
+
+            _primitives.Add("==", new PrimitiveDelegate(PrimitiveConditionEqual));
+            _primitives.Add("!=", new PrimitiveDelegate(PrimitiveConditionNotEqual));
+            _primitives.Add("<", new PrimitiveDelegate(PrimitiveConditionInferior));
+            _primitives.Add(">", new PrimitiveDelegate(PrimitiveConditionSuperior));
+            _primitives.Add("<=", new PrimitiveDelegate(PrimitiveConditionInferiorOrEqual));
+            _primitives.Add(">=", new PrimitiveDelegate(PrimitiveConditionSuperiorOrEqual));
+            _primitives.Add("not", new PrimitiveDelegate(PrimitiveNot));
+            _primitives.Add("isnull", new PrimitiveDelegate(PrimitiveConditionIsNull));
+            _primitives.Add("and", new PrimitiveDelegate(PrimitiveConditionAnd));
+            _primitives.Add("or", new PrimitiveDelegate(PrimitiveConditionOr));
+            _primitives.Add("xor", new PrimitiveDelegate(PrimitiveConditionXor));
+
+            _primitives.Add("console.print", new PrimitiveDelegate(PrimitiveConsolePrint));
+            _primitives.Add("?", new PrimitiveDelegate(PrimitiveConsolePrint));
+
+            _primitives.Add("EVENT", new PrimitiveDelegate(PrimitiveEvent));
+            _primitives.Add("event.fire", new PrimitiveDelegate(PrimitiveEventFire));    
+            _primitives.Add("event.purge", new PrimitiveDelegate(PrimitiveEventPurge));
+
+            _primitives.Add("AFTER", new PrimitiveDelegate(PrimitiveTimerAfter));
+            _primitives.Add("EVERY", new PrimitiveDelegate(PrimitiveTimerEvery));
+            _primitives.Add("timer.start", new PrimitiveDelegate(PrimitiveTimerStart));
+            _primitives.Add("timer.stop", new PrimitiveDelegate(PrimitiveTimerStop));
+            _primitives.Add("timer.purge", new PrimitiveDelegate(PrimitiveTimerPurge));
+
+            _primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
+
+            _primitives.Add("mogwai.halt", new PrimitiveDelegate(PrimitiveHalt));
+            _primitives.Add("mogwai.memory", new PrimitiveDelegate(PrimitiveGetMemory));
+            _primitives.Add("mogwai.reset", new PrimitiveDelegate(PrimitiveMogwaiReset));
+            _primitives.Add("mogwai.sendMessage", new PrimitiveDelegate(PrimitiveMogwaiSendMessage));
+            _primitives.Add("mogwai.reboot", new PrimitiveDelegate(PrimitiveMogwaiReboot)); 
+
+            _primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
+            _primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
+            _primitives.Add("gpio.setMode.inputPullUp", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullUp));
+            _primitives.Add("gpio.setMode.output", new PrimitiveDelegate(PrimitiveGpioSetModeOutput));
+            _primitives.Add("gpio.read", new PrimitiveDelegate(PrimitiveGpioPinRead));
+            _primitives.Add("gpio.write.high", new PrimitiveDelegate(PrimitiveGpioPinWriteHigh));
+            _primitives.Add("gpio.write.low", new PrimitiveDelegate(PrimitiveGpioPinWriteLow));
+            _primitives.Add("gpio.toggle", new PrimitiveDelegate(PrimitiveGpioPinToggle));
+            _primitives.Add("gpio.close", new PrimitiveDelegate(PrimitiveGpioPinClose));
+                
+            _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
+            _primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));  
+            _primitives.Add("IFELSE", new PrimitiveDelegate(PrimitiveIfElse)); 
+            _primitives.Add("WHILE", new PrimitiveDelegate(PrimitiveWhile));
+            _primitives.Add("FOR", new PrimitiveDelegate(PrimitiveFor));   
+            _primitives.Add("FORSTEP", new PrimitiveDelegate(PrimitiveForStep));   
+            _primitives.Add("FOREVER", new PrimitiveDelegate(PrimitiveForever));
+            _primitives.Add("DEFUNC", new PrimitiveDelegate(PrimitiveDefunc));
+            _primitives.Add("FOREACH", new PrimitiveDelegate(PrimitiveForeach));
+        }
+
+        private void RunLoop()
+        {
+            while (true)
+            {
+                _runSignal.WaitOne();
+
+                if (!string.IsNullOrEmpty(_pendingRunCode))
+                {
+                    var code = _pendingRunCode;
+                    var debugMode = _pendingDebugMode;
+
+                    _pendingRunCode = null;
+                    IsRunning = true; // synchrone, avant le Thread.Start(), ferme la fenêtre de course avec RunAsync
+
+                    var executionThread = new Thread(() => Run(code, debugMode));
+                    executionThread.Start();
+
+                    // RunLoop ne suit pas la fin de ce thread -> repart immédiatement en attente,
+                    // increvable même si Run() (ou une primitive en dessous) plante sur un défaut natif
+                }
+            }
+        }
+
+        private void AliveLoop()
+        {
+            while (true)
+            {
+                // On envoie toutes les 2 secondes un message "alive" pour indiquer que le programme est toujours en cours d'exécution
+
+                Thread.Sleep(2000);
+
+                if (IsRunning && AppGlobal.TcpServer.IsClientConnected)
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.DEVICE_NAME, "ALIVE"));
+            }
+        }
+
+        public bool IsValidName(string name, bool withPrimitiveChecking)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+
+            var c1 = name[0];
+            var c2 = name.Length > 1 ? name[1] : '\0';
+
+            if (withPrimitiveChecking)
+            {
+                if (_primitives.Contains(name))
+                    return false;
+            }
+
+            return name.IndexOfAny(_invalidChars) == -1;
+        }
+
+        public EvalResult Run(string code, bool debugMode = false)
+        {
+            try
+            {
+                IsRunning = true;
+
+                Reset();
+                
+                GC.Run(true);
+
+                // _debugMode = debugMode
+                
+                var stopwatch = Stopwatch.StartNew();
+
+                if (Delegate != null)
+                    Delegate.ProgramStart(this, code);
+
+                MOGFunction program;
+
+                try
+                {
+                    program = new MOGFunction(this, code);
+                }
+                catch (Exception ex)
+                {
+                    stopwatch.Stop();
+
+                    LastResult = EvalResult.ParseFailure(this, ex.Message);
+
+                    if (Delegate != null)
+                        Delegate.ProgramEnd(this, LastResult);
+
+                    return LastResult;
+                }
+
+                HaltRequested = false;
+                //ExitRequested = false;
+                //ReturnRequested = false;
+
+                EvalResult result = program.Execute();
+
+                HaltRequested = false;
+                //ExitRequested = false;
+                //ReturnRequested = false;
+
+                EvalResult result2;
+
+                if (result.IsError)
+                {
+                    if (_functions.Contains("MOGWAI.onError"))
+                    {
+                        var onErrorFunction = _functions["MOGWAI.onError"] as MOGFunction;
+                        result2 = onErrorFunction.Execute();
+
+                        if (result2.IsError)
+                            result = result2;
+                    }
+                }
+                else
+                {
+                    if (_functions.Contains("MOGWAI.onStop"))
+                    {
+                        var onStopFunction = _functions["MOGWAI.onStop"] as MOGFunction;
+                        result2 = onStopFunction.Execute();
+
+                        if (result2.IsError)
+                            result = result2;
+                    }
+                }
+
+                stopwatch.Stop();
+                result.Duration = stopwatch.Elapsed;
+
+                // Reset(_keepAlive);
+
+                // _debugMode = false;
+
+                if (Delegate != null)
+                    Delegate.ProgramEnd(this, result!);
+
+                LastResult = result;
+                return result;
+            }
+            finally
+            {
+                GC.Run(true);
+                IsRunning = false;
+            }
+        }
+
+        public bool RunAsync(string code, bool debugMode = false)
+        {
+            if (IsRunning)
+                return false;
+
+            _pendingRunCode = code;
+            _pendingDebugMode = debugMode;
+
+            _runSignal.Set();
+
+            return true;
+        }
+
+        public void Reset(bool keepAlive = false)
+        {
+            ClearTimers();
+
+            ClearWaitingFireObjects();
+
+            CleanupOpenPins();
+
+            _stacks.Clear();
+            _currentStack = new ArrayList();
+            _stacks.Add(_currentStack);
+
+            var glb = _varsContext[0] as VarContext;
+            glb.Clear();
+
+            _functions.Clear();
+
+            HaltRequested = false;
+            BreakRequested = false;
+        }
+
+        public void Halt() => HaltRequested = true;
+
+        #region STACK
+
+        public void AddNewStack()
+        {
+            _currentStack = new();
+            _stacks.Add(_currentStack);
+        }
+
+        public void RemoveLastStack()
+        {
+            if (_stacks.Count > 1)
+            {
+                _stacks.RemoveAt(_stacks.Count - 1);
+                _currentStack = _stacks[_stacks.Count - 1] as ArrayList;
+            }
+        }
+
+        public int StackSize => _currentStack.Count;
+
+        public void ShowStack()
+        {
+            Debug.WriteLine("--- STACK ---");
+
+            for (int i = _currentStack.Count - 1; i >= 0; i--)
+            {
+                var item = _currentStack[i] as MOGObject;
+                Debug.WriteLine(item.ToString());
+            }
+
+            Debug.WriteLine("-------------");
+        }
+
+        public void StackPush(MOGObject item)
+        {
+            _currentStack.Add(item);
+        }
+
+        public MOGObject StackPop()
+        {
+            if (_currentStack.Count > 0)
+            {
+                var item = _currentStack[_currentStack.Count - 1] as MOGObject;
+                _currentStack.RemoveAt(_currentStack.Count - 1);
+                return item;
+            }
+
+            return null;
+        }
+
+        public Type[] StackSign(int count)
+        {
+            if (_currentStack.Count < count)
+                return new Type[0];
+
+            var t = new Type[count];
+            var c = _currentStack.Count - count;
+            var index = 0;
+
+            for (int i = _currentStack.Count - 1; i >= c; i--)
+                t[index++] = _currentStack[i].GetType();
+
+            return t;
+        }
+
+        public void StackClear() => _currentStack.Clear();
+
+        public bool StackSwap()
+        {
+            if (_currentStack.Count > 1)
+            {
+                var s0 = _currentStack[_currentStack.Count - 1];
+                var s1 = _currentStack[_currentStack.Count - 2];
+
+                _currentStack[_currentStack.Count - 1] = s1;
+                _currentStack[_currentStack.Count - 2] = s0;
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public void StackDup() => StackPush(_currentStack[_currentStack.Count - 1] as MOGObject);
+
+        public void StackDrop() => _currentStack.RemoveAt(_currentStack.Count - 1);
+
+        #endregion
+
+        #region PRIMITIVES
+
+        private EvalResult PrimitivePlus(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                // 15 20 +
+
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                n0.Value += n1.Value;
+
+                StackPush(n0);
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGString) && s[1] == typeof(MOGString))
+            {
+                // "AA" "BB" +
+
+                var s1 = StackPop() as MOGString;   
+                var s0 = StackPop() as MOGString;
+
+                s0.Value += s1.Value;
+
+                StackPush(s0);
+
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGList))
+            {
+                // (1 2 3) "TOTO" + 
+
+                var item = StackPop();
+                
+                var list = StackPop() as MOGList;
+                list.AddItem(item);
+
+                StackPush(list);
+
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGData) && s[0] == typeof(MOGNumber))
+            {
+                // D:FFAB45 123 +
+
+                var value = StackPop() as MOGNumber;
+                var data = StackPop() as MOGData;
+                
+                data.AddItem((byte)value.Value);
+
+                StackPush(data);   
+                
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGRef))
+            {
+                // &ref X +
+
+                var item = StackPop();
+                var @ref = StackPop() as MOGRef;
+
+                var value = VarRead(@ref.Value, false);
+                
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+
+                StackPush(value);
+                StackPush(item);
+
+                var r = PrimitivePlus(name);
+
+                if (r.IsError)
+                    return r;
+
+                // On enlève la valeur modifiée de la stack qui ne sert à rien
+
+                StackDrop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveMathSubstraction(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                n0.Value -= n1.Value;
+
+                StackPush(n0);
+
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGRef))
+            {
+                // &ref X +
+
+                var item = StackPop();
+                var @ref = StackPop() as MOGRef;
+
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+
+                StackPush(value);
+                StackPush(item);
+
+                var r = PrimitiveMathSubstraction(name);
+
+                if (r.IsError)
+                    return r;
+
+                // On enlève la valeur modifiée de la stack qui ne sert à rien
+
+                StackDrop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveMathMultiplication(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                n0.Value *= n1.Value;
+
+                StackPush(n0);
+
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGRef))
+            {
+                // &ref X +
+
+                var item = StackPop();
+                var @ref = StackPop() as MOGRef;
+
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+
+                StackPush(value);
+                StackPush(item);
+
+                var r = PrimitiveMathMultiplication(name);
+
+                if (r.IsError)
+                    return r;
+
+                // On enlève la valeur modifiée de la stack qui ne sert à rien
+
+                StackDrop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveMathDivision(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                n0.Value /= n1.Value;   
+
+                StackPush(n0);
+
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGRef))
+            {
+                // &ref X +
+
+                var item = StackPop();
+                var @ref = StackPop() as MOGRef;
+
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+
+                StackPush(value);
+                StackPush(item);
+
+                var r = PrimitiveMathDivision(name);
+
+                if (r.IsError)
+                    return r;
+
+                // On enlève la valeur modifiée de la stack qui ne sert à rien
+
+                StackDrop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveGetType(string name)
+        {
+            if (StackSize < 1)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var n0 = StackPop();
+            StackPush(n0.Type.Clone());
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveStackClear(string name)
+        {
+            StackClear();
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveStackSwap(string name)
+        {
+            if (StackSize < 2)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            StackSwap();
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveStackDup(string name)
+        {
+            if (StackSize < 1)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            StackDup();
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveStackDrop(string name)
+        {
+            if (StackSize == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            StackDrop();
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveDebugWrite(string name)
+        {
+            if (StackSize == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var n0 = StackPop();
+
+            if (n0 is MOGRef @ref)
+            {
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+
+                StackPush(value);
+
+                var r = PrimitiveDebugWrite(name);
+
+                if (r.IsError)
+                    return r;
+
+                return EvalResult.NoError;
+            }
+
+            if (Delegate != null)
+            {
+                if (n0 is MOGString @string)
+                {
+                    return Delegate.DebugMessage(this, @string.Value);
+                }
+                else
+                {
+                    return Delegate.DebugMessage(this, n0.ToString());
+                }
+            }
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveConsolePrint(string name)
+        {
+            if (StackSize == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var n0 = StackPop();
+
+            if (n0 is MOGRef @ref)
+            {
+                var value = VarRead(@ref.Value, false);
+                
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+
+                StackPush(value);
+                
+                var r = PrimitiveConsolePrint(name);    
+
+                if (r.IsError)
+                    return r;
+
+                return EvalResult.NoError;  
+            }
+
+            if (Delegate != null)
+            {
+                if (n0 is MOGString @string)
+                {
+                    return Delegate.ConsolePrint(this, @string.Value);
+                }
+                else
+                {
+                    return Delegate.ConsolePrint(this, n0.ToString());
+                }   
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveSto(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var n = StackPop() as MOGName;
+            var value = StackPop() as MOGObject;
+
+            if (!IsValidName(n.Value, true))
+                return EvalResult.Failure(this, Error.InvalidNameError, name, n.ToString());
+
+            return VarWrite(n.Value, value);
+        }
+
+        private EvalResult PrimitiveBreak(string name)
+        {      
+            BreakRequested = true;
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveHalt(string name)
+        {
+            HaltRequested = true;
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveWait(string name)
+        {
+            // 50 wait
+
+            var s = StackSign(1);   
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);      
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var v = StackPop() as MOGNumber;  
+            
+            if (v.Value < 0)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+            var stopwatch = Stopwatch.StartNew();
+
+            while (stopwatch.Elapsed.TotalMilliseconds <= v.Value)
+            {
+                Thread.Sleep(10); 
+
+                var result = ExecuteWaitingFireObjects();
+                
+                if (result != EvalResult.NoError)
+                    return result;
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveGet(string name)
+        {
+            // (1 2 3) 0 get
+            // [x: 50 y: 10] x: get
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);  
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGList))
+            {
+                // (1 2 3) 0 get
+
+                var index = StackPop() as MOGNumber;
+                var list = StackPop() as MOGList;
+
+                if (index.Value < 0 || index.Value >= list.Items.Count)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name); 
+
+                var item = list.GetItem((int)index.Value);
+                StackPush(item);
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGKey) && s[1] == typeof(MOGRecord))
+            {
+                // [x: 10 y: 20] x: get
+
+                var key = StackPop() as MOGKey;
+                var record = StackPop() as MOGRecord;
+
+                var item = record.GetItem(key.Value);
+
+                if (item == null)
+                {
+                    StackPush(new MOGNull(this));
+                }
+                else
+                {
+                    StackPush(item);
+                }
+
+                return EvalResult.NoError;              
+            }
+            else if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGData))
+            {
+                // D:FFAA45 0 get
+
+                var index = StackPop() as MOGNumber;
+                var data = StackPop() as MOGData;
+
+                if (index.Value < 0 || index.Value >= data.Items.Count)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+                var item = data.GetItem((int)index.Value);
+                StackPush(new MOGNumber(this, item));
+
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGRef))
+            {
+                // &ref X get
+
+                var item = StackPop();
+                var @ref = StackPop() as MOGRef;
+                
+                var value = VarRead(@ref.Value, false);
+                
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                
+                StackPush(value);
+                StackPush(item);
+
+                var r = PrimitiveGet(name);
+
+                if (r.IsError)
+                    return r;
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSet(string name)
+        {
+            // 10 (1 2 3) 0 set ---> (10 2 3)
+            // 100 [x: 10 y: 20] x: set ---> [x: 100 y: 20]
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGList))
+            {
+                // 10 (1 2 3) 0 set
+
+                var index = StackPop() as MOGNumber;
+                var list = StackPop() as MOGList;
+                var value = StackPop();
+
+                if (index.Value < 0 || index.Value >= list.Items.Count)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+                list.SetItem((int)index.Value, value);
+                StackPush(list);
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGKey) && s[1] == typeof(MOGRecord))
+            {
+                // 100 [x: 10 y: 20] x: set
+
+                var key = StackPop() as MOGKey;
+                var record = StackPop() as MOGRecord;
+                var value = StackPop();
+
+                record.SetItem(key.Value, value);
+                StackPush(record);
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGData) && s[2] == typeof(MOGNumber))
+            {
+                // 10 D:FFAA45 0 set
+
+                var index = StackPop() as MOGNumber;
+                var data = StackPop() as MOGData;
+                var value = StackPop() as MOGNumber;
+
+                if (index.Value < 0 || index.Value >= data.Items.Count)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+                data.SetItem((int)index.Value, (byte)value.Value);
+                StackPush(data);
+
+                return EvalResult.NoError;
+            }
+            else if (s[1] == typeof(MOGRef))
+            {
+                // 10 &X 5 set
+                // 10 &X x: set
+
+                var item = StackPop();
+                var @ref = StackPop() as MOGRef;
+
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+
+                StackPush(value);
+                StackPush(item);
+
+                var r = PrimitiveSet(name);
+
+                if (r.IsError)
+                    return r;
+
+                StackDrop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+        }
+
+        private EvalResult PrimitiveSize(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGList))
+            {
+                var list = StackPop() as MOGList;
+                StackPush(new MOGNumber(this, list.Items.Count));
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGRecord))
+            {
+                var record = StackPop() as MOGRecord;
+                StackPush(new MOGNumber(this, record.Items.Count));
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGString))
+            {
+                var @string = StackPop() as MOGString;
+                StackPush(new MOGNumber(this, @string.Value.Length));
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGData))
+            {
+                var data = StackPop() as MOGData;
+                StackPush(new MOGNumber(this, data.Items.Count));
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGRef))
+            {
+                var @ref = StackPop() as MOGRef;
+                var value = VarRead(@ref.Value, false);
+                
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                
+                StackPush(value);
+
+                var r = PrimitiveSize(name);
+
+                if (r.IsError)
+                    return r;
+
+                return EvalResult.NoError;  
+            }
+
+           return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveDI(string name)
+        {
+            _disableInterrupts = true;
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveEI(string name)
+        {
+            _disableInterrupts = false;
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveToData(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber))
+            {
+                var n0 = StackPop() as MOGNumber;
+                var size = (int)n0.Value;   
+
+                if (size > StackSize)
+                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+                for (int i = 0; i < size; i++)
+                {
+                    if (_currentStack[i] is MOGNumber number && (int)number.Value >= 0 && (int)number.Value <= 255)
+                    {
+
+                    }
+                    else
+                    {
+                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, "only numbers between 0 and 255 are allowed.");
+                    }
+                }
+
+                var data = new MOGData(this);
+
+                for (int i = 0; i < size; i++)
+                {
+                    var n = StackPop() as MOGNumber;    
+                    data.Items.Insert(0, (byte)n.Value);
+                }
+
+                StackPush(data);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+        }
+
+        private EvalResult PrimitiveConditionEqual(string name)
+        {
+            // v1 v2 ==
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);  
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                // n1 n2 ==
+
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                StackPush(new MOGBoolean(this, n0.Value == n1.Value));
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGType) && s[1] == typeof(MOGType))
+            {
+                // t1 t2 ==
+                
+                var t1 = StackPop() as MOGType;
+                var t0 = StackPop() as MOGType;
+                
+                StackPush(new MOGBoolean(this, t0.Value == t1.Value));
+                
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionNotEqual(string name)
+        {
+            // v1 v2 !=
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                // n1 n2 != 
+
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                StackPush(new MOGBoolean(this, n0.Value != n1.Value));
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGType) && s[1] == typeof(MOGType))
+            {
+                // t1 t2 !=
+
+                var t1 = StackPop() as MOGType;
+                var t0 = StackPop() as MOGType;
+
+                StackPush(new MOGBoolean(this, t0.Value != t1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionInferior(string name)
+        {
+            // v1 v2 <
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                StackPush(new MOGBoolean(this, n0.Value < n1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionInferiorOrEqual(string name)
+        {
+            // v1 v2 <=
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                StackPush(new MOGBoolean(this, n0.Value <= n1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionSuperior(string name)
+        {
+            // v1 v2 >
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                StackPush(new MOGBoolean(this, n0.Value > n1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionSuperiorOrEqual(string name)
+        {
+            // v1 v2 >=
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = StackPop() as MOGNumber;
+                var n0 = StackPop() as MOGNumber;
+
+                StackPush(new MOGBoolean(this, n0.Value >= n1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionIsNull(string name)
+        {
+            if (StackSize == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var n0 = StackPop();
+            var b = n0 is MOGNull;
+
+            StackPush(new MOGBoolean(this, b));
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveConditionAnd(string name)
+        {
+            // true false and
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGBoolean))
+            {
+                var n1 = StackPop() as MOGBoolean;
+                var n0 = StackPop() as MOGBoolean;
+
+                StackPush(new MOGBoolean(this, n0.Value && n1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionOr(string name)
+        {
+            // true false or
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGBoolean))
+            {
+                var n1 = StackPop() as MOGBoolean;
+                var n0 = StackPop() as MOGBoolean;
+
+                StackPush(new MOGBoolean(this, n0.Value || n1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveConditionXor(string name)
+        {
+            // true false xor
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGBoolean))
+            {
+                var n1 = StackPop() as MOGBoolean;
+                var n0 = StackPop() as MOGBoolean;
+
+                StackPush(new MOGBoolean(this, n0.Value ^ n1.Value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveNot(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGBoolean))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var b = StackPop() as MOGBoolean;
+            b.Value = !b.Value;
+            StackPush(b);
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveRepeat(string name)
+        {
+            // 5 {...} REPEAT
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[1] != typeof(MOGNumber) || s[0] != typeof(MOGCode))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var code = StackPop() as MOGCode;
+            var n = StackPop() as MOGNumber;          
+
+            for (int i = 0; i < n.Value; i++)
+            {
+                var result = code.Execute();
+
+                if (result.IsError)
+                    return result;
+
+                if (BreakRequested)
+                {
+                    BreakRequested = false;
+                    break;
+                } 
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveIf(string name)
+        {
+            // true {...} IF
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);  
+
+            if (s[1] != typeof(MOGBoolean) || s[0] != typeof(MOGCode))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+
+            var code = StackPop() as MOGCode;   
+            var condition = StackPop() as MOGBoolean;   
+
+            if (condition.Value)
+                return code.Execute();
+            
+            return EvalResult.NoError;  
+        }
+
+        private EvalResult PrimitiveIfElse(string name)
+        {
+            // true {...} {...} IFELSE
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[2] != typeof(MOGBoolean) || s[1] != typeof(MOGCode) || s[0] != typeof(MOGCode))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var code1 = StackPop() as MOGCode;
+            var code2 = StackPop() as MOGCode;  
+            var condition = StackPop() as MOGBoolean;
+
+            if (condition.Value)
+                return code2.Execute();
+
+            return code1.Execute();
+        }
+
+        private EvalResult PrimitiveWhile(string name)
+        {
+            // { condition } { code } WHILE
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGCode) || s[1] != typeof(MOGCode))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var code = StackPop() as MOGCode;   
+            var conditionCode = StackPop() as MOGCode;  
+
+            while (true)
+            {
+                var conditionResult = conditionCode.Execute();
+
+                if (conditionResult.IsError)
+                    return conditionResult;
+
+                if (BreakRequested)
+                {
+                    BreakRequested = false;
+                    break;
+                }
+
+                var conditionValue = StackPop() as MOGBoolean;
+
+                if (conditionValue == null)
+                    return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+                if (!conditionValue.Value)
+                    break;
+
+                var result = code.Execute();
+
+                if (result.IsError)
+                    return result;
+
+                if (BreakRequested)
+                {
+                    BreakRequested = false;
+                    break;
+                }
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveFor(string name)
+        {
+            // 1 2 'i' {...} FOR
+
+            var s = StackSign(4);
+
+            if (s.Length == 0)
+                EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGName) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
+            {
+                var code = StackPop() as MOGCode;
+                var varName = StackPop() as MOGName;
+                var end = StackPop() as MOGNumber;
+                var start = StackPop() as MOGNumber;
+
+                var direction = (end!.Value - start!.Value) > 0 ? 1 : -1;   
+
+                EvalResult result = EvalResult.NoError;
+
+                for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += direction)
+                {
+                    if (BreakRequested)
+                    {
+                        BreakRequested = false;
+                        break;
+                    }
+
+                    result = VarWrite(varName.Value, new MOGNumber(this, i));
+
+                    if (result != EvalResult.NoError)
+                        break;
+
+                    result = code.Execute();
+
+                    if (result != EvalResult.NoError)
+                        break;
+                }
+
+                return result;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveForStep(string name)
+        {
+            // 1 2 2 'i' {...} FORSTEP
+
+            var s = StackSign(5);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGName) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
+            {
+                var code = StackPop() as MOGCode;
+                var varName = StackPop() as MOGName;
+                var step = StackPop() as MOGNumber;
+                var end = StackPop() as MOGNumber;
+                var start = StackPop() as MOGNumber;
+
+                var direction = (end.Value - start.Value) > 0 ? 1 : -1; 
+
+                step.Value = Math.Abs(step.Value) * direction;
+
+                EvalResult result = EvalResult.NoError;
+
+                for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += step.Value)
+                {
+                    if (BreakRequested)
+                    {
+                        BreakRequested = false; 
+                        break;
+                    }
+
+                    result = VarWrite(varName.Value, new MOGNumber(this, i));
+
+                    if (result != EvalResult.NoError)
+                        break;
+
+                    result = code.Execute();
+
+                    if (result != EvalResult.NoError)
+                        break;
+                }
+
+                return result;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveForever(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] != typeof(MOGCode))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            
+            var code = StackPop() as MOGCode;
+
+            while (true)
+            {
+                var result = code.Execute();
+
+                if (result.IsError)
+                    return result;
+
+                if (BreakRequested)
+                {
+                    BreakRequested = false;
+                    break;
+                }
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveForeach(string name)
+        {
+            // List name code FOREACH
+            // (1 2 3) 'i' { i ? } FOREACH      
+            // D:010203 'i' { i ? } FOREACH 
+            // "XXXX" 'i' { i ? } FOREACH
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            // 0 code
+            // 1 variable
+            // 2 list base
+
+            if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGName))
+            {
+                if (s[2] == typeof(MOGList))
+                {
+                    var code = StackPop() as MOGCode;
+                    var varName = StackPop() as MOGName;
+                    var list = StackPop() as MOGList;
+
+                    EvalResult result = EvalResult.NoError;
+
+                    foreach (var item in list.Items)
+                    {
+                        if (BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                            break;
+
+                        result = VarWrite(varName.Value, item as MOGObject);
+
+                        if (result.IsError)
+                            break;
+
+                        result = code.Execute();
+
+                        if (result.IsError)
+                            break;
+                    }
+
+                    return result;
+                }
+                else if (s[2] == typeof(MOGData))
+                {
+                    var code = StackPop() as MOGCode;
+                    var varName = StackPop() as MOGName;    
+                    var data = StackPop() as MOGData;
+
+                    EvalResult result = EvalResult.NoError;
+
+                    foreach (var item in data.Items)
+                    {
+                        if (BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                            break;
+
+                        result = VarWrite(varName.Value, new MOGNumber(this, (byte)item));
+                        
+                        if (result != EvalResult.NoError)
+                            break;
+
+                        result = code.Execute();
+
+                        if (result != EvalResult.NoError)
+                            break;
+                    }
+
+                    return result;
+                }
+                else if (s[2] == typeof(MOGString))
+                {
+                    var code = StackPop() as MOGCode;
+                    var varName = StackPop() as MOGName;
+                    var @string = StackPop() as MOGString;
+
+                    EvalResult result = EvalResult.NoError;
+
+                    foreach (var item in @string.Value)
+                    {
+                        if (BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                            break;
+
+                        result = VarWrite(varName.Value, new MOGString(this, item.ToString()));
+                        
+                        if (result != EvalResult.NoError)
+                            break;
+
+                        result = code.Execute();
+                        
+                        if (result != EvalResult.NoError)
+                            break;
+                    }
+
+                    return result;
+                }
+
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveDefunc(string name)
+        {
+            // code name DEFUNC
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName) && s[1] == typeof(MOGFunction))
+            {
+                var fname = StackPop() as MOGName;
+                var func = StackPop() as MOGFunction;
+
+                if (_functions.Contains(fname.Value))
+                    return EvalResult.Failure(this, Error.FunctionAlreadyExistsError, name);
+
+                _functions.Add(fname.Value, func);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveMogwaiSendMessage(string name)
+        {
+            // string object mogwai.sendMessage
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[1] == typeof(MOGString))
+            {
+                var parameter = StackPop();
+                var message = StackPop() as MOGString;
+
+                if (Delegate != null)
+                    return Delegate.MessageReceivedFromRuntime(this, message.Value, parameter);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveEvent(string name)
+        {
+            // function name EVENT
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName) & s[1] == typeof(MOGFunction))
+            {
+                var eventName = StackPop() as MOGName;
+                var function = StackPop() as MOGFunction;
+
+                return CreateNewEvent(eventName.Value, function);
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveEventFire(string name)
+        {
+            // 'BTN_CLICK' data event.fire
+            // 'BTN_CLICK' null event.fire
+            // 'BTN_CLICK' now event.fire
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[1] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            
+            var n0 = StackPop();
+            var n1 = StackPop() as MOGName;
+
+            return FireEvent(n1.Value, n0);
+        }
+
+        private EvalResult PrimitiveEventPurge(string name)
+        {
+            // 'toto' event.purge
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);      
+
+            if (s[0] == typeof(MOGName))
+            {
+                var eventName = StackPop() as MOGName;
+                return PurgeEvent(eventName.Value);
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveTimerEvery(string name)
+        {
+            // function interval name EVERY
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGFunction))
+            {
+                var timerName = StackPop() as MOGName;
+                var interval = StackPop() as MOGNumber;
+                var function = StackPop() as MOGFunction;
+
+                return CreateNewTimer(timerName.Value, (int)interval.Value, true, function);
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveTimerAfter(string name)
+        {
+            // function interval name AFTER
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGFunction))
+            {
+                var timerName = StackPop() as MOGName;
+                var interval = StackPop() as MOGNumber;
+                var function = StackPop() as MOGFunction;
+
+                return CreateNewTimer(timerName.Value, (int)interval.Value, false, function);
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+        }
+
+        private EvalResult PrimitiveTimerStart(string name)
+        {
+            // name timer.start
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var timerName = StackPop() as MOGName;  
+
+                if (!_timers.Contains(timerName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name);
+
+                var timer = _timers[timerName.Value] as MOGTimer;
+                return timer.Start();
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveTimerStop(string name)
+        {
+            // name timer.stop
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] == typeof(MOGName))
+            {
+                var timerName = StackPop() as MOGName;
+                
+                if (!_timers.Contains(timerName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name);
+                
+                var timer = _timers[timerName.Value] as MOGTimer;
+                return timer.Stop();
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveTimerPurge(string name)
+        {
+            // name timer.purge
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var timerName = StackPop() as MOGName;
+                return PurgeTimer(timerName.Value);
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveMogwaiReset(string name)
+        {
+            Reset();
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveMogwaiReboot(string name)
+        {
+            if (_functions.Contains("MOGWAI.onReboot"))
+            {
+                var onRebootFunction = _functions["MOGWAI.onReboot"] as MOGFunction;
+                var r = onRebootFunction.Execute();
+
+                if (r.IsError)
+                    return r;   
+            }
+
+            Thread.Sleep(1000);
+
+            Power.RebootDevice(5000, RebootOption.ClrOnly);
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveGetMemory(string name)
+        {
+            // true or false getMemory
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var b = StackPop() as MOGBoolean;
+            var v = GC.Run(b.Value);
+
+            StackPush(new MOGNumber(this, v));  
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveGpioModeInput(string name) => SetPinMode(name, PinMode.Input);
+
+        private EvalResult PrimitiveGpioSetModeInputPullDown(string name) => SetPinMode(name, PinMode.InputPullDown);
+
+        private EvalResult PrimitiveGpioSetModeInputPullUp(string name) => SetPinMode(name, PinMode.InputPullUp);
+
+        private EvalResult PrimitiveGpioSetModeOutput(string name) => SetPinMode(name, PinMode.Output);
+
+        private EvalResult PrimitiveGpioPinWriteHigh(string name) => GpioPinWrite(name, PinValue.High);
+
+        private EvalResult PrimitiveGpioPinWriteLow(string name) => GpioPinWrite(name, PinValue.Low);
+
+        private EvalResult PrimitiveGpioPinRead(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var numPin = StackPop() as MOGNumber;
+
+            if (numPin.Value < 0)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+            var pin = GetPin((int)numPin.Value);
+
+            if (pin == null)
+                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+
+            var e = pin.Read();
+            StackPush(new MOGNumber(this, e == PinValue.High ? 1 : 0));
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveGpioPinToggle(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var numPin = StackPop() as MOGNumber;
+
+            if (numPin.Value < 0)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+            var pin = GetPin((int)numPin.Value);
+
+            if (pin == null)
+                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+
+            pin.Toggle();
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveGpioPinClose(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var numPin = StackPop() as MOGNumber;
+
+            if (numPin.Value < 0)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+            var nPin = (int)numPin.Value;
+
+            if (!ClosePin((int)numPin.Value))
+                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+
+            return EvalResult.NoError;
+        }
+
+        #endregion
+
+        #region VARS
+
+        public EvalResult VarWrite(string name, MOGObject value)
+        {
+            // This name is used by a func ?
+
+            if (_functions.Contains(name))
+                return EvalResult.Failure(this, Error.NameAlreadyUsedByFunctionError);
+
+            bool r = false;
+
+            if (name.StartsWith("$"))
+            {
+                // Global var
+
+                var context = _varsContext[0] as VarContext;
+                r = context.Write(name, value);
+            }
+            else
+            {
+                // Local var
+
+                if (_currentLocalVarsContext != null)
+                    r = _currentLocalVarsContext.Write(name, value);
+            }
+
+            if (!r)
+            {
+                return EvalResult.Failure(this, Error.UnableToWriteValueError, "certainly bad type error");
+            }
+            else
+            {
+                return EvalResult.NoError;
+            }
+        }
+
+        public MOGObject VarRead(string name, bool clone = true)
+        {
+            MOGObject value = null;
+
+            if (name.StartsWith("$"))
+            {
+                var context = _varsContext[0] as VarContext;
+                value = context.Read(name, clone);
+            }
+            else
+            {
+                if (_currentLocalVarsContext != null)
+                    value = _currentLocalVarsContext.Read(name, clone);
+            }
+
+            return value;
+        }
+
+        public bool VarExists(string name)
+        {
+            if (name.StartsWith("$"))
+            {
+                var context = _varsContext[0] as VarContext;
+                return context.Exists(name);
+            }
+            else
+            {
+                if (_currentLocalVarsContext != null)
+                {
+                    return _currentLocalVarsContext.Exists(name);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
+        public bool VarPurge(string name)
+        {
+            if (name.StartsWith("$"))
+            {
+                var context = _varsContext[0] as VarContext;
+                return context.Purge(name);
+            }
+            else
+            {
+                if (_currentLocalVarsContext != null)
+                {
+                    return _currentLocalVarsContext.Purge(name);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
+        public void VarPushContext(string name)
+        {
+            _currentLocalVarsContext = new VarContext(name);
+            _varsContext.Add(_currentLocalVarsContext);
+        }
+
+        public void VarPopContext()
+        {
+            if (_varsContext.Count > 1)
+            {
+                _varsContext.RemoveAt(_varsContext.Count - 1);
+
+                if (_varsContext.Count > 0)
+                {
+                    _currentLocalVarsContext = _varsContext[_varsContext.Count - 1] as VarContext;
+                }
+                else
+                {
+                    _currentLocalVarsContext = null;
+                }
+            }
+        }
+
+        public string[] GetGlobalVarNames()
+        {
+            var context = _varsContext[0] as VarContext;
+            var names = new string[context.Keys.Length];
+            context.Keys.CopyTo(names, 0);
+            return names;
+        }
+
+        public string[] GetLocalVarNames()
+        {
+            if (_varsContext.Count < 2)
+                return new string[0];
+
+            var names = new string[_currentLocalVarsContext.Keys.Length];
+            _currentLocalVarsContext.Keys.CopyTo(names, 0);
+            return names;
+        }
+
+        #endregion
+
+        #region FUNCTIONS
+
+        public MOGFunction GetFunction(string name)
+        {
+            if (_functions.Contains(name))
+                return _functions[name] as MOGFunction;
+
+            return null;
+        }
+
+        #endregion
+
+        #region FIREOBJECTS
+
+        public void RegisterFireObject(MOGFireObject fireObject)
+        {
+            lock (_fireObjectsQueueLock)
+                _fireObjectsQueue.Enqueue(fireObject);
+        }
+
+        public void ClearWaitingFireObjects()
+        {
+            lock (_fireObjectsQueueLock)
+                _fireObjectsQueue.Clear();
+        }
+
+        public void ClearTimers()
+        {
+            foreach (var key in _timers.Keys)
+            {
+                var timer = _timers[key] as MOGTimer;
+                timer.Stop();
+            }
+
+            _timers.Clear();
+        }
+
+        public bool HasWaitingFireObjects => !_disableInterrupts && _fireObjectsQueue.Count > 0;
+
+        public EvalResult ExecuteWaitingFireObjects()
+        {
+            var result = EvalResult.NoError;
+
+            if (!_disableInterrupts && _fireObjectsQueue.Count > 0)
+            {
+                MOGFireObject fireObject = null;
+
+                lock (_fireObjectsQueueLock)
+                    fireObject = _fireObjectsQueue.Dequeue() as MOGFireObject;
+
+                AddNewStack();
+
+                result = fireObject.Function.Execute();
+
+                RemoveLastStack();
+            }
+
+            return result;
+        }
+
+        #endregion
+
+        #region TIMERS
+
+        public EvalResult PurgeTimer(string name)
+        {
+            if (_timers.Contains(name))
+            {
+                var timer = _timers[name] as MOGTimer;  
+                timer.Stop();
+                _timers.Remove(name);
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.UnknownNameError, $"unabled to purge unknown '{name}' timer.");
+        }
+
+        public EvalResult CreateNewTimer(string name, int interval, bool isCyclic, MOGFunction function, bool isLaterTimer = false)
+        {
+            if (_timers.Contains(name))
+                return EvalResult.Failure(this, Error.NameAlreadyExistsError, $"timer '{name}' already exists.");
+
+            if (interval < 0)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, "timer interval must be a positive value.");
+
+            var timer = new MOGTimer(this, name, interval, isCyclic, function, isLaterTimer);
+            _timers.Add(name, timer);
+
+            return EvalResult.NoError;
+        }
+
+        #endregion
+
+        #region EVENT FUNCTIONS
+
+        public bool EventExists(string name) => _events.Contains(name);
+
+        public MOGEvent GetEvent(string name)
+        {
+            if (_events.Contains(name))
+                return _events[name] as MOGEvent;
+
+            return null;
+        }
+
+        public EvalResult CreateNewEvent(string name, MOGFunction function)
+        {
+            if (_events.Contains(name))
+                return EvalResult.Failure(this, Error.NameAlreadyExistsError, $"event '{name}' already exists.");
+
+            var @event = new MOGEvent(this, name, function);
+            _events.Add(name, @event);
+
+            return EvalResult.NoError;
+        }
+
+        public EvalResult PurgeEvent(string name)
+        {
+            if (_events.Contains(name))
+            {
+                _events.Remove(name);
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.UnknownNameError, $"unabled to purge unknown '{name}' event.");
+        }
+
+        public EvalResult FireEvent(string name, MOGObject eventData)
+        {
+            lock (_fireEventLock)
+            {
+                try
+                {
+                    if (_events.Contains(name))
+                    {
+                        var @event = _events[name] as MOGEvent;
+                        var primitiveSto = new MOGPrimitive(this, "STO");
+
+                        @event = @event.Clone() as MOGEvent; ;
+
+                        @event.Function.Items.Insert(0, primitiveSto);
+                        @event.Function.Items.Insert(0, new MOGName(this, "eventData"));
+                        @event.Function.Items.Insert(0, eventData);
+
+                        RegisterFireObject(@event);
+                    }
+
+                    return EvalResult.NoError;
+                }
+                catch
+                {
+                    return EvalResult.Failure(this, Error.UnableToFireEventError, $"unable to fire event '{name}'.");
+                }
+            }
+        }
+
+        public void ClearEvents()
+        {
+            _events.Clear();
+        }
+
+        #endregion
+
+        #region GPIO
+
+        private GpioPin GetPin(int pinNumber)
+        {
+            if (_openPins.Contains(pinNumber))
+                return _openPins[pinNumber] as GpioPin;
+
+            return null;
+        }
+
+        private bool ClosePin(int pinNumber)
+        {
+            if (_openPins.Contains(pinNumber))
+            {
+                var pin = _openPins[pinNumber] as GpioPin;
+                _openPins.Remove(pin);
+                pin.ValueChanged -= GpioPin_ValueChanged;
+                pin.Dispose();
+                return true;
+            }
+
+            return false;
+        }
+
+        private EvalResult GpioPinWrite(string name, PinValue pinValue)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var numPin = StackPop() as MOGNumber;
+
+            if (numPin.Value < 0)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+            var pin = GetPin((int)numPin.Value);
+
+            if (pin == null)
+                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+
+            pin.Write(pinValue);
+
+            return EvalResult.NoError;
+        }
+
+        private void CleanupOpenPins()
+        {
+            foreach (int pinNumber in _openPins.Keys)
+            {
+                var pin = _openPins[pinNumber] as GpioPin;
+                pin.ValueChanged -= GpioPin_ValueChanged;
+                pin.Dispose();
+            }
+
+            _openPins.Clear();
+        }
+
+        private EvalResult SetPinMode(string name, PinMode mode)
+        {
+            // Used by all pin mode known
+            // 4 gpio.setMode.xxx
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var numPin = StackPop() as MOGNumber;
+
+            if (numPin.Value < 0)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+            var nPin = (int)numPin.Value;
+
+            if (_openPins.Contains(nPin))
+            {
+                var pin = _openPins[nPin] as GpioPin;
+                pin.SetPinMode(mode);
+            }
+            else
+            {
+                GpioPin newPin = _gpioController.OpenPin(nPin, mode);
+                _openPins.Add(nPin, newPin);
+
+                newPin.ValueChanged += GpioPin_ValueChanged;
+            }
+            return EvalResult.NoError;
+        }
+        
+        private void GpioPin_ValueChanged(object sender, PinValueChangedEventArgs e)
+        {
+            var eventType = e.ChangeType == PinEventTypes.Rising ? 1 : 0;
+
+            var record = new MOGRecord(this);
+            record.SetItem("pin", new MOGNumber(this, e.PinNumber));
+            record.SetItem("eventType", new MOGNumber(this, eventType));
+
+            FireEvent("GPIO_PIN_CHANGED",record);
+        }
+
+        #endregion
+    }
+}

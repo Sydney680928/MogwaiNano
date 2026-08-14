@@ -1,0 +1,17 @@
+MOGWAI NANO
+Copyright 2026 Stéphane Sibué
+
+This product includes software developed by Stéphane Sibué
+for embedded scripting on .NET nanoFramework microcontrollers.
+
+MOGWAI NANO is a companion project to MOGWAI, a stack-based RPN
+scripting engine for .NET (https://github.com/Sydney680928/mogwai).
+
+Project: https://github.com/Sydney680928/MogwaiNano
+Author: Stéphane Sibué
+Website: coding4phone.com
+
+This product includes third-party open source software provided
+by the .NET nanoFramework project (https://nanoframework.net/),
+licensed under the MIT License. See https://nanoframework.net for
+details on the .NET nanoFramework project and its contributors.
