@@ -28,9 +28,9 @@ jobs:
         run: nuget restore src/MogwaiNano/MogwaiNano.sln
 
       - name: Build MogwaiNano device runtime (Release)
-        run: msbuild src/MogwaiNano/MogwaiNano/MogwaiNano/MogwaiNano.nfproj -p:Configuration=Release -t:Rebuild
+        run: msbuild src/MogwaiNano/MogwaiNano/MogwaiNano.nfproj -p:Configuration=Release -t:Rebuild
 
       - name: Attach binary to release
         uses: softprops/action-gh-release@v2
         with:
-          files: src/MogwaiNano/MogwaiNano/MogwaiNano/bin/Release/MogwaiNano.bin
+          files: src/MogwaiNano/MogwaiNano/bin/Release/MogwaiNano.bin
