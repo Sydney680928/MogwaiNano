@@ -25,7 +25,7 @@ jobs:
         uses: nuget/setup-nuget@v2
 
       - name: Restore packages
-        run: nuget restore src/MogwaiNano/MogwaiNano/MogwaiNano.sln
+        run: nuget restore src/MogwaiNano/MogwaiNano.sln
 
       - name: Build MogwaiNano device runtime (Release)
         run: msbuild src/MogwaiNano/MogwaiNano/MogwaiNano/MogwaiNano.nfproj -p:Configuration=Release -t:Rebuild
