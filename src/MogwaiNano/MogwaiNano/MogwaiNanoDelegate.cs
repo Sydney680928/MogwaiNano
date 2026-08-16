@@ -17,18 +17,12 @@ namespace MogwaiNano
 
         public void ProgramEnd(MogwaiNanoEngine engine, EvalResult result)
         {
-            Debug.WriteLine("Program did end");
-            Debug.WriteLine(result.ToString());
-            Debug.WriteLine($"MEM={GC.Run(false)}");
-
             var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "PROGRAM.DID.END", result.ToString());
             AppGlobal.TcpServer.EnqueueMessage(msg);
         }
 
         public void ProgramStart(MogwaiNanoEngine engine, string code)
         {
-            Debug.WriteLine("Program did start");
-
             var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "PROGRAM.DID.START");
             AppGlobal.TcpServer.EnqueueMessage(msg);
 
@@ -36,8 +30,6 @@ namespace MogwaiNano
 
         public EvalResult DebugMessage(MogwaiNanoEngine engine, string message)
         {
-            Debug.WriteLine(message);
-
             if (AppGlobal.TcpServer.IsClientConnected)
             {
                 var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "DEBUG.WRITE", message);

@@ -67,11 +67,6 @@ namespace MogwaiNano
             if (message.Function == "RUN")
             {
                 var code = message.Parameters[0];
-
-                Debug.WriteLine("RUN command received");
-                Debug.WriteLine(code);
-                Debug.WriteLine("Executing code...");
-
                 AppGlobal.MogwaiNanoEngine.RunAsync(code);
             }
             else if (message.Function == "AUTORUN.SET")
@@ -80,9 +75,7 @@ namespace MogwaiNano
                 // Le code est encodé en base64 pour éviter les problèmes d'encodage
 
                 var code = message.Parameters[0];
-
                 File.WriteAllText(@"I:\autorun.mog", code);
-                Debug.WriteLine($"autorun.mog written.");
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.SET", "OK"));
             }
@@ -101,10 +94,7 @@ namespace MogwaiNano
             else if (message.Function == "AUTORUN.PURGE")
             {
                 if (File.Exists(@"I:\autorun.mog"))
-                {
                     File.Delete(@"I:\autorun.mog");
-                    Debug.WriteLine($"autorun.mog deleted.");
-                }
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.PURGE", "OK"));
             }
@@ -128,6 +118,11 @@ namespace MogwaiNano
                 {
                     AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "STATE.GET", "IDLE"));
                 }
+            }
+            else if (message.Function == "MEMORY.GET")
+            {
+                var memory = GC.Run(false);  
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "MEMORY.GET", memory.ToString()));
             }
             else if (message.Function == "SESSION.GET")
             {

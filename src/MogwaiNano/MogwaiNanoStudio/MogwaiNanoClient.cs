@@ -121,12 +121,7 @@ namespace MogwaiNanoStudio
                         var message = JsonSerializer.Deserialize<ServerMessage>(json);
 
                         if (message != null)
-                        {
-                            Debug.WriteLine("Message received from nano");
-                            Debug.WriteLine(message.ToString());
-
                             MessageReceived?.Invoke(this, message);
-                        }
                     }
                     catch (Exception ex)
                     {

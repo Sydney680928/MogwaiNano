@@ -28,8 +28,6 @@ namespace MogwaiNano.Objects
 
         public override EvalResult Execute()
         {
-            Debug.WriteLine($"EXECUTE {ToString()}");
-
             Engine.VarPushContext(Name);
             var r = base.Execute();
             //Engine.ReturnRequested = false;

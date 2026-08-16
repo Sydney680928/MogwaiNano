@@ -429,19 +429,6 @@ namespace MogwaiNano.Engine
 
         public int StackSize => _currentStack.Count;
 
-        public void ShowStack()
-        {
-            Debug.WriteLine("--- STACK ---");
-
-            for (int i = _currentStack.Count - 1; i >= 0; i--)
-            {
-                var item = _currentStack[i] as MOGObject;
-                Debug.WriteLine(item.ToString());
-            }
-
-            Debug.WriteLine("-------------");
-        }
-
         public void StackPush(MOGObject item)
         {
             _currentStack.Add(item);

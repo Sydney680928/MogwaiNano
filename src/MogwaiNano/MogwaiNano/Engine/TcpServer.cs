@@ -44,14 +44,10 @@ namespace MogwaiNano.Engine
 
         public void StopTcpServer()
         {
-            Debug.WriteLine("Stopping TCP server...");  
-
             _shuttingDown = true;
-            _tcpClient?.Close();    // <-- ajout indispensable : débloque le stream.Read() en cours, envoie un vrai FIN/RST
-            _tcpListener?.Stop(); // débloque AcceptTcpClient() en cours -> lève une exception
-            _tcpThread.Join(2000); // attend que le thread se termine proprement, timeout de sécurité
-
-            Debug.WriteLine("TCP server stopped."); 
+            _tcpClient?.Close(); 
+            _tcpListener?.Stop();
+            _tcpThread.Join(2000);
         }
 
         public void EnqueueMessage(ServerMessage message)
@@ -84,25 +80,16 @@ namespace MogwaiNano.Engine
                             _tcpClient = null;
                         }
                     }
-                    catch (Exception ex)
+                    catch
                     {
                         if (_shuttingDown)
-                            break; // fermeture volontaire, pas une vraie erreur -> sortie propre
-
-                        Debug.WriteLine($"TCP client error: {ex.Message}");
+                            break;
                     }
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                if (!_shuttingDown)
-                {
-                    Debug.WriteLine($"TCP server fatal error: {ex.Message}");
-                }
-                else
-                {
-                    Debug.WriteLine("TCP server shutting down.");
-                }
+
             }
         }
 
@@ -178,19 +165,17 @@ namespace MogwaiNano.Engine
             {
                 var message = (ServerMessage)JsonConvert.DeserializeObject(json, typeof(ServerMessage));
 
-                Debug.WriteLine($"Received TCP message - Source: {message.Source}, Function: {message.Function}");
-
                 if (message.Function == "BYE")
                 {
                     _pauseSending = true;
-                    _disconnectRequested = true; // fait sortir HandleClient immédiatement, pas dans 30s
+                    _disconnectRequested = true;
                 }
 
                 MessageReceived?.Invoke(message);               
             }
-            catch (Exception ex)
+            catch
             {
-                Debug.WriteLine($"ProcessMessage error: {ex.Message}");
+
             }
         }
 
@@ -205,9 +190,8 @@ namespace MogwaiNano.Engine
             {
                 SendMessage(stream, message);
             }
-            catch (Exception ex)
+            catch
             {
-                Debug.WriteLine($"SendMessage failed (client probably disconnected): {ex.Message}");
                 // on avale l'erreur : un échec d'envoi ne doit jamais faire tomber le thread appelant,
                 // qu'il s'agisse du thread réseau ou du thread d'exécution du moteur
             }

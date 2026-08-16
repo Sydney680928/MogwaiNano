@@ -24,8 +24,6 @@ namespace MogwaiNano.Engine
 
         public void StopUdpServer()
         {
-            Debug.WriteLine("Stopping UDP server...");
-
             _shuttingDown = true;
 
             using (var wakeupClient = new UdpClient())
@@ -36,8 +34,6 @@ namespace MogwaiNano.Engine
             }
 
             _udpThread.Join(2000);
-
-            Debug.WriteLine("UDP server stopped.");
         }
 
         private void UdpListenLoop()
@@ -56,12 +52,10 @@ namespace MogwaiNano.Engine
                         int length = _udpListener.Receive(buffer, ref remoteEndPoint);
 
                         if (_shuttingDown)
-                            break; // le paquet reçu était peut-être notre propre "WAKEUP"
+                            break;
 
                         string json = Encoding.UTF8.GetString(buffer, 0, length);
                         var message = (ServerMessage)JsonConvert.DeserializeObject(json, typeof(ServerMessage));
-
-                        Debug.WriteLine($"Received UDP message from {remoteEndPoint.Address}:{remoteEndPoint.Port} - Source: {message.Source}, Function: {message.Function}");
 
                         if (message.Source == AppGlobal.EXPECTED_SOURCE && message.Function == "WHO IS HERE")
                             SendDiscoveryResponse(_udpListener, remoteEndPoint);
@@ -70,21 +64,12 @@ namespace MogwaiNano.Engine
                     {
                         if (_shuttingDown)
                             break;
-
-                        // sinon, erreur ponctuelle -> ignorée
                     }
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                if (!_shuttingDown)
-                {
-                    Debug.WriteLine($"UDP server fatal error: {ex.Message}");
-                }
-                else
-                {
-                   Debug.WriteLine("UDP server shutting down.");
-                }
+
             }
         }
 

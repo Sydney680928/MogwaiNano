@@ -75,6 +75,7 @@ namespace MogwaiNanoStudio
             "nano.view",
             "nano.session",
             "nano.lastResult",
+            "nano.memory",
 
             "mogwai.memory",
 
@@ -327,6 +328,10 @@ namespace MogwaiNanoStudio
             else if (word == "nano.state")
             {
                 return await AppGlobal.NanoRuntime.GetState();
+            }
+            else if (word == "nano.memory")
+            {
+                return await AppGlobal.NanoRuntime.GetMemory();
             }
             else if (word == "nano.session")
             {

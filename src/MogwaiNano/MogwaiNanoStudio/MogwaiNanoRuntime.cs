@@ -54,14 +54,7 @@ namespace MogwaiNanoStudio
             _pingTimer = new Timer(_ =>
             {
                 if (AppGlobal.NanoClient.IsConnected)
-                {
-                    Debug.WriteLine("Sending PING to Nano...");
                     AppGlobal.NanoClient.SendMessage(new ServerMessage(SOURCE_NAME, "PING"));
-                }
-                else
-                {
-                    Debug.WriteLine("Nano is not connected, skipping PING.");
-                }
             
             }, null, 10000, 10000);
 
@@ -120,7 +113,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var messageState = new ServerMessage(SOURCE_NAME, "STATE.GET");
-            var responseState = await SendMessageAndWaitResponse(messageState, 2000);
+            var responseState = await SendMessageAndWaitResponse(messageState);
 
             if (responseState == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -158,7 +151,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var messageState = new ServerMessage(SOURCE_NAME, "STATE.GET");
-            var responseState = await SendMessageAndWaitResponse(messageState, 1000);
+            var responseState = await SendMessageAndWaitResponse(messageState);
 
             if (responseState == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -189,7 +182,7 @@ namespace MogwaiNanoStudio
             if (!ExitViewModeRequested)
             {
                 var messageLastResult = new ServerMessage(SOURCE_NAME, "LAST.RESULT.GET");
-                var responseLastResult = await SendMessageAndWaitResponse(messageLastResult, 2000);
+                var responseLastResult = await SendMessageAndWaitResponse(messageLastResult);
 
                 if (responseLastResult == null)
                     return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -230,7 +223,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var message = new ServerMessage(SOURCE_NAME, "AUTORUN.PURGE");
-            var response = await SendMessageAndWaitResponse(message, 1000);
+            var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -247,7 +240,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var message = new ServerMessage(SOURCE_NAME, "AUTORUN.GET");
-            var response = await SendMessageAndWaitResponse(message, 1000);
+            var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -282,7 +275,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var message = new ServerMessage(SOURCE_NAME, "STATE.GET");
-            var response = await SendMessageAndWaitResponse(message, 2000);
+            var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -299,7 +292,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var message = new ServerMessage(SOURCE_NAME, "SESSION.GET");
-            var response = await SendMessageAndWaitResponse(message, 2000);
+            var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -316,7 +309,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var message = new ServerMessage(SOURCE_NAME, "LAST.RESULT.GET");
-            var response = await SendMessageAndWaitResponse(message, 2000);
+            var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -327,13 +320,35 @@ namespace MogwaiNanoStudio
             return EvalResult.NoError;
         }
 
+        public async Task<EvalResult> GetMemory()
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "MEMORY.GET");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (double.TryParse(response.Parameters[0], out double memory))
+            {
+                _engine.StackPushNumber(memory);
+                return EvalResult.NoError;
+            }
+            else
+            {
+                return EvalResult.Failure(_engine, Error.BadArgumentValueError, "Invalid memory value received from device.");
+            }
+        }
+
         public async Task<EvalResult> StateIsRunning()
         {
             if (!AppGlobal.NanoClient.IsConnected)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
 
             var message = new ServerMessage(SOURCE_NAME, "STATE.GET");
-            var response = await SendMessageAndWaitResponse(message, 1000);
+            var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -375,9 +390,6 @@ namespace MogwaiNanoStudio
                 {
                     ListenMessages = false;
                     IsRunning = false;
-
-                    AppGlobal.NanoClient.Disconnect();
-
                     return false;
                 }
             }
