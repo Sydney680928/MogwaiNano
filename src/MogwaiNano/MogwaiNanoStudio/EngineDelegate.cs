@@ -269,10 +269,11 @@ namespace MogwaiNanoStudio
                             {
                                 var target = record.GetItem("target") as MOGString;
                                 var ip = record.GetItem("ip") as MOGString;
+                                var name = record.GetItem("name") as MOGString;
 
-                                if (target != null && ip != null)
+                                if (target != null && ip != null && name != null)
                                 {
-                                    Console.WriteLine($"{c}: {target.Value.PadRight(20)} - {ip.Value}");
+                                    Console.WriteLine($"{c}: {name.Value.PadRight(20)} - {ip.Value} - {target.Value.PadRight(20)}");
                                     c++;
                                 }
                             }

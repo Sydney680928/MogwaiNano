@@ -225,7 +225,7 @@ namespace MogwaiNanoStudio
                         {
                             var record = new MOGRecord(engine);
 
-                            record.SetString("device", response.Source);
+                            record.SetString("name", response.Source);
                             record.SetString("version", response.Parameters[0]);
                             record.SetString("session", response.Parameters[1]);
                             record.SetString("ip", ip);

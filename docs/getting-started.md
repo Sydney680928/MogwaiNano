@@ -59,12 +59,12 @@ nano.select -> 'device'
 if (device ->type .record ==) then { device->ip: nano.connect ? }
 ```
 
-`nano.select` runs a network scan on its own, then shows you every device that responded — platform and IP — and lets you pick one:
+`nano.select` runs a network scan on its own, then shows you every device that responded — name, platform, and IP — and lets you pick one:
 
 ```
-0: ESP32_REV3           - 192.168.1.80
-1: ESP32_REV3           - 192.168.1.75
-Select device number (enter only = abort): 1
+0: DEVICE1              - 192.168.1.75 - ESP32_REV3
+1: DEVICE2              - 192.168.1.80 - ESP32_REV3
+Select device number (enter only = abort): 0
 ```
 
 If you pick one, its scan record (device name, version, session, IP, platform, target, OEM, firmware version) is pushed onto the stack. If nothing responds, or you just press Enter to abort, `null` is pushed instead.
@@ -90,7 +90,7 @@ nano.isConnected ?
 ```
 nano.scan foreach 'd' do
 {
-    if (d device: get "MogwaiNanoDevice" ==) then
+    if (d name: get "MogwaiNanoDevice" ==) then
     {
         d ip: get nano.connect
         break
