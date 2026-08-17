@@ -2,7 +2,7 @@
 
 ![MOGWAI NANO](images/img01.png)
 
-## [MOGWAI](https://github.com/Sydney680928/mogwai) NANO - RPN Scripting for Microcontrollers
+## [MOGWAI](https://github.com/Sydney680928/mogwai) NANO - Scripting for Microcontrollers
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET nanoFramework](https://img.shields.io/badge/.NET-nanoFramework-blue.svg)](https://nanoframework.net/)
