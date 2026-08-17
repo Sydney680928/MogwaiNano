@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET nanoFramework](https://img.shields.io/badge/.NET-nanoFramework-blue.svg)](https://nanoframework.net/)
 
-**Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) RPN engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
+**Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
 > If MOGWAI NANO looks useful to you, a ⭐ helps others discover it — thank you!
 
