@@ -14,7 +14,6 @@
 
 using MOGWAI.Engine;
 using MOGWAI.Objects;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -39,7 +38,7 @@ namespace MogwaiNanoStudio
         {
             _tcpClient = new TcpClient();
             _tcpClient.Connect(host, port);
-            
+
             _stream = _tcpClient.GetStream();
             _stream.ReadTimeout = 60000; // ou une valeur cohérente avec ton heartbeat existant
 
@@ -59,8 +58,8 @@ namespace MogwaiNanoStudio
                     SendMessage(new ServerMessage(AppGlobal.SOURCE_NAME, "BYE"));
                     Thread.Sleep(500); // laisse le temps au message de partir et au device de réagir
                 }
-                catch 
-                { 
+                catch
+                {
 
                 }
             }

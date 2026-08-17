@@ -1,4 +1,18 @@
-﻿using MogwaiNano.Exceptions;
+﻿// Copyright 2026 Stéphane Sibué
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using MogwaiNano.Exceptions;
 using MogwaiNano.Objects;
 using System.Collections;
 using System.Text;
@@ -210,7 +224,7 @@ namespace MogwaiNano.Engine
                         {
                             if (_index > 1 && _code[_index - 2] == '\\')
                             {
-                                // Caractère d'échappement, on n'augmente pas le niveau
+                                // escape char, no level up
                             }
                             else if (level == 0 || --level < 0)
                             {
@@ -221,7 +235,7 @@ namespace MogwaiNano.Engine
                         {
                             if (_index > 1 && _code[_index - 2] == '\\')
                             {
-                                // Caractère d'échappement, on n'augmente pas le niveau
+                                // escape char, no level up
                             }
                             else
                             {

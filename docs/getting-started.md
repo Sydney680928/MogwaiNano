@@ -115,7 +115,7 @@ To actually watch a device's live output, use `nano.view`:
 ```
 
 ```
-──── Start view mode (press ESC to exit) ─────────────
+──── Start view mode (press CTRL-C to exit) ─────────────
 1
 2
 3
@@ -134,7 +134,7 @@ OK
 execution time 00:00:04.3724066
 ```
 
-`nano.view` attaches to the currently running program and streams its console/debug output to your screen in real time. Press `Escape` to detach and return to the prompt — the program keeps running on the device regardless, `nano.view` only affects whether you're watching it or not.
+`nano.view` attaches to the currently running program and streams its console/debug output to your screen in real time. Press `Ctrl+C` to detach and return to the prompt — the program keeps running on the device regardless, `nano.view` only affects whether you're watching it or not.
 
 Notice the `1000 wait` at the very start of the program: attaching `nano.view` right after `nano.run` still takes a brief moment over the network, so a short initial delay gives it time to attach before the program starts printing — otherwise you could miss the first few lines.
 
@@ -155,7 +155,11 @@ Wire an LED (with a current-limiting resistor, ~220Ω for a red LED on 3.3V) bet
 } nano.run
 ```
 
-The LED should now be blinking, entirely controlled by code running on the device — no `nano.view` needed here, since there's nothing printed to watch. Press `Ctrl+C` to stop it — MOGWAI NANO Studio sends a halt request, and the device interrupts the program cleanly.
+The LED should now be blinking, entirely controlled by code running on the device. `Ctrl+C` here would only interrupt your local MOGWAI script on the PC — since this example's `nano.run` call has already returned, there's nothing local left running to interrupt. To actually stop the program running *on the device*, use `nano.halt`:
+
+```
+nano.halt
+```
 
 ## 6. React to a button press
 
@@ -202,7 +206,7 @@ Timers run independently of your main program, on their own schedule:
 nano.view
 ```
 
-Every 5 seconds, `"still alive"` is printed — interleaved with whatever else the program is doing — regardless of what the main `forever do` loop is up to. As with any device output, you need `nano.view` running to actually see it; `Escape` to detach whenever you like, the timer keeps firing on the device either way.
+Every 5 seconds, `"still alive"` is printed — interleaved with whatever else the program is doing — regardless of what the main `forever do` loop is up to. As with any device output, you need `nano.view` running to actually see it; `Ctrl+C` to detach whenever you like, the timer keeps firing on the device either way.
 
 ## 8. Make it survive without a PC connected
 
@@ -231,7 +235,36 @@ nano.autorun.get      # returns the stored code as a MOGCode block
 nano.autorun.purge    # clears it
 ```
 
-## 9. Reboot cleanly
+## 9. Naming your device and checking its free memory
+
+Once you have more than one device on your network, telling them apart by IP alone gets tedious. Give a device a persistent name — it survives reboots, and shows up as the `device` field in future `nano.scan`/`nano.select` results:
+
+```
+nano.name.set "Greenhouse Sensor"
+nano.name ?
+```
+
+Every device starts out named `"MogwaiNanoDevice"` until you set something else.
+
+You can also check how much RAM is currently free on the device — useful when writing long-running scripts, or just to keep an eye on things:
+
+```
+nano.memory ?
+```
+
+This is a lightweight, non-blocking query (it doesn't force a garbage collection on the device the way `mogwai.memory` does from within a running program) — safe to call frequently, even in a polling loop.
+
+If your program is running *on the device* itself (typically as a stored autorun program, with no Studio connection to fall back on), `mogwai.info` gives you everything in a single call — a record with the device's system version, IP, name, platform, session, free memory, target, MOGWAI NANO version, and OEM build details:
+
+```
+{ mogwai.info ? } nano.run
+```
+
+```
+[system: "1.17.0.334" ip: "192.168.1.75" name: "DEVICE1" platform: "ESP32" session: "39122" memory: 49872 target: "ESP32_REV3" mogwai: "0.1.0.0" oem: "MinSizeRel build, chip rev. >= 3, without support for PSRAM"]
+```
+
+## 10. Reboot cleanly
 
 If your program needs to reboot the device itself (for example, after applying a new configuration), call `mogwai.reboot` from within the running script. If you've defined a `MOGWAI.onReboot` function, it runs first, giving you a chance to clean up:
 
@@ -253,7 +286,7 @@ nano.halt
 nano.state ?
 ```
 
-## 10. Putting it all together
+## 11. Putting it all together
 
 Here's a complete, self-contained script that ties together everything covered so far: it checks whether you're already connected, discovers and connects to a device if not (handling both a failed connection and an aborted selection), then runs a program and watches its output.
 

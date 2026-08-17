@@ -16,16 +16,13 @@ using MOGWAI.Engine;
 using MOGWAI.Interfaces;
 using MOGWAI.Objects;
 using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Text.Json;
 using Terminal.Gui;
 
 namespace MogwaiNanoStudio
 {
     internal class EngineDelegate : IDelegate
     {
-        public delegate void NanoRunEventHandler(string code);  
+        public delegate void NanoRunEventHandler(string code);
         public event NanoRunEventHandler? NanoRun;
 
         public delegate void NanoRequestTcpConnectionEventHandler(string host, int port);
@@ -33,7 +30,7 @@ namespace MogwaiNanoStudio
 
         private MogwaiEngine _engine;
 
-        private string _text     = string.Empty;
+        private string _text = string.Empty;
         private string _filename = string.Empty;
 
         private string Filename
@@ -55,11 +52,11 @@ namespace MogwaiNanoStudio
         // thread principal. Terminal.Gui ne peut pas tourner sur un thread secondaire.
 
         public string[] HostFunctions(MogwaiEngine engine) => [
-            "?s", 
-            "run", 
-            "file.edit", 
-            "file.select", 
-            "nano.run", 
+            "?s",
+            "run",
+            "file.edit",
+            "file.select",
+            "nano.run",
             "nano.connect",
             "nano.disconnect",
             "nano.isConnected",
@@ -76,6 +73,8 @@ namespace MogwaiNanoStudio
             "nano.session",
             "nano.lastResult",
             "nano.memory",
+            "nano.name",
+            "nano.name.set",
 
             "mogwai.memory",
 
@@ -333,6 +332,25 @@ namespace MogwaiNanoStudio
             {
                 return await AppGlobal.NanoRuntime.GetMemory();
             }
+            else if (word == "nano.name")
+            {
+                return await AppGlobal.NanoRuntime.GetName();
+            }
+            else if (word == "nano.name.set")
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    var name = engine.StackPopString();
+                    return await AppGlobal.NanoRuntime.SetName(name.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
             else if (word == "nano.session")
             {
                 return await AppGlobal.NanoRuntime.GetSession();
@@ -469,15 +487,15 @@ namespace MogwaiNanoStudio
             lock (_ConsoleAccessLocker)
                 switch (color.ToLower())
                 {
-                    case "black":   Console.ForegroundColor = ConsoleColor.Black;   break;
-                    case "blue":    Console.ForegroundColor = ConsoleColor.Blue;    break;
-                    case "cyan":    Console.ForegroundColor = ConsoleColor.Cyan;    break;
-                    case "gray":    Console.ForegroundColor = ConsoleColor.Gray;    break;
-                    case "green":   Console.ForegroundColor = ConsoleColor.Green;   break;
+                    case "black": Console.ForegroundColor = ConsoleColor.Black; break;
+                    case "blue": Console.ForegroundColor = ConsoleColor.Blue; break;
+                    case "cyan": Console.ForegroundColor = ConsoleColor.Cyan; break;
+                    case "gray": Console.ForegroundColor = ConsoleColor.Gray; break;
+                    case "green": Console.ForegroundColor = ConsoleColor.Green; break;
                     case "magenta": Console.ForegroundColor = ConsoleColor.Magenta; break;
-                    case "red":     Console.ForegroundColor = ConsoleColor.Red;     break;
-                    case "white":   Console.ForegroundColor = ConsoleColor.White;   break;
-                    case "yellow":  Console.ForegroundColor = ConsoleColor.Yellow;  break;
+                    case "red": Console.ForegroundColor = ConsoleColor.Red; break;
+                    case "white": Console.ForegroundColor = ConsoleColor.White; break;
+                    case "yellow": Console.ForegroundColor = ConsoleColor.Yellow; break;
                     default: break;
                 }
 
@@ -489,15 +507,15 @@ namespace MogwaiNanoStudio
             lock (_ConsoleAccessLocker)
                 switch (color.ToLower())
                 {
-                    case "black":   Console.BackgroundColor = ConsoleColor.Black;   break;
-                    case "blue":    Console.BackgroundColor = ConsoleColor.Blue;    break;
-                    case "cyan":    Console.BackgroundColor = ConsoleColor.Cyan;    break;
-                    case "gray":    Console.BackgroundColor = ConsoleColor.Gray;    break;
-                    case "green":   Console.BackgroundColor = ConsoleColor.Green;   break;
+                    case "black": Console.BackgroundColor = ConsoleColor.Black; break;
+                    case "blue": Console.BackgroundColor = ConsoleColor.Blue; break;
+                    case "cyan": Console.BackgroundColor = ConsoleColor.Cyan; break;
+                    case "gray": Console.BackgroundColor = ConsoleColor.Gray; break;
+                    case "green": Console.BackgroundColor = ConsoleColor.Green; break;
                     case "magenta": Console.BackgroundColor = ConsoleColor.Magenta; break;
-                    case "red":     Console.BackgroundColor = ConsoleColor.Red;     break;
-                    case "white":   Console.BackgroundColor = ConsoleColor.White;   break;
-                    case "yellow":  Console.BackgroundColor = ConsoleColor.Yellow;  break;
+                    case "red": Console.BackgroundColor = ConsoleColor.Red; break;
+                    case "white": Console.BackgroundColor = ConsoleColor.White; break;
+                    case "yellow": Console.BackgroundColor = ConsoleColor.Yellow; break;
                     default: break;
                 }
 

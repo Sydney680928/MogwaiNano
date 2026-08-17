@@ -1,4 +1,17 @@
-﻿
+﻿// Copyright 2026 Stéphane Sibué
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using MogwaiNano.Interfaces;
 using MogwaiNano.Objects;
 using nanoFramework.Runtime.Native;
@@ -167,8 +180,7 @@ namespace MogwaiNano.Engine
             _primitives.Add("drop", new PrimitiveDelegate(PrimitiveStackDrop));
 
             _primitives.Add("break", new PrimitiveDelegate(PrimitiveBreak));
-
-            _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
+          
             _primitives.Add("wait", new PrimitiveDelegate(PrimitiveWait));
             _primitives.Add("get", new PrimitiveDelegate(PrimitiveGet));
             _primitives.Add("set", new PrimitiveDelegate(PrimitiveSet));
@@ -208,7 +220,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("mogwai.memory", new PrimitiveDelegate(PrimitiveGetMemory));
             _primitives.Add("mogwai.reset", new PrimitiveDelegate(PrimitiveMogwaiReset));
             _primitives.Add("mogwai.sendMessage", new PrimitiveDelegate(PrimitiveMogwaiSendMessage));
-            _primitives.Add("mogwai.reboot", new PrimitiveDelegate(PrimitiveMogwaiReboot)); 
+            _primitives.Add("mogwai.reboot", new PrimitiveDelegate(PrimitiveMogwaiReboot));
+            _primitives.Add("mogwai.info", new PrimitiveDelegate(PrimitiveMogwaiInfo));
 
             _primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
             _primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
@@ -219,7 +232,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("gpio.write.low", new PrimitiveDelegate(PrimitiveGpioPinWriteLow));
             _primitives.Add("gpio.toggle", new PrimitiveDelegate(PrimitiveGpioPinToggle));
             _primitives.Add("gpio.close", new PrimitiveDelegate(PrimitiveGpioPinClose));
-                
+
+            _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
             _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
             _primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));  
             _primitives.Add("IFELSE", new PrimitiveDelegate(PrimitiveIfElse)); 
@@ -243,13 +257,9 @@ namespace MogwaiNano.Engine
                     var debugMode = _pendingDebugMode;
 
                     _pendingRunCode = null;
-                    IsRunning = true; // synchrone, avant le Thread.Start(), ferme la fenêtre de course avec RunAsync
 
                     var executionThread = new Thread(() => Run(code, debugMode));
                     executionThread.Start();
-
-                    // RunLoop ne suit pas la fin de ce thread -> repart immédiatement en attente,
-                    // increvable même si Run() (ou une primitive en dessous) plante sur un défaut natif
                 }
             }
         }
@@ -258,12 +268,10 @@ namespace MogwaiNano.Engine
         {
             while (true)
             {
-                // On envoie toutes les 2 secondes un message "alive" pour indiquer que le programme est toujours en cours d'exécution
-
                 Thread.Sleep(2000);
 
                 if (IsRunning && AppGlobal.TcpServer.IsClientConnected)
-                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.DEVICE_NAME, "ALIVE"));
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "ALIVE"));
             }
         }
 
@@ -566,8 +574,6 @@ namespace MogwaiNano.Engine
                 if (r.IsError)
                     return r;
 
-                // On enlève la valeur modifiée de la stack qui ne sert à rien
-
                 StackDrop();
 
                 return EvalResult.NoError;
@@ -613,8 +619,6 @@ namespace MogwaiNano.Engine
 
                 if (r.IsError)
                     return r;
-
-                // On enlève la valeur modifiée de la stack qui ne sert à rien
 
                 StackDrop();
 
@@ -662,8 +666,6 @@ namespace MogwaiNano.Engine
                 if (r.IsError)
                     return r;
 
-                // On enlève la valeur modifiée de la stack qui ne sert à rien
-
                 StackDrop();
 
                 return EvalResult.NoError;
@@ -709,8 +711,6 @@ namespace MogwaiNano.Engine
 
                 if (r.IsError)
                     return r;
-
-                // On enlève la valeur modifiée de la stack qui ne sert à rien
 
                 StackDrop();
 
@@ -1874,7 +1874,7 @@ namespace MogwaiNano.Engine
 
         private EvalResult PrimitiveEventPurge(string name)
         {
-            // 'toto' event.purge
+            // 'eventName' event.purge
 
             var s = StackSign(1);
 
@@ -2034,6 +2034,28 @@ namespace MogwaiNano.Engine
             var v = GC.Run(b.Value);
 
             StackPush(new MOGNumber(this, v));  
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveMogwaiInfo(string name)
+        {
+            var record = new MOGRecord(this);
+
+            record.SetItem("name", new MOGString(this, AppGlobal.NanoParameters.Name));
+            record.SetItem("mogwai", new MOGString(this, AppGlobal.MogwaiNanoEngine.Version.ToString()));
+            record.SetItem("ip", new MOGString(this, value: AppGlobal.IpAddress));
+            record.SetItem("session", new MOGString(this, AppGlobal.Session.ToString()));
+            
+            record.SetItem("platform", new MOGString(this, SystemInfo.Platform));
+            record.SetItem("target", new MOGString(this, SystemInfo.TargetName));
+            record.SetItem("oem", new MOGString(this, SystemInfo.OEMString));
+            record.SetItem("system", new MOGString(this, SystemInfo.Version.ToString()));
+
+            var memory = GC.Run(false);
+            record.SetItem("memory", new MOGNumber(this, memory));
+
+            StackPush(record);
 
             return EvalResult.NoError;
         }

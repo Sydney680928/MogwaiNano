@@ -35,6 +35,7 @@
     <Compile Include="Exceptions\MogwaiParseErrorException.cs" />
     <Compile Include="Interfaces\IDelegate.cs" />
     <Compile Include="MogwaiNanoDelegate.cs" />
+    <Compile Include="NanoParameters.cs" />
     <Compile Include="Objects\MOGData.cs" />
     <Compile Include="Objects\MOGEvent.cs" />
     <Compile Include="Objects\MOGFireObject.cs" />

@@ -1,4 +1,18 @@
-﻿using MogwaiNano.Engine;
+﻿// Copyright 2026 Stéphane Sibué
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using MogwaiNano.Engine;
 using System;
 using System.IO.Ports;
 using System.Reflection;
@@ -13,7 +27,9 @@ namespace MogwaiNano
 
         public const string EXPECTED_SOURCE = "STUDIO_NANO";
 
-        public const string DEVICE_NAME = "MogwaiNanoDevice";
+        public const string PARAMETERS_FILE = @"I:\nano_parameters.json";
+
+        public const string AUTORUN_FILE = @"I:\autorun.mog";
 
         public static MogwaiNanoEngine MogwaiNanoEngine { get; } = new MogwaiNanoEngine();
 
@@ -26,5 +42,9 @@ namespace MogwaiNano
         public static TcpServer TcpServer { get; } = new();
 
         public static int Session { get; } = RandomGenerator.Next(100000);
+
+        public static NanoParameters NanoParameters { get; set; } = new NanoParameters();
+
+        public static string IpAddress { get; set; } = "?.?.?.?";
     }
 }

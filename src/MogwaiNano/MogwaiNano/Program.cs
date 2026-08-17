@@ -1,3 +1,17 @@
+// Copyright 2026 Stéphane Sibué
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using MogwaiNano.Engine;
 using nanoFramework.Networking;
 using nanoFramework.Runtime.Native;
@@ -14,9 +28,6 @@ namespace MogwaiNano
 {
     public class Program
     {
-        private const int TCP_PORT = 5200;
-        private const string DEVICE_NAME = "MogwaiNanoDevice";
-
         public static void Main()
         {
             Power.OnRebootEvent += Power_OnRebootEvent;
@@ -24,6 +35,10 @@ namespace MogwaiNano
             Debug.WriteLine("MOGWAI NANO");
             Debug.WriteLine($"Version {AppGlobal.MogwaiNanoEngine.Version}");
             Debug.WriteLine("(c) 2026 Stéphane Sibué");
+
+            AppGlobal.NanoParameters = NanoParameters.Load(AppGlobal.PARAMETERS_FILE);
+
+            Debug.WriteLine($"Device name: {AppGlobal.NanoParameters.Name}");
             Debug.WriteLine($"Session {AppGlobal.Session}");
 
             if (!ConnectToWifi())
@@ -56,7 +71,7 @@ namespace MogwaiNano
 
         private static void Power_OnRebootEvent()
         {
-            var message = new ServerMessage(DEVICE_NAME, "REBOOTING");
+            var message = new ServerMessage(AppGlobal.NanoParameters.Name, "REBOOTING");
             AppGlobal.TcpServer.EnqueueMessage(message);
 
             Thread.Sleep(1000);
@@ -75,32 +90,32 @@ namespace MogwaiNano
                 // Le code est encodé en base64 pour éviter les problèmes d'encodage
 
                 var code = message.Parameters[0];
-                File.WriteAllText(@"I:\autorun.mog", code);
+                File.WriteAllText(AppGlobal.AUTORUN_FILE, code);
 
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.SET", "OK"));
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "AUTORUN.SET", "OK"));
             }
             else if (message.Function == "AUTORUN.GET")
             {
-                if (File.Exists(@"I:\autorun.mog"))
+                if (File.Exists(AppGlobal.AUTORUN_FILE))
                 {
-                    string code = File.ReadAllText(@"I:\autorun.mog");
-                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.GET", code));
+                    string code = File.ReadAllText(AppGlobal.AUTORUN_FILE);
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "AUTORUN.GET", code));
                 }
                 else
                 {
-                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.GET", ""));
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "AUTORUN.GET", ""));
                 }
             }
             else if (message.Function == "AUTORUN.PURGE")
             {
-                if (File.Exists(@"I:\autorun.mog"))
-                    File.Delete(@"I:\autorun.mog");
+                if (File.Exists(AppGlobal.AUTORUN_FILE))
+                    File.Delete(AppGlobal.AUTORUN_FILE);
 
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "AUTORUN.PURGE", "OK"));
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "AUTORUN.PURGE", "OK"));
             }
             else if (message.Function == "HALT")
             {
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "HALT", "REQUESTED"));
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "HALT", "REQUESTED"));
                 AppGlobal.MogwaiNanoEngine.Halt();
             }
             else if (message.Function == "REBOOT")
@@ -112,29 +127,44 @@ namespace MogwaiNano
             {
                 if (AppGlobal.MogwaiNanoEngine.IsRunning)
                 {
-                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "STATE.GET", "RUNNING"));
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "STATE.GET", "RUNNING"));
                 }
                 else
                 {
-                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "STATE.GET", "IDLE"));
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "STATE.GET", "IDLE"));
                 }
             }
             else if (message.Function == "MEMORY.GET")
             {
                 var memory = GC.Run(false);  
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "MEMORY.GET", memory.ToString()));
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "MEMORY.GET", memory.ToString()));
+            }
+            else if (message.Function == "NAME.GET")
+            {
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "NAME.GET", AppGlobal.NanoParameters.Name));
+            }
+            else if (message.Function == "NAME.SET")
+            {
+                if (message.Parameters.Length > 0 && message.Parameters[0] != null)
+                {
+                    var newName = message.Parameters[0];
+                    AppGlobal.NanoParameters.Name = newName;
+                    AppGlobal.NanoParameters.Save(AppGlobal.PARAMETERS_FILE);                  
+                }
+
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "NAME.SET", "OK"));
             }
             else if (message.Function == "SESSION.GET")
             {
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "SESSION.GET", AppGlobal.Session.ToString()));
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "SESSION.GET", AppGlobal.Session.ToString()));
             }
             else if (message.Function == "LAST.RESULT.GET")
             {
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "LAST.RESULT.GET", AppGlobal.MogwaiNanoEngine.LastResult.ToString()));
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "LAST.RESULT.GET", AppGlobal.MogwaiNanoEngine.LastResult.ToString()));
             }
             else if (message.Function == "PING")
             {
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(DEVICE_NAME, "PONG"));
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "PONG"));
             }
         }
 
@@ -155,7 +185,8 @@ namespace MogwaiNano
             }
             else
             {
-                Debug.WriteLine($"OK - {NetworkInterface.GetAllNetworkInterfaces()[0].IPv4Address}");
+                AppGlobal.IpAddress = NetworkInterface.GetAllNetworkInterfaces()[0].IPv4Address;
+                Debug.WriteLine($"OK - {AppGlobal.IpAddress}");
             }
 
             return true;

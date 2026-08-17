@@ -342,6 +342,43 @@ namespace MogwaiNanoStudio
             }
         }
 
+        public async Task<EvalResult> GetName()
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "NAME.GET");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0 && response.Parameters[0] != null)
+            {
+                _engine.StackPushString(response.Parameters[0]);
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(_engine, Error.BadArgumentValueError, "No name value received from device.");
+        }
+
+        public async Task<EvalResult> SetName(string name)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "NAME.SET", name);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0 && response.Parameters[0] != null && response.Parameters[0] == "OK")
+                return EvalResult.NoError;
+
+            return EvalResult.Failure(_engine, Error.BadArgumentValueError);
+        }
+
         public async Task<EvalResult> StateIsRunning()
         {
             if (!AppGlobal.NanoClient.IsConnected)

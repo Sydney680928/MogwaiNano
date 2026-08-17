@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
@@ -33,11 +31,11 @@ internal static class FileAssociationHelper
 {
     // ── Constants ─────────────────────────────────────────────────────────────
 
-    private const string Extension     = ".mog";
-    private const string ProgId        = "MOGWAI.Script";        // Windows ProgId
+    private const string Extension = ".mog";
+    private const string ProgId = "MOGWAI.Script";        // Windows ProgId
     private const string FileTypeLabel = "MOGWAI Script";
-    private const string MimeType      = "application/x-mogwai"; // Linux / macOS
-    private const string DesktopId     = "mogwai-cli.desktop";   // Linux
+    private const string MimeType = "application/x-mogwai"; // Linux / macOS
+    private const string DesktopId = "mogwai-cli.desktop";   // Linux
 
     // ── Public entry point ───────────────────────────────────────────────────
 
@@ -49,9 +47,9 @@ internal static class FileAssociationHelper
     {
         try
         {
-            if      (OperatingSystem.IsWindows()) EnsureWindowsAssociation();
-            else if (OperatingSystem.IsLinux())   EnsureLinuxAssociation();
-            else if (OperatingSystem.IsMacOS())   EnsureMacOSAssociation();
+            if (OperatingSystem.IsWindows()) EnsureWindowsAssociation();
+            else if (OperatingSystem.IsLinux()) EnsureLinuxAssociation();
+            else if (OperatingSystem.IsMacOS()) EnsureMacOSAssociation();
         }
         catch (Exception ex)
         {
@@ -132,7 +130,7 @@ internal static class FileAssociationHelper
 
     // Shell notification constants
     private const uint SHCNE_ASSOCCHANGED = 0x0800_0000;
-    private const uint SHCNF_IDLIST       = 0x0000;
+    private const uint SHCNF_IDLIST = 0x0000;
 
     [DllImport("shell32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     [SupportedOSPlatform("windows")]
@@ -151,12 +149,12 @@ internal static class FileAssociationHelper
             return;
         }
 
-        var home    = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var mimeDir = Path.Combine(home, ".local", "share", "mime", "packages");
         var appsDir = Path.Combine(home, ".local", "share", "applications");
 
         // Track whether we need to refresh caches
-        bool mimeChanged    = false;
+        bool mimeChanged = false;
         bool desktopChanged = false;
 
         // 1 · MIME type declaration ──────────────────────────────────────────
@@ -251,7 +249,7 @@ internal static class FileAssociationHelper
 
         // Check current registrations to avoid redundant writes
         var dump = RunCommandOutput(lsRegister, "-dump");
-        if (dump.Contains(exePath,  StringComparison.OrdinalIgnoreCase) &&
+        if (dump.Contains(exePath, StringComparison.OrdinalIgnoreCase) &&
             dump.Contains(Extension, StringComparison.OrdinalIgnoreCase))
             return;
 
@@ -279,12 +277,12 @@ internal static class FileAssociationHelper
         {
             using var proc = Process.Start(new ProcessStartInfo
             {
-                FileName               = command,
-                Arguments              = arguments,
-                UseShellExecute        = false,
-                CreateNoWindow         = true,
+                FileName = command,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
                 RedirectStandardOutput = true,
-                RedirectStandardError  = true,
+                RedirectStandardError = true,
             });
             proc?.WaitForExit();
         }
@@ -301,12 +299,12 @@ internal static class FileAssociationHelper
         {
             using var proc = Process.Start(new ProcessStartInfo
             {
-                FileName               = command,
-                Arguments              = arguments,
-                UseShellExecute        = false,
-                CreateNoWindow         = true,
+                FileName = command,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
                 RedirectStandardOutput = true,
-                RedirectStandardError  = true,
+                RedirectStandardError = true,
             });
             return proc?.StandardOutput.ReadToEnd() ?? string.Empty;
         }

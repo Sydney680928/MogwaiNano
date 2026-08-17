@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reference sigil (`&`) — direct object reference instead of copy, significantly reducing memory allocation and fragmentation on long-running scripts
 - Types: `MOGNumber` (`float`-based, to leverage ESP32 hardware FPU), `MOGString`, `MOGName`, `MOGList`, `MOGRecord`, `MOGKey`, `MOGCode`, `MOGFunction`, `MOGData` (raw byte buffers, `D:` literal syntax)
 - `get`/`set` primitives for list (by index) and record (by key) access, plus `size` for collection length
-- System primitives — `mogwai.halt`, `mogwai.memory` (free RAM reporting), `mogwai.reset`, `mogwai.sendMessage`
+- System primitives — `mogwai.halt`, `mogwai.memory` (free RAM reporting), `mogwai.reset`, `mogwai.sendMessage`, `mogwai.info` (a `MOGRecord` with system version, IP, device name, platform, session, free memory, target, MOGWAI NANO version, and OEM build details — everything in one call, useful from within an autorun program that has no active Studio connection to query)
 - Lifecycle hooks — `MOGWAI.onStop` (any clean exit), `MOGWAI.onError` (unhandled error), `MOGWAI.onReboot` (pre-reboot cleanup, see below)
 - Structured error codes (`MW.xx`), with a dedicated `MW.5xx` range reserved for hardware-related errors (`MW.500-509` GPIO, `MW.510-519` I2C, etc.)
 

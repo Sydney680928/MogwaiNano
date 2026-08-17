@@ -1,8 +1,19 @@
-﻿using MogwaiNano.Engine;
+﻿// Copyright 2026 Stéphane Sibué
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using MogwaiNano.Engine;
 using MogwaiNano.Interfaces;
-using MogwaiNano.Objects;
-using System.Diagnostics;
-using GC = nanoFramework.Runtime.Native.GC;
 
 namespace MogwaiNano
 {
@@ -17,13 +28,13 @@ namespace MogwaiNano
 
         public void ProgramEnd(MogwaiNanoEngine engine, EvalResult result)
         {
-            var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "PROGRAM.DID.END", result.ToString());
+            var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.END", result.ToString());
             AppGlobal.TcpServer.EnqueueMessage(msg);
         }
 
         public void ProgramStart(MogwaiNanoEngine engine, string code)
         {
-            var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "PROGRAM.DID.START");
+            var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.START");
             AppGlobal.TcpServer.EnqueueMessage(msg);
 
         }
@@ -32,7 +43,7 @@ namespace MogwaiNano
         {
             if (AppGlobal.TcpServer.IsClientConnected)
             {
-                var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "DEBUG.WRITE", message);
+                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.WRITE", message);
                 AppGlobal.TcpServer.EnqueueMessage(msg);
             }
 
@@ -43,7 +54,7 @@ namespace MogwaiNano
         {
             if (AppGlobal.TcpServer.IsClientConnected)
             {
-                var msg = new ServerMessage(AppGlobal.DEVICE_NAME, "CONSOLE.PRINT", message);
+                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "CONSOLE.PRINT", message);
                 AppGlobal.TcpServer.EnqueueMessage(msg);
             }
 
