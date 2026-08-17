@@ -2,12 +2,12 @@
 
 ![MOGWAI NANO](images/img01.png)
 
-## [MOGWAI](https://github.com/Sydney680928/mogwai) NANO - RPN Scripting for Microcontrollers
+## [MOGWAI](https://github.com/Sydney680928/mogwai) NANO - Scripting for Microcontrollers
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET nanoFramework](https://img.shields.io/badge/.NET-nanoFramework-blue.svg)](https://nanoframework.net/)
 
-**Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) RPN engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
+**Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
 > If MOGWAI NANO looks useful to you, a ⭐ helps others discover it — thank you!
 
@@ -24,7 +24,7 @@ MOGWAI NANO is not a port of the desktop MOGWAI engine — it's a **companion ru
 } nano.run
 ```
 
-Behind the scenes, the code is **desugared** into pure canonical RPN before being sent to the device:
+Behind the scenes, the code is **desugared** into pure canonical [RPN](https://en.wikipedia.org/wiki/Reverse_Polish_notation) before being sent to the device:
 
 ```
 { a 10 > } eval { "big" ? } { "small" ? } IFELSE
@@ -52,7 +52,7 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 
 ## Key features
 
-- **Full RPN language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`)
+- **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`)
 - **Hardware support** — GPIO (digital I/O, interrupts) today; I2C, SPI, PWM and ADC packages already validated, primitives coming in upcoming releases
 - **Timers** — one-shot and recurring, running independently of your main program
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
@@ -91,9 +91,9 @@ nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --a
 nanoff --target RP_PICO_W_RP2040 --update --deploy --image MogwaiNano.bin
 ```
 
-> **Why two separate commands:** combining `--update` and `--deploy --address` in a single `nanoff` invocation causes the `--address` flag to be silently ignored — `nanoff` falls back to its own (unreliable) automatic address calculation instead, which writes the application outside the actual deployment partition. Running the firmware update and the deployment as two separate commands avoids this. This has been confirmed on two different ESP32 boards.
+> **Why two separate commands, and why `--address` is required:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation is unreliable and consistently fails to match the device's actual partition layout — confirmed across three different boards, with and without a pinned firmware version. Always pass `--address 0x1E0000` explicitly when deploying. It also needs to be in its own command, separate from `--update`: combining `--update` and `--deploy --address` in a single invocation causes `--address` to be silently ignored.
 >
-> **A note on the `--address` flag:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation can be unreliable and doesn't always match the device's actual partition layout — explicitly passing `--address 0x1E0000` avoids this. After deploying, check the device with `nanoff --devicedetails` or Device Explorer and look at the `Assemblies:` section to confirm success — `MogwaiNano` should be listed there with its dependencies. The `Deployment Map` field further down is unrelated to this (it reports on In-Field Update capability, which this target doesn't support) and will read `Empty` even on a fully successful deployment — don't use it to diagnose a failed deploy.
+> After deploying, check the device with `nanoff --devicedetails` or Device Explorer and look at the `Assemblies:` section to confirm success — `MogwaiNano` should be listed there with its dependencies. The `Deployment Map` field further down is unrelated to this (it reports on In-Field Update capability, which this target doesn't support) and will read `Empty` even on a fully successful deployment — don't use it to diagnose a failed deploy.
 
 > On ESP32, you may be asked to hold the BOOT/FLASH button on the board during flashing.
 
@@ -163,7 +163,7 @@ Special thanks to [Laurent Ellerbach](https://github.com/Ellerbach), an active n
 
 ## Related projects
 
-- [MOGWAI](https://github.com/Sydney680928/mogwai) — the desktop RPN scripting engine
+- [MOGWAI](https://github.com/Sydney680928/mogwai) — the desktop scripting engine
 - [.NET nanoFramework](https://nanoframework.net/) — the .NET CLR for microcontrollers
 
 ## License
