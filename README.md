@@ -80,11 +80,13 @@ Download the latest `MogwaiNano.bin` from the [Releases](../../releases) page, t
 dotnet tool install -g nanoff
 
 # ESP32
-nanoff --target ESP32_REV3 --serialport COMx --update --deploy --image MogwaiNano.bin
+nanoff --target ESP32_REV3 --serialport COMx --fwversion 1.17.0.334 --update --deploy --image MogwaiNano.bin --address 0x1E0000
 
 # Raspberry Pi Pico W (hold BOOTSEL while plugging in)
 nanoff --target RP_PICO_W_RP2040 --update --deploy --image MogwaiNano.bin
 ```
+
+> **A note on the `--address` flag:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation can be unreliable and doesn't always match the device's actual partition layout — explicitly passing `--address 0x1E0000` avoids this. If you deploy without it and later check the device with `nanoff --devicedetails` or Device Explorer, look at the `Assemblies:` section to confirm success — `MogwaiNano` should be listed there with its dependencies. The `Deployment Map` field further down is unrelated to this (it reports on In-Field Update capability, which this target doesn't support) and will read `Empty` even on a fully successful deployment — don't use it to diagnose a failed deploy.
 
 > On ESP32, you may be asked to hold the BOOT/FLASH button on the board during flashing.
 
