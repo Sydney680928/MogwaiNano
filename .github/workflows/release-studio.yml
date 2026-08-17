@@ -1,0 +1,63 @@
+name: Release Studio
+
+on:
+  release:
+    types: [ published ]
+
+permissions:
+  contents: write   # required to create the release and upload assets
+
+jobs:
+  publish-studio:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [ win-x64, linux-x64, linux-arm64, osx-x64, osx-arm64 ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publish MOGWAI NANO Studio (${{ matrix.rid }})
+        run: >
+          dotnet publish src/MogwaiNano/MogwaiNanoStudio/MogwaiNanoStudio.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:DebugType=none
+          --output publish/${{ matrix.rid }}
+
+      - name: Set binary name
+        id: bin
+        run: |
+          BIN_NAME="MogwaiNanoStudio"
+          if [ "${{ matrix.rid }}" = "win-x64" ]; then
+            BIN_NAME="${BIN_NAME}.exe"
+          fi
+          echo "name=$BIN_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Set executable permission (Linux/macOS)
+        if: matrix.rid != 'win-x64'
+        run: chmod +x "publish/${{ matrix.rid }}/${{ steps.bin.outputs.name }}"
+
+      - name: Package archive
+        run: |
+          cd publish/${{ matrix.rid }}
+          if [ "${{ matrix.rid }}" = "win-x64" ]; then
+            zip "../../mogwai-nano-studio-${{ github.event.release.tag_name }}-${{ matrix.rid }}.zip" "${{ steps.bin.outputs.name }}"
+          else
+            tar -czf "../../mogwai-nano-studio-${{ github.event.release.tag_name }}-${{ matrix.rid }}.tar.gz" "${{ steps.bin.outputs.name }}"
+          fi
+          cd ../../
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mogwai-nano-studio-${{ github.event.release.tag_name }}-${{ matrix.rid }}.*
