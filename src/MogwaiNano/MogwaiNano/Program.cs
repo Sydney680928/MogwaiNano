@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using MogwaiNano.Engine;
+using MogwaiNano.Objects;
 using nanoFramework.Networking;
 using nanoFramework.Runtime.Native;
 using System;
@@ -157,6 +158,22 @@ namespace MogwaiNano
             else if (message.Function == "SESSION.GET")
             {
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "SESSION.GET", AppGlobal.Session.ToString()));
+            }
+            else if (message.Function == "INFO.GET")
+            {
+                var memory = GC.Run(false);
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(
+                    AppGlobal.NanoParameters.Name, 
+                    "INFO.GET", 
+                    AppGlobal.NanoParameters.Name, 
+                    AppGlobal.MogwaiNanoEngine.Version.ToString(),
+                    AppGlobal.IpAddress,
+                    AppGlobal.Session.ToString(),
+                    SystemInfo.Platform,
+                    SystemInfo.TargetName,  
+                    SystemInfo.OEMString,
+                    SystemInfo.Version.ToString(),
+                    memory.ToString()));
             }
             else if (message.Function == "LAST.RESULT.GET")
             {

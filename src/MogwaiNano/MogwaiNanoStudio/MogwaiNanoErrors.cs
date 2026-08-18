@@ -27,5 +27,7 @@ namespace MogwaiNanoStudio
         public static Error DeviceBusyError { get; } = new Error("MW.5003", $"device busy error", Error.ErrorType.User);
 
         public static Error DeviceIsNotRunningError { get; } = new Error("MW.5004", $"device is not running error", Error.ErrorType.User);
+
+        public static Error BadDeviceResponse { get; } = new Error("MW.5005", $"bad device response error", Error.ErrorType.User);
     }
 }

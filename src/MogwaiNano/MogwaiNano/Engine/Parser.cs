@@ -15,6 +15,7 @@
 using MogwaiNano.Exceptions;
 using MogwaiNano.Objects;
 using System.Collections;
+using System.Globalization;
 using System.Text;
 
 namespace MogwaiNano.Engine
@@ -105,12 +106,6 @@ namespace MogwaiNano.Engine
 
         private MOGObject ParseItem(string item)
         {
-            if (LooksLikeNumber(item))
-            {
-                if (float.TryParse(item, out float value))
-                    return new MOGNumber(_engine, value);
-            }
-
             if (item == "true")
                 return new MOGBoolean(_engine, true);
 
@@ -120,6 +115,25 @@ namespace MogwaiNano.Engine
             if (item == "null")
                 return new MOGNull(_engine);
 
+            if (item.StartsWith("0x"))
+            {
+                if (item.Length > 2)
+                {
+                    try
+                    {
+                        float n = System.Convert.ToByte(item.Substring(2), 16);
+                        return new MOGNumber(_engine, n);
+                    }
+                    catch
+                    {
+                        throw new MogwaiParseErrorException("invalid conversion operation");
+                    }
+                }
+                else
+                {
+                    throw new MogwaiParseErrorException("invalid conversion operation");
+                }
+            }
 
             if (item.EndsWith(":") && item.Length > 1)
             {
@@ -170,6 +184,12 @@ namespace MogwaiNano.Engine
                     var data = new MOGData(_engine, content);
                     return data;
                 }
+            }
+
+            if (LooksLikeNumber(item))
+            {
+                if (float.TryParse(item, out float value))
+                    return new MOGNumber(_engine, value);
             }
 
             if (_engine.IsPrimitive(item))

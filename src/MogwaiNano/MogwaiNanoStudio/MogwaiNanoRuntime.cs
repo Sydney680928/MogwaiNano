@@ -14,7 +14,6 @@
 
 using MOGWAI.Engine;
 using MOGWAI.Objects;
-using System.Diagnostics;
 using System.Text;
 
 namespace MogwaiNanoStudio
@@ -395,7 +394,47 @@ namespace MogwaiNanoStudio
 
             return EvalResult.NoError;
         }
-        
+
+        public async Task<EvalResult> GetInfo()
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "INFO.GET");
+            var response = await SendMessageAndWaitResponse(message);
+            
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+            
+            if (response.Parameters == null || response.Parameters.Length < 8)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid info response from device.");
+
+            if (int.TryParse(response.Parameters[8], out int memory))
+            {
+                var record = new MOGRecord(_engine);
+
+                record.SetString("name", response.Parameters[0]);
+                record.SetString("mogwai", response.Parameters[1]);
+                record.SetString("ip", response.Parameters[2]);
+                record.SetString("session", response.Parameters[3]);
+
+                record.SetString("platform", response.Parameters[4]);
+                record.SetString("target", response.Parameters[5]);
+                record.SetString("oem", response.Parameters[6]);
+                record.SetString("system", response.Parameters[7]);
+
+                record.SetNumber("memory", memory);
+
+                _engine.StackPush(record);
+
+                return EvalResult.NoError;
+            }
+            else
+            {
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid memory value received from device.");
+            }        
+        }
+
         private async Task<bool> WaitNanoProgramDidEnd(int timeout = 12000)
         {
             _lastAliveReceived = DateTime.Now;

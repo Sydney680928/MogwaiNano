@@ -75,6 +75,7 @@ namespace MogwaiNanoStudio
             "nano.memory",
             "nano.name",
             "nano.name.set",
+            "nano.info",
 
             "mogwai.memory",
 
@@ -333,6 +334,10 @@ namespace MogwaiNanoStudio
             {
                 return await AppGlobal.NanoRuntime.GetMemory();
             }
+            else if (word == "nano.info")
+            {
+                return await AppGlobal.NanoRuntime.GetInfo();
+            }   
             else if (word == "nano.name")
             {
                 return await AppGlobal.NanoRuntime.GetName();
