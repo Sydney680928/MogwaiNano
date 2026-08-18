@@ -64,8 +64,8 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 
 | Platform | Status |
 |---|---|
-| ESP32 | ✅ Tested |
-| Raspberry Pi Pico W | ✅ Tested |
+| ESP32 | ✅ Tested — recommended |
+| Raspberry Pi Pico W | ⚠️ Runtime tested and working, but WiFi configuration currently blocked (see Quick Start note) |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 
@@ -82,20 +82,19 @@ dotnet tool install -g nanoff
 # ESP32 — two separate commands (see note below on why)
 
 # 1. Flash the firmware
-nanoff --target ESP32_REV3 --serialport COMx --fwversion 1.17.0.334 --update
+nanoff --target ESP32_REV3 --serialport COMx --update
 
 # 2. Deploy the application
 nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --address 0x1E0000
-
-# Raspberry Pi Pico W (hold BOOTSEL while plugging in)
-nanoff --target RP_PICO_W_RP2040 --update --deploy --image MogwaiNano.bin
 ```
 
-> **Why two separate commands, and why `--address` is required:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation is unreliable and consistently fails to match the device's actual partition layout — confirmed across three different boards, with and without a pinned firmware version. Always pass `--address 0x1E0000` explicitly when deploying. It also needs to be in its own command, separate from `--update`: combining `--update` and `--deploy --address` in a single invocation causes `--address` to be silently ignored.
+> **Why two separate commands, and why `--address` is required:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation is unreliable and consistently fails to match the device's actual partition layout — confirmed across three different boards, regardless of firmware version. Always pass `--address 0x1E0000` explicitly when deploying. It also needs to be in its own command, separate from `--update`: combining `--update` and `--deploy --address` in a single invocation causes `--address` to be silently ignored.
 >
 > After deploying, check the device with `nanoff --devicedetails` or Device Explorer and look at the `Assemblies:` section to confirm success — `MogwaiNano` should be listed there with its dependencies. The `Deployment Map` field further down is unrelated to this (it reports on In-Field Update capability, which this target doesn't support) and will read `Empty` even on a fully successful deployment — don't use it to diagnose a failed deploy.
 
 > On ESP32, you may be asked to hold the BOOT/FLASH button on the board during flashing.
+
+> **Raspberry Pi Pico W:** flashing the firmware and deploying the application both work, but WiFi network configuration via `nanoff --networkdeployment` currently hangs on this target — see [Known Limitations](CHANGELOG.md) below. Until this is resolved, ESP32 is the recommended target to follow this guide with.
 
 ### 2. Configure WiFi
 
