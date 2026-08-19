@@ -18,6 +18,7 @@ using nanoFramework.Runtime.Native;
 using System;
 using System.Collections;
 using System.Device.Gpio;
+using System.Device.I2c;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -52,6 +53,7 @@ namespace MogwaiNano.Engine
         private Thread _aliveThread;  
         private Hashtable _openPins = new(3);
         private GpioController _gpioController = new();
+        private Hashtable _i2cDevices = new(2); 
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -233,6 +235,13 @@ namespace MogwaiNano.Engine
             _primitives.Add("gpio.toggle", new PrimitiveDelegate(PrimitiveGpioPinToggle));
             _primitives.Add("gpio.close", new PrimitiveDelegate(PrimitiveGpioPinClose));
 
+            _primitives.Add("i2c.open", new PrimitiveDelegate(PrimitiveI2cOpen));
+            _primitives.Add("i2c.close", new PrimitiveDelegate(PrimitiveI2cClose)); 
+            _primitives.Add("i2c.write", new PrimitiveDelegate(PrimitiveI2cWrite));
+            _primitives.Add("i2c.register.write", new PrimitiveDelegate(PrimitiveI2cRegisterWrite));
+            _primitives.Add("i2c.read", new PrimitiveDelegate(PrimitiveI2cRead));
+            _primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
+
             _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
             _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
             _primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));  
@@ -402,6 +411,8 @@ namespace MogwaiNano.Engine
             ClearWaitingFireObjects();
 
             CleanupOpenPins();
+            
+            CleanupI2cDevices();
 
             _stacks.Clear();
             _currentStack = new ArrayList();
@@ -956,7 +967,7 @@ namespace MogwaiNano.Engine
                 var index = StackPop() as MOGNumber;
                 var data = StackPop() as MOGData;
 
-                if (index.Value < 0 || index.Value >= data.Items.Count)
+                if (index.Value < 0 || index.Value >= data.Items.Length)
                     return EvalResult.Failure(this, Error.BadArgumentValueError, name);
 
                 var item = data.GetItem((int)index.Value);
@@ -1037,7 +1048,7 @@ namespace MogwaiNano.Engine
                 var data = StackPop() as MOGData;
                 var value = StackPop() as MOGNumber;
 
-                if (index.Value < 0 || index.Value >= data.Items.Count)
+                if (index.Value < 0 || index.Value >= data.Items.Length)
                     return EvalResult.Failure(this, Error.BadArgumentValueError, name);
 
                 data.SetItem((int)index.Value, (byte)value.Value);
@@ -1102,7 +1113,7 @@ namespace MogwaiNano.Engine
             else if (s[0] == typeof(MOGData))
             {
                 var data = StackPop() as MOGData;
-                StackPush(new MOGNumber(this, data.Items.Count));
+                StackPush(new MOGNumber(this, data.Items.Length));
                 return EvalResult.NoError;
             }
             else if (s[0] == typeof(MOGRef))
@@ -1165,13 +1176,15 @@ namespace MogwaiNano.Engine
                     }
                 }
 
-                var data = new MOGData(this);
+                var items = new byte[size];
 
                 for (int i = 0; i < size; i++)
                 {
-                    var n = StackPop() as MOGNumber;    
-                    data.Items.Insert(0, (byte)n.Value);
+                    var n = StackPop() as MOGNumber;
+                    items[i] = (byte)n.Value;
                 }
+
+                var data = new MOGData(this, items);
 
                 StackPush(data);
 
@@ -2060,6 +2073,8 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
+        #region GPIO
+
         private EvalResult PrimitiveGpioModeInput(string name) => SetPinMode(name, PinMode.Input);
 
         private EvalResult PrimitiveGpioSetModeInputPullDown(string name) => SetPinMode(name, PinMode.InputPullDown);
@@ -2145,6 +2160,277 @@ namespace MogwaiNano.Engine
 
             return EvalResult.NoError;
         }
+
+        #endregion
+
+        #region I2C
+
+        private EvalResult PrimitiveI2cOpen(string name)
+        {
+            // 'name' bus address i2c.open
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber) || s[2] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var address = StackPop() as MOGNumber;  
+            var bus = StackPop() as MOGNumber; 
+            var deviceName = StackPop() as MOGName;   
+
+            int busNumber = (int)bus.Value;
+
+            if (busNumber < 1 || busNumber > 2)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C bus number must be between 1 and 2");
+
+            int addressNumber = (int)address.Value; 
+
+            if (addressNumber < 0 || addressNumber > 127)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C address number must be between 0 and 127");
+
+            if (_i2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(this, Error.I2cDeviceAlreadyOpenedError, name, $"I2C device (bus {busNumber}, address {addressNumber:X2}) is already opened");
+
+            try
+            { 
+                var i2cSettings = new I2cConnectionSettings(busNumber, addressNumber, I2cBusSpeed.FastMode);
+                var i2cDevice = I2cDevice.Create(i2cSettings);
+
+                _i2cDevices.Add(deviceName.Value, i2cDevice);
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(this, Error.I2cDeviceOpenError, name, $"failed to open I2C device (bus {busNumber}, address {addressNumber:X2})", ex.Message);
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveI2cClose(string name)
+        {
+            // name i2c.close   
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var deviceName = StackPop() as MOGName;
+
+            if (!_i2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+
+            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+            _i2cDevices.Remove(deviceName.Value);   
+            
+            i2cDevice.Dispose();
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveI2cWrite(string name)
+        {
+            // name data i2c.write
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+           
+            if (s[0] != typeof(MOGData) || s[1] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var data = StackPop() as MOGData;
+            var deviceName = StackPop() as MOGName;
+
+            if (!_i2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+
+            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+
+            try
+            {
+                var r = i2cDevice.Write(data.ToSpanByte());
+
+                if (r.Status == I2cTransferStatus.FullTransfer)
+                {
+                    return EvalResult.NoError;
+                }
+                else
+                {
+                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
+            }
+        }
+
+        private EvalResult PrimitiveI2cRegisterWrite(string name)
+        {
+            // name register data i2c.write
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGData) || s[1] != typeof(MOGNumber) || s[2] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var data = StackPop() as MOGData;
+            var register = StackPop() as MOGNumber;
+            var deviceName = StackPop() as MOGName;
+
+            if (!_i2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+
+            if (register.Value < 0 || register.Value > 255)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
+
+            var registerAddress = (byte)register.Value;    
+
+            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+
+            try
+            {
+                byte[] buffer = new byte[1 + data.Items.Length];
+                buffer[0] = registerAddress;
+                Array.Copy(data.Items, 0, buffer, 1, data.Items.Length);
+
+                var span = new SpanByte(buffer);
+                var r = i2cDevice.Write(span);
+
+                if (r.Status == I2cTransferStatus.FullTransfer)
+                {
+                    return EvalResult.NoError;
+                }
+                else
+                {
+                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
+            }
+        }
+
+        private EvalResult PrimitiveI2cRead(string name)
+        {
+            // name length i2c.read
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var length = StackPop() as MOGNumber;
+            var deviceName = StackPop() as MOGName;
+
+            if (!_i2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+
+            if (length.Value < 0 || length.Value > 255)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C read length must be between 0 and 255");
+            
+            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+            
+            try
+            {
+                byte[] buffer = new byte[(int)length.Value];
+                var span = new SpanByte(buffer);
+                var r = i2cDevice.Read(span);
+
+                if (r.Status == I2cTransferStatus.FullTransfer)
+                {
+                    var mogData = new MOGData(this, buffer);
+                    StackPush(mogData);
+
+                    return EvalResult.NoError;
+                }
+                else
+                {
+                    return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", ex.Message);
+            }
+        }
+
+        private EvalResult PrimitiveI2cRegisterRead(string name)
+        {
+            // name register length i2c.read
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber) || s[2] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var length = StackPop() as MOGNumber;
+            var register = StackPop() as MOGNumber;
+            var deviceName = StackPop() as MOGName;
+
+            if (!_i2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+
+            if (register.Value < 0 || register.Value > 255)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
+
+            var registerAddress = (byte)register.Value;
+
+            if (length.Value < 0 || length.Value > 255)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C read length must be between 0 and 255");
+
+            var count = (int)length.Value;
+
+            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+
+            try
+            {
+                byte[] writeBuffer = new byte[] { registerAddress };
+                byte[] readBuffer = new byte[count];
+
+                SpanByte writeSpan = new SpanByte(writeBuffer);
+                SpanByte readSpan = new SpanByte(readBuffer);
+
+                I2cTransferResult r = i2cDevice.WriteRead(writeSpan, readSpan);
+
+                if (r.Status == I2cTransferStatus.FullTransfer)
+                {
+                    var mogData = new MOGData(this, readBuffer);
+                    StackPush(mogData);
+
+                    return EvalResult.NoError;
+                }
+                else
+                {
+                    return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", ex.Message);
+            }
+        }
+
+
+        #endregion
 
         #endregion
 
@@ -2554,6 +2840,21 @@ namespace MogwaiNano.Engine
 
             FireEvent("GPIO_PIN_CHANGED",record);
         }
+
+        #region I2C
+
+        private void CleanupI2cDevices()
+        {
+            foreach (var key in _i2cDevices.Keys)
+            {
+                var i2cDevice = _i2cDevices[key] as I2cDevice;
+                i2cDevice.Dispose();
+            }
+
+            _i2cDevices.Clear();
+        }   
+
+        #endregion
 
         #endregion
     }

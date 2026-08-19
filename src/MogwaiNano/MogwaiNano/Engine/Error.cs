@@ -41,7 +41,12 @@ namespace MogwaiNano.Engine
             _invalidNameError, 
             _unableToWriteValueError, 
             _unknownWordError,
-            _gpioUnknownPinError, 
+            _gpioUnknownPinError,
+            _i2cDeviceAlreadyOpenedError,
+            _i2cDeviceOpenError,
+            _i2cUnknownDeviceNameError,
+            _i2cWriteError,
+            _i2cReadError,
             _fatalError;
 
         private static void EnsureInitialized()
@@ -71,8 +76,14 @@ namespace MogwaiNano.Engine
             _invalidNameError = RegisterError("MW.46", "invalid name error");
             _unableToWriteValueError = RegisterError("MW.47", "unable to write value in var error");
             _unknownWordError = RegisterError("MW.50", "unknown word error");
+            
             _gpioUnknownPinError = RegisterError("MW.500", "gpio unknown pin error");
-            _fatalError = RegisterError("MW.!!!", "fatal error");
+            
+            _i2cDeviceAlreadyOpenedError = RegisterError("MW.510", "i2c device already opened error");             
+            _i2cDeviceOpenError = RegisterError("MW.511", "i2c device open error");
+            _i2cUnknownDeviceNameError = RegisterError("MW.512", "i2c unknown device name error");
+            _i2cWriteError = RegisterError("MW.513", "i2c write error");
+            _i2cReadError = RegisterError("MW.514", "i2c read error");
         }
 
         private static Error RegisterError(string code, string message)
@@ -123,7 +134,17 @@ namespace MogwaiNano.Engine
         public static Error UnknownWordError { get { EnsureInitialized(); return _unknownWordError; } }
         
         public static Error GpioUnknownPinError { get { EnsureInitialized(); return _gpioUnknownPinError; } }
-        
+
+        public static Error I2cDeviceAlreadyOpenedError { get { EnsureInitialized(); return _i2cDeviceAlreadyOpenedError; } }
+
+        public static Error I2cDeviceOpenError { get { EnsureInitialized(); return _i2cDeviceOpenError; } }
+
+        public static Error I2cUnknownDeviceNameError { get { EnsureInitialized(); return _i2cUnknownDeviceNameError; } }
+
+        public static Error I2cWriteError { get { EnsureInitialized(); return _i2cWriteError; } }
+
+        public static Error I2cReadError { get { EnsureInitialized(); return _i2cReadError; } }
+
         public static Error FatalError { get { EnsureInitialized(); return _fatalError; } }
 
         public string Code { get; set; }
