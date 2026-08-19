@@ -435,6 +435,79 @@ namespace MogwaiNanoStudio
             }        
         }
 
+        public Task<EvalResult> Select()
+        {
+            var list = AppGlobal.NanoClient.Scan(_engine);
+
+            if (list.Items.Count > 0)
+            {
+                while (true)
+                {
+                    var c = 0;
+
+                    foreach (var item in list.Items)
+                    {
+                        if (item is MOGRecord record && record.Items.ContainsKey("target") && record.Items.ContainsKey("ip"))
+                        {
+                            var target = record.GetItem("target") as MOGString;
+                            var ip = record.GetItem("ip") as MOGString;
+                            var name = record.GetItem("name") as MOGString;
+
+                            if (target != null && ip != null && name != null)
+                            {
+                                Console.WriteLine($"{c}: {name.Value.PadRight(20)} - {ip.Value} - {target.Value.PadRight(20)}");
+                                c++;
+                            }
+                        }
+                    }
+
+                    if (c == 0)
+                    {
+                        // Aucun device valide dans la liste, on retourne null
+
+                        _engine.StackPushNull();
+                        return Task.FromResult(EvalResult.NoError);
+                    }
+
+                    Console.WriteLine("");
+
+                    var ly = Console.CursorTop;
+
+                    while (true)
+                    {
+                        Console.SetCursorPosition(0, ly);
+                        Console.Write(new string(' ', Console.WindowWidth));
+
+                        Console.SetCursorPosition(0, ly);
+                        Console.Write("Select device number (enter only = abort): ");
+
+                        var input = Console.ReadLine();
+
+                        if (string.IsNullOrEmpty(input))
+                        {
+                            // ESC
+
+                            _engine.StackPushNull();
+                            return Task.FromResult(EvalResult.NoError);
+                        }
+                        else if (int.TryParse(input, out int index) && index >= 0 && index < c)
+                        {
+                            _engine.StackPush(list.Items[index]);
+                            return Task.FromResult(EvalResult.NoError);
+                        }
+                    }
+
+                }
+            }
+            else
+            {
+                // Aucun device dans la liste, on retourne null
+
+                _engine.StackPushNull();
+                return Task.FromResult(EvalResult.NoError);
+            }
+        }
+
         private async Task<bool> WaitNanoProgramDidEnd(int timeout = 12000)
         {
             _lastAliveReceived = DateTime.Now;

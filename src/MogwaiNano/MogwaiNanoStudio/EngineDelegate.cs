@@ -76,6 +76,7 @@ namespace MogwaiNanoStudio
             "nano.name",
             "nano.name.set",
             "nano.info",
+            "nano.userConnect",
 
             "mogwai.memory",
 
@@ -222,11 +223,9 @@ namespace MogwaiNanoStudio
                     {
                         AppGlobal.NanoClient.Connect(ip.Value, AppGlobal.TCP_PORT);
                         engine.StackPushBoolean(true);
-
                     }
                     catch
                     {
-                        AppGlobal.NanoClient.Disconnect();
                         engine.StackPushBoolean(false);
                     }
 
@@ -256,73 +255,51 @@ namespace MogwaiNanoStudio
             {
                 // nano.select
 
-                var list = AppGlobal.NanoClient.Scan(_engine);
+                return await AppGlobal.NanoRuntime.Select();
+            }
+            else if (word == "nano.userConnect")
+            {
+                // nano.userConnect = nano.select + nano.connect
+                // true if connected, false if not or no device selected
 
-                if (list.Items.Count > 0)
+                var r = await AppGlobal.NanoRuntime.Select();
+
+                if (r != EvalResult.NoError)
+                    return r;
+
+                var s = _engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(_engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGNull))
                 {
-                    while (true)
-                    {
-                        var c = 0;
+                    // no device or no device selected or user canceled selection
 
-                        foreach (var item in list.Items)
-                        {
-                            if (item is MOGRecord record && record.Items.ContainsKey("target") && record.Items.ContainsKey("ip"))
-                            {
-                                var target = record.GetItem("target") as MOGString;
-                                var ip = record.GetItem("ip") as MOGString;
-                                var name = record.GetItem("name") as MOGString;
-
-                                if (target != null && ip != null && name != null)
-                                {
-                                    Console.WriteLine($"{c}: {name.Value.PadRight(20)} - {ip.Value} - {target.Value.PadRight(20)}");
-                                    c++;
-                                }
-                            }
-                        }
-
-                        if (c == 0)
-                        {
-                            // Aucun device valide dans la liste, on retourne null
-
-                            engine.StackPushNull();
-                            return EvalResult.NoError;
-                        }
-
-                        Console.WriteLine("");
-
-                        var ly = Console.CursorTop;
-
-                        while (true)
-                        {
-                            Console.SetCursorPosition(0, ly);
-                            Console.Write(new string(' ', Console.WindowWidth));
-
-                            Console.SetCursorPosition(0, ly);
-                            Console.Write("Select device number (enter only = abort): ");
-
-                            var input = Console.ReadLine();
-
-                            if (string.IsNullOrEmpty(input))
-                            {
-                                // ESC
-
-                                engine.StackPushNull();
-                                return EvalResult.NoError;
-                            }
-                            else if (int.TryParse(input, out int index) && index >= 0 && index < c)
-                            {
-                                engine.StackPush(list.Items[index]);
-                                return EvalResult.NoError;
-                            }
-                        }
-
-                    }
+                    _engine.StackPushBoolean(false);
+                    return EvalResult.NoError;
                 }
-                else
+                else if (s[0] == typeof(MOGRecord))
                 {
-                    // Aucun device dans la liste, on retourne null
+                    var record = _engine.StackPopRecord();
 
-                    engine.StackPushNull();
+                    // ip: key is mandatory, value is the IP address of the device
+
+                    var ip = record.GetItem("ip") as MOGString;
+
+                    if (ip == null)
+                        return EvalResult.Failure(_engine, Error.BadArgumentValueError, word, "ip: key is mandatory");
+
+                    try
+                    {
+                        AppGlobal.NanoClient.Connect(ip.Value, AppGlobal.TCP_PORT);
+                        _engine.StackPushBoolean(true);
+                    }
+                    catch
+                    {
+                        _engine.StackPushBoolean(false);
+                    }
+
                     return EvalResult.NoError;
                 }
             }
@@ -337,7 +314,7 @@ namespace MogwaiNanoStudio
             else if (word == "nano.info")
             {
                 return await AppGlobal.NanoRuntime.GetInfo();
-            }   
+            }
             else if (word == "nano.name")
             {
                 return await AppGlobal.NanoRuntime.GetName();

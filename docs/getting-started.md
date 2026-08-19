@@ -345,6 +345,16 @@ else
 
 This is entirely regular MOGWAI code — `if`/`then`/`else`, `mogwai.exit` for early exit on failure, `guard`/`else` to catch a failure in `nano.run`/`nano.view` itself (for example, if the device drops off the network right as the script tries to run something) — orchestrating the connection and the discovery UI on your PC, with only the small inner block ever actually running on the device. A good pattern to reuse and adapt as your own scripts grow.
 
+### The shortcut version
+
+Everything in the connection block above — scan, list, select, connect — is exactly what `nano.userConnect` does in a single call:
+
+```
+if (nano.isConnected not) then { nano.userConnect }
+```
+
+Same guided experience, same `true`/`false` outcome as `nano.connect`, one line instead of the block spelled out above. Now that you've seen what it does under the hood, use whichever fits your script better.
+
 ## What's next
 
 - Browse the [shared primitives reference](shared-primitives.md) for everything common to MOGWAI and MOGWAI NANO
