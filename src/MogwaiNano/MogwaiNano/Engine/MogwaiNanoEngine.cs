@@ -279,8 +279,10 @@ namespace MogwaiNano.Engine
             {
                 Thread.Sleep(2000);
 
+                /*
                 if (IsRunning && AppGlobal.TcpServer.IsClientConnected)
                     AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "ALIVE"));
+                */
             }
         }
 

@@ -142,12 +142,6 @@ while (true)
             {
                 var r = await AppGlobal.MogwaiEngine.RunAsync(codeToRun, false);
 
-                while (AppGlobal.NanoRuntime.IsRunning)
-                    await Task.Delay(100);
-
-                while (Console.KeyAvailable)
-                    _ = Console.ReadKey(true);
-
                 Console.WriteLine();
                 Console.WriteLine(r);
 

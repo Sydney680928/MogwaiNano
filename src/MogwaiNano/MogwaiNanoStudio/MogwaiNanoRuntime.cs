@@ -194,7 +194,9 @@ namespace MogwaiNanoStudio
             Console.WriteLine("──── Exit view mode ──────────────────────────────────");
             Console.WriteLine();
 
+            ListenMessages = false;
             ViewMode = false;
+            ExitViewModeRequested = false;
 
             return EvalResult.NoError;
         }
@@ -537,9 +539,9 @@ namespace MogwaiNanoStudio
 
                 if (interval.TotalMilliseconds >= timeout)
                 {
-                    ListenMessages = false;
-                    IsRunning = false;
-                    return false;
+                    //ListenMessages = false;
+                    //IsRunning = false;
+                    //return false;
                 }
             }
 
