@@ -40,11 +40,11 @@ namespace MogwaiNano
             AppGlobal.NanoParameters = NanoParameters.Load(AppGlobal.PARAMETERS_FILE);
 
             Debug.WriteLine($"Device name: {AppGlobal.NanoParameters.Name}");
-            Debug.WriteLine($"Session {AppGlobal.Session}");
+            Debug.WriteLine($"Session: {AppGlobal.Session}");
 
             if (!ConnectToWifi())
             {
-                Debug.WriteLine("Impossible de se connecter au WiFi. Arrêt du programme.");
+                Debug.WriteLine("Program stopping.");
                 return;
             }
 
@@ -57,11 +57,12 @@ namespace MogwaiNano
             var @delegate = new MogwaiNanoDelegate(AppGlobal.MogwaiNanoEngine);
             AppGlobal.MogwaiNanoEngine.Delegate = @delegate;
 
-            Debug.WriteLine($"MEMORY={GC.Run(true)}");
+            Debug.WriteLine($"Memory: {GC.Run(true)} bytes free");
 
             if (File.Exists(@"I:\autorun.mog"))
             {
-                Debug.WriteLine("autorun.mog found. Executing...");
+                Debug.WriteLine("autorun.mog found.");
+                Debug.WriteLine("running...");
 
                 string code = File.ReadAllText(@"I:\autorun.mog");
                 AppGlobal.MogwaiNanoEngine.RunAsync(code);
@@ -187,7 +188,7 @@ namespace MogwaiNano
 
         private static bool ConnectToWifi()
         {
-            Debug.Write("Connexion au WiFi... ");
+            Debug.Write("Connecting to WiFi... ");
 
             CancellationTokenSource cs = new(60000);
 
@@ -196,14 +197,14 @@ namespace MogwaiNano
             if (!success)
             {
                 Debug.WriteLine();
-                Debug.WriteLine("Aucune configuration WiFi trouvée ou échec de connexion.");
+                Debug.WriteLine("No WiFi configuration found or connection failed.");
                 
                 return false;
             }
             else
             {
                 AppGlobal.IpAddress = NetworkInterface.GetAllNetworkInterfaces()[0].IPv4Address;
-                Debug.WriteLine($"OK - {AppGlobal.IpAddress}");
+                Debug.WriteLine($"OK @ {AppGlobal.IpAddress}");
             }
 
             return true;

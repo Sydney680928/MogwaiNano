@@ -81,14 +81,16 @@ dotnet tool install -g nanoff
 
 # ESP32 — two separate commands (see note below on why)
 
-# 1. Flash the firmware
-nanoff --target ESP32_REV3 --serialport COMx --update
+# 1. Flash the firmware (--masserase avoids issues from leftover factory partitions on a brand-new board)
+nanoff --target ESP32_REV3 --serialport COMx --masserase --update
 
 # 2. Deploy the application
 nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --address 0x1E0000
 ```
 
 > **Why two separate commands, and why `--address` is required:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation is unreliable and consistently fails to match the device's actual partition layout — confirmed across three different boards, regardless of firmware version. Always pass `--address 0x1E0000` explicitly when deploying. It also needs to be in its own command, separate from `--update`: combining `--update` and `--deploy --address` in a single invocation causes `--address` to be silently ignored.
+>
+> **Why `--masserase`:** on a board that was never flashed with nanoFramework before (or previously ran different firmware), leftover factory partition data can cause the deployment to fail — `--masserase` wipes the flash clean first, avoiding this entirely. Recommended on every first flash of a new board.
 >
 > After deploying, check the device with `nanoff --devicedetails` or Device Explorer and look at the `Assemblies:` section to confirm success — `MogwaiNano` should be listed there with its dependencies. The `Deployment Map` field further down is unrelated to this (it reports on In-Field Update capability, which this target doesn't support) and will read `Empty` even on a fully successful deployment — don't use it to diagnose a failed deploy.
 

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using nanoFramework.Json;
-using System;
 using System.Collections;
 using System.Diagnostics;
 using System.Net;
@@ -59,7 +57,7 @@ namespace MogwaiNano.Engine
         public void StopTcpServer()
         {
             _shuttingDown = true;
-            _tcpClient?.Close(); 
+            _tcpClient?.Close();
             _tcpListener?.Stop();
             _tcpThread.Join(2000);
         }
@@ -140,7 +138,7 @@ namespace MogwaiNano.Engine
         private void HandleClient(TcpClient client)
         {
             NetworkStream stream = client.GetStream();
-            
+
             var idleStopwatch = Stopwatch.StartNew();
 
             _disconnectRequested = false;
@@ -173,11 +171,11 @@ namespace MogwaiNano.Engine
             _outgoingQueue.Clear();
         }
 
-        private void ProcessMessage(string json, NetworkStream stream)
+        private void ProcessMessage(string nano, NetworkStream stream)
         {
             try
             {
-                var message = (ServerMessage)JsonConvert.DeserializeObject(json, typeof(ServerMessage));
+                var message = ServerMessage.FromNanoFormat(nano);
 
                 if (message.Function == "BYE")
                 {
@@ -185,7 +183,7 @@ namespace MogwaiNano.Engine
                     _disconnectRequested = true;
                 }
 
-                MessageReceived?.Invoke(message);               
+                MessageReceived?.Invoke(message);
             }
             catch
             {
@@ -213,9 +211,8 @@ namespace MogwaiNano.Engine
 
         private void SendMessage(NetworkStream stream, ServerMessage message)
         {
-            string json = JsonConvert.SerializeObject(message);
-            string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
-            byte[] payloadBytes = Encoding.UTF8.GetBytes(base64);
+            string nano = message.ToNanoFormat();
+            byte[] payloadBytes = Encoding.UTF8.GetBytes(nano);
 
             int length = payloadBytes.Length;
             byte[] lengthBytes = new byte[4];
@@ -234,6 +231,7 @@ namespace MogwaiNano.Engine
         private string ReadMessage(NetworkStream stream)
         {
             byte[] lengthBuffer = new byte[4];
+
             if (!ReadExactly(stream, lengthBuffer, 4))
                 return null;
 
@@ -243,12 +241,11 @@ namespace MogwaiNano.Engine
                 return null;
 
             byte[] payloadBuffer = new byte[messageLength];
+
             if (!ReadExactly(stream, payloadBuffer, messageLength))
                 return null;
 
-            string base64 = Encoding.UTF8.GetString(payloadBuffer, 0, messageLength);
-            byte[] jsonBytes = Convert.FromBase64String(base64);
-            return Encoding.UTF8.GetString(jsonBytes, 0, jsonBytes.Length);
+            return Encoding.UTF8.GetString(payloadBuffer, 0, payloadBuffer.Length);
         }
 
         private bool ReadExactly(NetworkStream stream, byte[] buffer, int count)

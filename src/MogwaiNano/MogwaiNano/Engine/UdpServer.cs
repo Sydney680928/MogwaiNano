@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using nanoFramework.Json;
 using nanoFramework.Runtime.Native;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -66,8 +65,8 @@ namespace MogwaiNano.Engine
                         if (_shuttingDown)
                             break;
 
-                        string json = Encoding.UTF8.GetString(buffer, 0, length);
-                        var message = (ServerMessage)JsonConvert.DeserializeObject(json, typeof(ServerMessage));
+                        string nano = Encoding.UTF8.GetString(buffer, 0, length);
+                        var message = ServerMessage.FromNanoFormat(nano);
 
                         if (message.Source == AppGlobal.EXPECTED_SOURCE && message.Function == "WHO IS HERE")
                             SendDiscoveryResponse(_udpListener, remoteEndPoint);
@@ -98,9 +97,8 @@ namespace MogwaiNano.Engine
                 SystemInfo.Version.ToString()
             );
 
-            string json = JsonSerializer.SerializeObject(response);
-            byte[] responseBytes = Encoding.UTF8.GetBytes(json);
-
+            string nano = response.ToNanoFormat();
+            byte[] responseBytes = Encoding.UTF8.GetBytes(nano);
             udpListener.Send(responseBytes, remoteEndPoint);
         }
     }

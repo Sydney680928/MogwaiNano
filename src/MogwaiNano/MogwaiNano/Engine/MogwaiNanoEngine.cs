@@ -175,6 +175,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("/", new PrimitiveDelegate(PrimitiveMathDivision));
 
             _primitives.Add("->data", new PrimitiveDelegate(PrimitiveToData));
+            _primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
+            _primitives.Add("bcd->", new PrimitiveDelegate(PrimitiveBcdToDecimal));
 
             _primitives.Add("clear", new PrimitiveDelegate(PrimitiveStackClear));
             _primitives.Add("swap", new PrimitiveDelegate(PrimitiveStackSwap));
@@ -241,6 +243,7 @@ namespace MogwaiNano.Engine
             _primitives.Add("i2c.register.write", new PrimitiveDelegate(PrimitiveI2cRegisterWrite));
             _primitives.Add("i2c.read", new PrimitiveDelegate(PrimitiveI2cRead));
             _primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
+            _primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
 
             _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
             _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
@@ -2075,6 +2078,54 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
+        private EvalResult PrimitiveBcdToDecimal(string name)
+        {
+            // bcd->
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var number = StackPop() as MOGNumber;
+
+            if (number == null)
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            int bcdValue = (int)number.Value;
+            int decimalValue = ((bcdValue >> 4) * 10) + (bcdValue & 0x0F);
+
+            StackPush(new MOGNumber(this, decimalValue));
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveDecimalToBcd(string name) 
+        {
+            // ->bcd
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var number = StackPop() as MOGNumber;
+
+            if (number == null)
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            int decimalValue = (int)number.Value;
+
+            if (decimalValue < 0 || decimalValue > 99)
+                return EvalResult.Failure(this, Error.BadArgumentValueError, name); // BCD sur un octet = 0-99
+
+            int bcdValue = ((decimalValue / 10) << 4) | (decimalValue % 10);
+
+            StackPush(new MOGNumber(this, bcdValue));
+
+            return EvalResult.NoError;
+        }
+
         #region GPIO
 
         private EvalResult PrimitiveGpioModeInput(string name) => SetPinMode(name, PinMode.Input);
@@ -2431,6 +2482,47 @@ namespace MogwaiNano.Engine
             }
         }
 
+        private EvalResult PrimitiveI2cScan(string name)
+        {
+            // bus i2c.scan
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var bus = StackPop() as MOGNumber;
+            int busNumber = (int)bus.Value;
+
+            SpanByte span = new byte[1];
+            bool isDevice;
+
+            var list = new MOGList(this);
+
+            for (int i = 0; i <= 0xFF; i++)
+            {
+                isDevice = false;
+                I2cDevice i2c = new(new I2cConnectionSettings(busNumber, i));
+               
+                var res = i2c.WriteByte(0x07);                        
+                isDevice = res.Status == I2cTransferStatus.FullTransfer;
+
+                res = i2c.Read(span);
+                isDevice &= res.Status == I2cTransferStatus.FullTransfer;
+
+                if (isDevice)
+                    list.AddItem(new MOGNumber(this, i));
+
+                i2c.Dispose();
+            }
+
+            StackPush(list);
+
+            return EvalResult.NoError;
+        }
 
         #endregion
 

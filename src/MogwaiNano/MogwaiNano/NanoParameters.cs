@@ -35,7 +35,7 @@ namespace MogwaiNano
             }
             catch
             {
-                
+
             }
 
             return new NanoParameters();

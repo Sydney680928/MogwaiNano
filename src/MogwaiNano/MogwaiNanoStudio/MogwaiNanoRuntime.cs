@@ -248,9 +248,6 @@ namespace MogwaiNanoStudio
 
             var code = response.Parameters[0] ?? "";
 
-            byte[] decoded = Convert.FromBase64String(code);
-            code = Encoding.UTF8.GetString(decoded, 0, decoded.Length);
-
             var allowPrivatePrimitives = _engine.AllowPrivatePrimitives;
             _engine.AllowPrivatePrimitives = true;
 

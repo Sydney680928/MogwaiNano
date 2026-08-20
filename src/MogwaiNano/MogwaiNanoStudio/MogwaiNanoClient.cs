@@ -79,9 +79,8 @@ namespace MogwaiNanoStudio
 
             try
             {
-                string json = JsonSerializer.Serialize(message);
-                string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
-                byte[] payloadBytes = Encoding.UTF8.GetBytes(base64);
+                string nano = message.ToNanoFormat();
+                byte[] payloadBytes = Encoding.UTF8.GetBytes(nano);
 
                 byte[] lengthBytes = new byte[4];
                 int length = payloadBytes.Length;
@@ -110,14 +109,14 @@ namespace MogwaiNanoStudio
             {
                 while (_running)
                 {
-                    string? json = ReadMessage();
+                    string? nano = ReadMessage();
 
-                    if (json == null)
+                    if (nano == null)
                         break; // connexion fermée proprement
 
                     try
                     {
-                        var message = JsonSerializer.Deserialize<ServerMessage>(json);
+                        var message = ServerMessage.FromNanoFormat(nano);
 
                         if (message != null)
                             MessageReceived?.Invoke(this, message);
@@ -150,12 +149,11 @@ namespace MogwaiNanoStudio
             int messageLength = (lengthBuffer[0] << 24) | (lengthBuffer[1] << 16) | (lengthBuffer[2] << 8) | lengthBuffer[3];
 
             byte[] payloadBuffer = new byte[messageLength];
+            
             if (!ReadExactly(payloadBuffer, messageLength))
                 return null;
 
-            string base64 = Encoding.UTF8.GetString(payloadBuffer, 0, messageLength);
-            byte[] jsonBytes = Convert.FromBase64String(base64);
-            return Encoding.UTF8.GetString(jsonBytes, 0, jsonBytes.Length);
+            return Encoding.UTF8.GetString(payloadBuffer, 0, payloadBuffer.Length);
         }
 
         private bool ReadExactly(byte[] buffer, int count)
@@ -188,8 +186,8 @@ namespace MogwaiNanoStudio
             udpClient.EnableBroadcast = true;
 
             var request = new ServerMessage(AppGlobal.SOURCE_NAME, "WHO IS HERE");
-            string json = JsonSerializer.Serialize(request);
-            byte[] data = Encoding.UTF8.GetBytes(json);
+            string nano = request.ToNanoFormat();
+            byte[] data = Encoding.UTF8.GetBytes(nano);
 
             var broadcastEndpoint = new IPEndPoint(IPAddress.Broadcast, AppGlobal.DISCOVERY_PORT);
 
@@ -198,7 +196,7 @@ namespace MogwaiNanoStudio
 
             udpClient.Client.ReceiveTimeout = 1000;
 
-            var deadline = DateTime.Now.AddMilliseconds(1000);
+            var deadline = DateTime.Now.AddMilliseconds(2000);
             var nextSendTime = DateTime.Now;
 
             while (DateTime.Now < deadline)
@@ -213,9 +211,9 @@ namespace MogwaiNanoStudio
                 {
                     IPEndPoint? remoteEndPoint = null;
                     byte[] received = udpClient.Receive(ref remoteEndPoint);
-                    string responseJson = Encoding.UTF8.GetString(received);
+                    string responseNano = Encoding.UTF8.GetString(received);
 
-                    var response = JsonSerializer.Deserialize<ServerMessage>(responseJson);
+                    var response = ServerMessage.FromNanoFormat(responseNano);
 
                     if (response != null && response.Function == "I AM HERE" && response.Parameters != null && response.Parameters.Length >= 6)
                     {
