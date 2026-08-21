@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+## 0.2.0] - 2026-08-21
+
+### Added
+
 - Hexadecimal number literals (`0xFF`)
 - `nano.info` — remote equivalent of the device-side `mogwai.info`, returning the same `MOGRecord` (system version, IP, device name, platform, session, free memory, target, MOGWAI NANO version, and OEM build details) without needing a `nano.run` round-trip
 - `nano.user.connect` — guided connection shortcut combining discovery, interactive selection, and connection in one call: scans for devices, lists the ones that responded for the user to pick from, and connects to the selected one. Pushes `true` on a successful connection, `false` if nothing responded, no device was selected, or the connection failed — the same boolean convention as `nano.connect`
@@ -115,5 +123,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.1.0
