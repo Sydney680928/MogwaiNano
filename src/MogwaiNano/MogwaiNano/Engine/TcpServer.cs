@@ -24,6 +24,7 @@ namespace MogwaiNano.Engine
     public class TcpServer
     {
         private const int MAX_MESSAGE_SIZE = 16384;
+        private const int MAX_QUEUE_SIZE = 100; 
 
         private Thread _tcpThread;
         private TcpListener _tcpListener;
@@ -62,10 +63,13 @@ namespace MogwaiNano.Engine
             _tcpThread.Join(2000);
         }
 
-        public void EnqueueMessage(ServerMessage message)
+        private void EnqueueMessage(ServerMessage message)
         {
             lock (_outgoingLock)
             {
+                if (_outgoingQueue.Count >= MAX_QUEUE_SIZE)
+                    _outgoingQueue.Dequeue();
+
                 _outgoingQueue.Enqueue(message);
             }
         }
