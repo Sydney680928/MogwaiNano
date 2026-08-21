@@ -22,7 +22,6 @@ namespace MogwaiNanoStudio
     {
         private const string SOURCE_NAME = "STUDIO_NANO";
 
-        private DateTime _lastAliveReceived;
         private MogwaiEngine _engine;
         private Timer _pingTimer;
 
@@ -40,7 +39,7 @@ namespace MogwaiNanoStudio
 
         public bool IsRunning { get; private set; } = false;
 
-        public bool ListenMessages { get; set; } = false;
+        public bool DisplayMessages { get; set; } = false;
 
         public bool ViewMode { get; private set; } = false; 
 
@@ -87,10 +86,6 @@ namespace MogwaiNanoStudio
             {
                 NanoPrint?.Invoke(message.Parameters[0]);
             }
-            else if (message.Function == "ALIVE")
-            {
-                _lastAliveReceived = DateTime.Now;
-            }
         }
 
         public bool Halt()
@@ -120,7 +115,7 @@ namespace MogwaiNanoStudio
             if (responseState.Parameters[0] != "IDLE")
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceBusyError);
 
-            ListenMessages = false;
+            DisplayMessages = false;
 
             IsRunning = false;
 
@@ -133,8 +128,6 @@ namespace MogwaiNanoStudio
             {
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
             }
-
-            // On attend que le programme démarre
 
             var startResponse = await WaitResponse("PROGRAM.DID.START");
 
@@ -164,37 +157,34 @@ namespace MogwaiNanoStudio
 
             IsRunning = true;   
             ExitViewModeRequested = false;
-            ListenMessages = true;
+            DisplayMessages = true;
             ViewMode = true;
 
-            // On attend que le programme se termine
-
-            if (! await WaitNanoProgramDidEnd())
-            {
-                ListenMessages = false;
-                ViewMode = false;
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
-            }
-
-            // On affiche le résultat final du programme si on n'est pas simplement sorti du mode view
+            await WaitNanoProgramDidEnd();
 
             if (!ExitViewModeRequested)
             {
+                Console.WriteLine();
+
                 var messageLastResult = new ServerMessage(SOURCE_NAME, "LAST.RESULT.GET");
                 var responseLastResult = await SendMessageAndWaitResponse(messageLastResult);
 
                 if (responseLastResult == null)
-                    return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
-
-                Console.WriteLine();
-                Console.WriteLine(responseLastResult.Parameters[0]);
+                {
+                    Console.WriteLine("device unreachable !");
+                    Console.WriteLine("unabled to get program result.");
+                }
+                else
+                {
+                    Console.WriteLine(responseLastResult.Parameters[0]);
+                }
             }
 
             Console.WriteLine();
             Console.WriteLine("──── Exit view mode ──────────────────────────────────");
             Console.WriteLine();
 
-            ListenMessages = false;
+            DisplayMessages = false;
             ViewMode = false;
             ExitViewModeRequested = false;
 
@@ -462,8 +452,6 @@ namespace MogwaiNanoStudio
 
                     if (c == 0)
                     {
-                        // Aucun device valide dans la liste, on retourne null
-
                         _engine.StackPushNull();
                         return Task.FromResult(EvalResult.NoError);
                     }
@@ -484,8 +472,6 @@ namespace MogwaiNanoStudio
 
                         if (string.IsNullOrEmpty(input))
                         {
-                            // ESC
-
                             _engine.StackPushNull();
                             return Task.FromResult(EvalResult.NoError);
                         }
@@ -500,49 +486,33 @@ namespace MogwaiNanoStudio
             }
             else
             {
-                // Aucun device dans la liste, on retourne null
-
                 _engine.StackPushNull();
                 return Task.FromResult(EvalResult.NoError);
             }
         }
 
-        private async Task<bool> WaitNanoProgramDidEnd(int timeout = 12000)
+        private async Task WaitNanoProgramDidEnd()
         {
-            _lastAliveReceived = DateTime.Now;
-
             while (IsRunning)
             {
                 await Task.Delay(100);
 
-                if (ExitViewModeRequested)
+                if (ExitViewModeRequested || _engine.HaltRequested)
                 {
-                    ListenMessages = false;
-                    return true;
-                }
-
-                if (_engine.HaltRequested)
-                {
-                    ListenMessages = false;
-                    return true;
+                    DisplayMessages = false;
+                    return;
                 }
 
                 var r = await _engine.Yield();
 
                 if (r.IsError)
-                    return false;
-
-                var interval = DateTime.Now - _lastAliveReceived;
-
-                if (interval.TotalMilliseconds >= timeout)
                 {
-                    //ListenMessages = false;
-                    //IsRunning = false;
-                    //return false;
+                    DisplayMessages = false;
+                    return;
                 }
             }
 
-            return true;
+            DisplayMessages = false;
         }
 
         private async Task<ServerMessage?> WaitResponse(string function, int timeout = 5000)

@@ -45,14 +45,7 @@ namespace MogwaiNanoStudio
         /// <summary>True si le code en session diffère du dernier enregistrement.</summary>
         public bool HasUnsavedChanges => _sessionCode != _savedText;
 
-        /// <summary>
-        /// Code à exécuter après la fermeture de l'éditeur.
-        /// Non-null si l'utilisateur a demandé un Run (F5).
-        /// Program.cs le consomme après le retour de Open().
-        /// </summary>
         public string? PendingRunCode { get; private set; }
-
-        // ─── Constructeur ─────────────────────────────────────────────────────
 
         public MogwaiEditor(MogwaiEngine engine, EngineDelegate engineDelegate)
         {
@@ -60,18 +53,12 @@ namespace MogwaiNanoStudio
             _delegate = engineDelegate;
         }
 
-        // ─── Helpers ─────────────────────────────────────────────────────────
-
-        /// <summary>Normalise les fins de ligne en \n (TextView travaille en \n).</summary>
         private static string Normalize(string s) => s.Replace("\r\n", "\n");
-
-        // ─── Point d'entrée ───────────────────────────────────────────────────
 
         public void Open()
         {
             PendingRunCode = null;
 
-            // ── Barre de commandes (avant-dernière ligne) ────────────────────
             var cmdBar = new Label("  Ctrl+N New   Ctrl+O Open   Ctrl+W Save   Ctrl+A Save as   F5 Run   Ctrl+Q Quit")
             {
                 X     = 0,
@@ -84,7 +71,6 @@ namespace MogwaiNanoStudio
                 },
             };
 
-            // ── Hint bar (dernière ligne) : Ln/Col + chemin ──────────────────
             var hintBar = new Label("")
             {
                 X     = 0,
@@ -97,7 +83,6 @@ namespace MogwaiNanoStudio
                 },
             };
 
-            // ── Colonne numéros de ligne ─────────────────────────────────────
             const int gutterWidth = 6; // "9999 │" = 6 chars
 
             var lineNumView = new TextView
@@ -116,7 +101,6 @@ namespace MogwaiNanoStudio
                 },
             };
 
-            // ── TextView principal ───────────────────────────────────────────
             var textView = new EditorTextView
             {
                 X        = gutterWidth,
@@ -132,7 +116,6 @@ namespace MogwaiNanoStudio
                 },
             };
 
-            // ── Window ───────────────────────────────────────────────────────
             var window = new Window(BuildTitle(_sessionCode))
             {
                 X      = 0,
@@ -149,7 +132,6 @@ namespace MogwaiNanoStudio
             };
             window.Add(lineNumView, textView);
 
-            // ── Callbacks EditorTextView ─────────────────────────────────────
             textView.OnNew    = () => DoNew(textView, lineNumView, window);
             textView.OnOpen   = () => { if (ConfirmSave(textView)) DoOpen(textView, lineNumView, window); };
             textView.OnSave   = () => { DoSave(textView); window.Title = BuildTitle(GetText(textView)); };
@@ -157,7 +139,6 @@ namespace MogwaiNanoStudio
             textView.OnRun    = () => DoRun(textView);
             textView.OnQuit   = () => { if (ConfirmSave(textView)) Application.RequestStop(); };
 
-            // ── Init ─────────────────────────────────────────────────────────
             ConsoleDriver? driver = null;
             try
             {
@@ -173,7 +154,6 @@ namespace MogwaiNanoStudio
 
             RefreshLineNumbers(lineNumView, textView);
 
-            // ── Timer 50 ms : scroll sync + numéros de ligne + titre + hint ──
             object? timerToken = null;
             timerToken = Application.MainLoop.AddTimeout(
                 TimeSpan.FromMilliseconds(50),
@@ -199,7 +179,6 @@ namespace MogwaiNanoStudio
                     return true;
                 });
 
-            // ── KeyPress sur Application.Top (filet de sécurité) ────────────
             Application.Top.KeyPress += (e) =>
             {
                 switch (e.KeyEvent.Key)
@@ -230,9 +209,6 @@ namespace MogwaiNanoStudio
             Application.Shutdown();
         }
 
-        // ─── Helpers UI ──────────────────────────────────────────────────────
-
-        /// <summary>Lit le contenu du TextView en normalisant les fins de ligne.</summary>
         private static string GetText(TextView tv) =>
             Normalize(tv.Text.ToString() ?? string.Empty);
 
@@ -256,8 +232,6 @@ namespace MogwaiNanoStudio
             var dirty = currentCode != _savedText ? " ●" : string.Empty;
             return $"MOGWAI NANO Editor — {name}{dirty}";
         }
-
-        // ─── Actions ─────────────────────────────────────────────────────────
 
         private void DoNew(TextView textView, TextView lineNumView, Window window)
         {
@@ -388,12 +362,6 @@ namespace MogwaiNanoStudio
                 _ => false,
             };
         }
-
-        // ─── EditorTextView ───────────────────────────────────────────────────
-        //
-        // Sous-classe de TextView qui intercepte nos raccourcis AVANT que le
-        // comportement par défaut du TextView ne les consomme.
-        // (Ctrl+N = saut de ligne, Ctrl+A = select all dans le TextView natif)
 
         private sealed class EditorTextView : TextView
         {

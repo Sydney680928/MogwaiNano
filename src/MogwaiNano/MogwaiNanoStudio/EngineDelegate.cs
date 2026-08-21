@@ -47,10 +47,6 @@ namespace MogwaiNanoStudio
             _engine = engine;
         }
 
-        // ─── Host functions ───────────────────────────────────────────────────
-        // "edit" est retiré : il est maintenant géré dans Program.cs sur le
-        // thread principal. Terminal.Gui ne peut pas tourner sur un thread secondaire.
-
         public string[] HostFunctions(MogwaiEngine engine) => [
             "?s",
             "run",
@@ -61,7 +57,7 @@ namespace MogwaiNanoStudio
             "nano.disconnect",
             "nano.isConnected",
             "nano.scan",
-            "nano.select",
+            "nano.user.select",
             "nano.state",
             "nano.isRunning",
             "nano.halt",
@@ -69,14 +65,14 @@ namespace MogwaiNanoStudio
             "nano.autorun.get",
             "nano.autorun.purge",
             "nano.reboot",
-            "nano.view",
+            "nano.user.view",
             "nano.session",
             "nano.lastResult",
             "nano.memory",
             "nano.name",
             "nano.name.set",
             "nano.info",
-            "nano.userConnect",
+            "nano.user.connect",
 
             "mogwai.memory",
 
@@ -251,15 +247,15 @@ namespace MogwaiNanoStudio
 
                 return EvalResult.NoError;
             }
-            else if (word == "nano.select")
+            else if (word == "nano.user.select")
             {
-                // nano.select
+                // nano.user.select
 
                 return await AppGlobal.NanoRuntime.Select();
             }
-            else if (word == "nano.userConnect")
+            else if (word == "nano.user.connect")
             {
-                // nano.userConnect = nano.select + nano.connect
+                // nano.user.connect = nano.user.select + nano.connect
                 // true if connected, false if not or no device selected
 
                 var r = await AppGlobal.NanoRuntime.Select();
@@ -405,7 +401,7 @@ namespace MogwaiNanoStudio
                     return EvalResult.Failure(engine, MogwaiNanoErrors.DeviceUnreachableError);
                 }
             }
-            else if (word == "nano.view")
+            else if (word == "nano.user.view")
             {
                 return await AppGlobal.NanoRuntime.ViewAsync();
             }

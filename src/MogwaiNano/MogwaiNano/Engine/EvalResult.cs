@@ -27,49 +27,51 @@ namespace MogwaiNano.Engine
             {
                 if (_noError == null)
                     _noError = new EvalResult();
-
                 return _noError;
             }
         }
 
-        public Error Error { get; init; } = Error.None;
-
-        public string[] Informations { get; init; }
-
+        public Error Error { get; private set; }
+        
+        public string[] Informations { get; private set; }
+        
         public TimeSpan Duration { get; set; }
 
         public bool IsError => Error != Error.None;
-
+        
         public bool IsSuccess => Error == Error.None;
 
-        static EvalResult()
+        public EvalResult()
         {
-
+            Error = Error.None;
+            Informations = new string[0];
         }
 
         public static EvalResult Failure(MogwaiNanoEngine engine, Error error, params string[] informations)
         {
             engine.LastError = error;
 
-            return new EvalResult
+            var result = new EvalResult
             {
                 Error = error,
-                Informations = informations
+                Informations = informations ?? new string[0]
             };
+            return result;
         }
 
         public static EvalResult ParseFailure(MogwaiNanoEngine engine, params string[] informations)
         {
             engine.LastError = Error.ParseError;
 
-            return new EvalResult
+            var result = new EvalResult
             {
                 Error = engine.LastError,
                 //StartErrorPosition = engine.LastParserStartErrorPosition,
                 //EndErrorPosition = engine.LastParserEndErrorPosition,
                 //ExecutionContext = engine.LastParserExecutionContext,
-                Informations = informations
+                Informations = informations ?? new string[0]
             };
+            return result;
         }
 
         public override string ToString()

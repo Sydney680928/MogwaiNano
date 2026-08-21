@@ -21,6 +21,7 @@ using System.Device.Gpio;
 using System.Device.I2c;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using System.Reflection;
 using System.Threading;
 using GC = nanoFramework.Runtime.Native.GC;
@@ -53,7 +54,9 @@ namespace MogwaiNano.Engine
         private Thread _aliveThread;  
         private Hashtable _openPins = new(3);
         private GpioController _gpioController = new();
-        private Hashtable _i2cDevices = new(2); 
+        private Hashtable _i2cDevices = new(2);
+        private string[] _skills = { "GPIO", "I2C" };
+        private ArrayList _flags = new();
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -138,11 +141,6 @@ namespace MogwaiNano.Engine
 
             _runThread = new Thread(RunLoop);
             _runThread.Start();
-
-            // Create and start is alive thread 
-
-            _aliveThread = new Thread(AliveLoop); 
-            _aliveThread.Start();
         }
 
         public bool IsPrimitive(string name) => _primitives.Contains(name);
@@ -218,6 +216,14 @@ namespace MogwaiNano.Engine
             _primitives.Add("timer.stop", new PrimitiveDelegate(PrimitiveTimerStop));
             _primitives.Add("timer.purge", new PrimitiveDelegate(PrimitiveTimerPurge));
 
+            _primitives.Add("skills", new PrimitiveDelegate(PrimitiveGetSkills));
+            _primitives.Add("hasSkill", new PrimitiveDelegate(PrimitiveHasSkill)); 
+
+            _primitives.Add("flag.set", new PrimitiveDelegate(PrimitiveFlagSet));   
+            _primitives.Add("flag.clear", new PrimitiveDelegate(PrimitiveFlagClear)); 
+            _primitives.Add("flag.isSet", new PrimitiveDelegate(PrimitiveFlagIsSet));
+            _primitives.Add("flag.isClear", new PrimitiveDelegate(PrimitiveFlagIsClear));
+
             _primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
 
             _primitives.Add("mogwai.halt", new PrimitiveDelegate(PrimitiveHalt));
@@ -273,19 +279,6 @@ namespace MogwaiNano.Engine
                     var executionThread = new Thread(() => Run(code, debugMode));
                     executionThread.Start();
                 }
-            }
-        }
-
-        private void AliveLoop()
-        {
-            while (true)
-            {
-                Thread.Sleep(2000);
-
-                /*
-                if (IsRunning && AppGlobal.TcpServer.IsClientConnected)
-                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "ALIVE"));
-                */
             }
         }
 
@@ -2126,6 +2119,131 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
+        #region SKILLS
+
+        private EvalResult PrimitiveGetSkills(string name)
+        {
+            var list = new MOGList(this);
+            
+            foreach (var skill in _skills)
+                list.AddItem(new MOGString(this, skill));
+ 
+            StackPush(list);
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveHasSkill(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] != typeof(MOGString))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var skillName = StackPop() as MOGString;
+            var skillValue = skillName.Value.ToUpper();
+
+            foreach (var skill in _skills)
+            {
+                if (skill == skillValue)
+                {
+                    StackPush(new MOGBoolean(this, true));
+                    return EvalResult.NoError;
+                }
+            }   
+
+            StackPush(new MOGBoolean(this, false));
+            
+            return EvalResult.NoError;
+        }
+
+        #endregion
+
+        #region FLAGS
+
+        private EvalResult PrimitiveFlagSet(string name)
+        {
+            // 'name' flag.set
+
+            var s = StackSign(1);
+            
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            
+            var flagName = StackPop() as MOGName;
+
+            if (!_flags.Contains(flagName.Value))
+                _flags.Add(flagName.Value);
+            
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveFlagClear(string name)
+        {
+            // 'name' flag.clear
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var flagName = StackPop() as MOGName;
+
+            if (_flags.Contains(flagName.Value))
+                _flags.Remove(flagName.Value);
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveFlagIsSet(string name)
+        {
+            // 'name' flag.isSet
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var flagName = StackPop() as MOGName;
+            var v = _flags.Contains(flagName.Value);
+            StackPush(new MOGBoolean(this, v));
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveFlagIsClear(string name)
+        {
+            // 'name' flag.isClear
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var flagName = StackPop() as MOGName;
+            var v = _flags.Contains(flagName.Value);
+            StackPush(new MOGBoolean(this, !v));
+
+            return EvalResult.NoError;
+        }
+
+        #endregion
+
         #region GPIO
 
         private EvalResult PrimitiveGpioModeInput(string name) => SetPinMode(name, PinMode.Input);
@@ -2484,39 +2602,31 @@ namespace MogwaiNano.Engine
 
         private EvalResult PrimitiveI2cScan(string name)
         {
-            // bus i2c.scan
-
             var s = StackSign(1);
 
             if (s.Length == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
-
+            
             if (s[0] != typeof(MOGNumber))
                 return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
 
             var bus = StackPop() as MOGNumber;
             int busNumber = (int)bus.Value;
 
-            SpanByte span = new byte[1];
-            bool isDevice;
-
             var list = new MOGList(this);
+            
+            byte[] probe = new byte[1];
+            SpanByte span = new SpanByte(probe);
 
-            for (int i = 0; i <= 0xFF; i++)
+            for (int address = 0x08; address <= 0x77; address++)
             {
-                isDevice = false;
-                I2cDevice i2c = new(new I2cConnectionSettings(busNumber, i));
-               
-                var res = i2c.WriteByte(0x07);                        
-                isDevice = res.Status == I2cTransferStatus.FullTransfer;
+                using (I2cDevice i2c = new(new I2cConnectionSettings(busNumber, address)))
+                {
+                    var res = i2c.Write(span);
 
-                res = i2c.Read(span);
-                isDevice &= res.Status == I2cTransferStatus.FullTransfer;
-
-                if (isDevice)
-                    list.AddItem(new MOGNumber(this, i));
-
-                i2c.Dispose();
+                    if (res.Status == I2cTransferStatus.FullTransfer)
+                        list.AddItem(new MOGNumber(this, address));
+                }
             }
 
             StackPush(list);

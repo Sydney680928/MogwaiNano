@@ -24,13 +24,13 @@ AppGlobal.MogwaiEngine.AllowPrivatePrimitives = true;
 
 AppGlobal.NanoRuntime.NanoDebugWrite += (message) =>
 {
-    if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.ListenMessages)
+    if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.DisplayMessages)
         Console.WriteLine($"[DBG] {message}");
 };
 
 AppGlobal.NanoRuntime.NanoPrint += (message) =>
 {
-    if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.ListenMessages)
+    if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.DisplayMessages)
         Console.WriteLine(message);
 };
 
@@ -71,9 +71,6 @@ Console.WriteLine();
 Console.WriteLine(MogwaiEngine.RuntimePrompt);
 Console.WriteLine();
 
-// L'éditeur est géré ici, sur le thread principal, comme BYE et STUDIO.
-// Terminal.Gui DOIT tourner sur le thread principal
-
 var editor = new MogwaiEditor(AppGlobal.MogwaiEngine, AppGlobal.EngineDelegate);
 
 Console.CancelKeyPress += (_, e) =>
@@ -101,7 +98,7 @@ FileAssociationHelper.EnsureFileAssociation();
 while (true)
 {
     Console.WriteLine();
-    Console.Write("MOGWAI > ");
+    Console.Write("MOGWAI NANO > ");
 
     var input = Console.ReadLine() ?? string.Empty;
     var cmd = input.Trim().ToUpper();
@@ -128,15 +125,9 @@ while (true)
     }
     else if (cmd == "EDIT")
     {
-        // Boucle éditeur/run : l'éditeur se rouvre automatiquement après
-        // chaque exécution F5, jusqu'à ce que l'utilisateur quitte (Ctrl+Q).
-
         do
         {
             editor.Open();
-
-            // F5 depuis l'éditeur → PendingRunCode non-null.
-            // On exécute ici, dans la console propre (Terminal.Gui fermé).
 
             if (editor.PendingRunCode is string codeToRun)
             {
@@ -159,8 +150,6 @@ while (true)
             Console.WriteLine();
 
         } while (editor.PendingRunCode != null);
-
-        // PendingRunCode == null → l'utilisateur a quitté l'éditeur (Ctrl+Q / Exit)
     }
     else if (cmd == "STUDIO")
     {
@@ -207,23 +196,15 @@ while (true)
     {
         try
         {
-            var task = AppGlobal.MogwaiEngine.RunAsync(input, true);
-
-            while (task.Status != TaskStatus.RanToCompletion)
-            {
-                if (Console.KeyAvailable)
-                {
-                    var k = Console.ReadKey(true);
-
-                    if (k.Key == ConsoleKey.F10)
-                        AppGlobal.MogwaiEngine.DebugFireNextStepSignal();
-                    else if (k.Key == ConsoleKey.F5)
-                        AppGlobal.MogwaiEngine.DebugFireResumeSignal();
-                }
-            }
+            var result = await AppGlobal.MogwaiEngine.RunAsync(input, true);
 
             Console.WriteLine();
-            Console.WriteLine(task.Result);
+            Console.WriteLine(result);
+
+            if (result.IsError)
+            {
+
+            }
         }
         catch (Exception ex)
         {
