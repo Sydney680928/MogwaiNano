@@ -395,7 +395,7 @@ namespace MogwaiNanoStudio
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
             
-            if (response.Parameters == null || response.Parameters.Length < 8)
+            if (response.Parameters == null || response.Parameters.Length < 9)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid info response from device.");
 
             if (int.TryParse(response.Parameters[8], out int memory))
@@ -413,6 +413,18 @@ namespace MogwaiNanoStudio
                 record.SetString("system", response.Parameters[7]);
 
                 record.SetNumber("memory", memory);
+
+                var list = new MOGList(_engine);
+
+                if (!string.IsNullOrEmpty(response.Parameters[9]))
+                {
+                    var sks = response.Parameters[9].Split('\n');
+
+                    foreach (var sk in sks)
+                        list.AddString(sk);
+                }
+
+                record.SetItem("skills", list);
 
                 _engine.StackPush(record);
 

@@ -283,15 +283,18 @@ nano.memory ?
 
 This is a lightweight, non-blocking query (it doesn't force a garbage collection on the device the way `mogwai.memory` does from within a running program) — safe to call frequently, even in a polling loop.
 
-If your program is running *on the device* itself (typically as a stored autorun program, with no Studio connection to fall back on), `mogwai.info` gives you everything in a single call — a record with the device's system version, IP, name, platform, session, free memory, target, MOGWAI NANO version, and OEM build details:
+If your program is running *on the device* itself (typically as a stored autorun program, with no Studio connection to fall back on), `mogwai.info` gives you everything in a single call — a record with the device's system version, IP, name, platform, session, free memory, target, MOGWAI NANO version, OEM build details, and the device's skills:
 
 ```
-{ mogwai.info ? } nano.run
+{ 1000 wait mogwai.info ? } nano.run
+nano.user.view
 ```
 
 ```
-[system: "1.17.0.334" ip: "192.168.1.75" name: "DEVICE1" platform: "ESP32" session: "39122" memory: 49872 target: "ESP32_REV3" mogwai: "0.1.0.0" oem: "MinSizeRel build, chip rev. >= 3, without support for PSRAM"]
+[system: "1.17.0.334" ip: "192.168.1.75" name: "DEVICE1" platform: "ESP32" session: "39122" memory: 49872 target: "ESP32_REV3" mogwai: "0.2.0.0" oem: "MinSizeRel build, chip rev. >= 3, without support for PSRAM" skills: ("GPIO" "I2C")]
 ```
+
+As with the earlier `nano.user.view` example, the `1000 wait` gives the view mode time to fully attach before the program prints anything — skip it and you risk missing the very first output. Without `nano.user.view` at all, nothing from `?`/`console.print` is displayed, `mogwai.info` included.
 
 ## 11. Reboot cleanly
 

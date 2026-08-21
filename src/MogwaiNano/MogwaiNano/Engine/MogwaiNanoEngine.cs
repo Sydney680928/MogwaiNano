@@ -89,7 +89,9 @@ namespace MogwaiNano.Engine
 
         public Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
-        public EvalResult LastResult { get; private set; } = EvalResult.NoError;    
+        public EvalResult LastResult { get; private set; } = EvalResult.NoError;
+
+        public string[] Skills => _skills;
 
         public MogwaiNanoEngine()
         {
@@ -2065,6 +2067,13 @@ namespace MogwaiNano.Engine
 
             var memory = GC.Run(false);
             record.SetItem("memory", new MOGNumber(this, memory));
+
+            var skills = new MOGList(this);
+
+            foreach (var skill in _skills)
+                skills.AddItem(new MOGString(this, skill));
+
+            record.SetItem("skills", skills);
 
             StackPush(record);
 

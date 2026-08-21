@@ -163,18 +163,30 @@ namespace MogwaiNano
             else if (message.Function == "INFO.GET")
             {
                 var memory = GC.Run(false);
+
+                var sb = new StringBuilder();
+
+                foreach (var skill in AppGlobal.MogwaiNanoEngine.Skills)
+                {
+                    if (sb.Length > 0)
+                        sb.Append('\n');
+
+                    sb.Append(skill);                  
+                }
+
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(
-                    AppGlobal.NanoParameters.Name, 
-                    "INFO.GET", 
-                    AppGlobal.NanoParameters.Name, 
+                    AppGlobal.NanoParameters.Name,
+                    "INFO.GET",
+                    AppGlobal.NanoParameters.Name,
                     AppGlobal.MogwaiNanoEngine.Version.ToString(),
                     AppGlobal.IpAddress,
                     AppGlobal.Session.ToString(),
                     SystemInfo.Platform,
-                    SystemInfo.TargetName,  
+                    SystemInfo.TargetName,
                     SystemInfo.OEMString,
                     SystemInfo.Version.ToString(),
-                    memory.ToString()));
+                    memory.ToString(),
+                    sb.ToString()));
             }
             else if (message.Function == "LAST.RESULT.GET")
             {

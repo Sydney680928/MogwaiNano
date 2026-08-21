@@ -117,24 +117,34 @@ namespace MogwaiNano.Engine
                 if (_pauseSending)
                 {
                     Thread.Sleep(50);
-                    continue;
                 }
-
-                ServerMessage message = null;
-
-                lock (_outgoingLock)
+                else if (_connectionBroken)
                 {
-                    if (_outgoingQueue.Count > 0)
-                        message = (ServerMessage)_outgoingQueue.Dequeue();
-                }
+                    lock (_outgoingLock)
+                    {
+                        _outgoingQueue.Clear();
+                    }
 
-                if (message != null)
-                {
-                    AppGlobal.TcpServer.SendMessage(message);
+                    Thread.Sleep(50);
                 }
                 else
                 {
-                    Thread.Sleep(50);
+                    ServerMessage message = null;
+
+                    lock (_outgoingLock)
+                    {
+                        if (_outgoingQueue.Count > 0)
+                            message = (ServerMessage)_outgoingQueue.Dequeue();
+                    }
+
+                    if (message != null)
+                    {
+                        AppGlobal.TcpServer.SendMessage(message);
+                    }
+                    else
+                    {
+                        Thread.Sleep(50);
+                    }
                 }
             }
         }
