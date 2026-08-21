@@ -86,7 +86,7 @@ namespace MogwaiNano.Engine
             {
                 sb.AppendLine(Error.ToString());
 
-                if (Informations.Length > 0)
+                if (Informations != null && Informations.Length > 0)
                 {
                     foreach (var info in Informations)
                         sb.AppendLine(info);
