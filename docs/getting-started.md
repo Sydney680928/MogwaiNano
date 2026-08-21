@@ -17,7 +17,7 @@ Launch `MogwaiNanoStudio.exe`. You get a regular MOGWAI console.
 > This is the single most important thing to understand before going further: **everything you type in MOGWAI NANO Studio — at the console prompt, or in the editor — runs on your PC**, using the full desktop MOGWAI engine. Typing `code` doesn't mean "code" on the device. It means "code" on your computer, right here, right now.
 >
 > The **only** way to get code running on a device is to:
-> 1. Connect to it (`nano.connect`, `nano.select`, etc.)
+> 1. Connect to it (`nano.connect`, `nano.user.select`, etc.)
 > 2. Wrap the code you want to run *on the device* inside a block, and pass it to `nano.run`
 >
 > ```
@@ -25,7 +25,7 @@ Launch `MogwaiNanoStudio.exe`. You get a regular MOGWAI console.
 > { "hello from the device" ? } nano.run   # runs on the device — only because of nano.run
 > ```
 >
-> Everything outside a `nano.run` block — variables, loops, `if`/`then`, file I/O, even other `nano.*` primitives like `nano.scan` or `nano.select` — is regular MOGWAI running locally on your machine. It's a full scripting language in its own right, and you'll use it to *orchestrate* what happens on the device (deciding which one to connect to, what to send, when, and what to do with the result) — not to run things on the device itself. Only the contents of a `nano.run` block ever leave your PC.
+> Everything outside a `nano.run` block — variables, loops, `if`/`then`, file I/O, even other `nano.*` primitives like `nano.scan` or `nano.user.select` — is regular MOGWAI running locally on your machine. It's a full scripting language in its own right, and you'll use it to *orchestrate* what happens on the device (deciding which one to connect to, what to send, when, and what to do with the result) — not to run things on the device itself. Only the contents of a `nano.run` block ever leave your PC.
 
 ### A more comfortable way to write code: `edit`
 
@@ -52,14 +52,14 @@ This is how every example in this guide was actually written and tested — writ
 
 ## 3. Find your device
 
-You don't need to know your device's IP address. Ask `nano.select` to discover it on the network:
+You don't need to know your device's IP address. Ask `nano.user.select` to discover it on the network:
 
 ```
-nano.select -> 'device'
+nano.user.select -> 'device'
 if (device ->type .record ==) then { device->ip: nano.connect ? }
 ```
 
-`nano.select` runs a network scan on its own, then shows you every device that responded — name, platform, and IP — and lets you pick one:
+`nano.user.select` runs a network scan on its own, then shows you every device that responded — name, platform, and IP — and lets you pick one:
 
 ```
 0: DEVICE1              - 192.168.1.75 - ESP32_REV3
@@ -85,7 +85,7 @@ nano.isConnected ?
 
 ### Scripted discovery (no user interaction)
 
-`nano.select` is built for interactive use — it always prompts for input. If you're writing a script that should decide on its own (for example: "if a specific device is on the network, connect to it automatically"), use `nano.scan` directly instead. It returns the raw list of records without ever asking anything, so you can filter it programmatically:
+`nano.user.select` is built for interactive use — it always prompts for input. If you're writing a script that should decide on its own (for example: "if a specific device is on the network, connect to it automatically"), use `nano.scan` directly instead. It returns the raw list of records without ever asking anything, so you can filter it programmatically:
 
 ```
 nano.scan foreach 'd' do
@@ -108,10 +108,10 @@ Everything you want to execute *on the device* goes inside a code block, passed 
 
 Behind the scenes, MOGWAI NANO Studio desugars this block into canonical RPN and sends it over the network. `nano.run` only waits long enough to confirm the program has actually started on the device — it does **not** wait for it to finish, and it does **not** show any output. By default, console output (`?`/`console.print`) and `debug.write` messages coming from the device are silently discarded, whether the program was launched via `nano.run` or is running as a stored autorun program.
 
-To actually watch a device's live output, use `nano.view`:
+To actually watch a device's live output, use `nano.user.view`:
 
 ```
-{ 1000 wait 1 10 for 'i' do { i ? 100 wait } } nano.run nano.view
+{ 1000 wait 1 10 for 'i' do { i ? 100 wait } } nano.run nano.user.view
 ```
 
 ```
@@ -134,9 +134,9 @@ OK
 execution time 00:00:04.3724066
 ```
 
-`nano.view` attaches to the currently running program and streams its console/debug output to your screen in real time. Press `Ctrl+C` to detach and return to the prompt — the program keeps running on the device regardless, `nano.view` only affects whether you're watching it or not.
+`nano.user.view` attaches to the currently running program and streams its console/debug output to your screen in real time. Press `Ctrl+C` to detach and return to the prompt — the program keeps running on the device regardless, `nano.user.view` only affects whether you're watching it or not.
 
-Notice the `1000 wait` at the very start of the program: attaching `nano.view` right after `nano.run` still takes a brief moment over the network, so a short initial delay gives it time to attach before the program starts printing — otherwise you could miss the first few lines.
+Notice the `1000 wait` at the very start of the program: attaching `nano.user.view` right after `nano.run` still takes a brief moment over the network, so a short initial delay gives it time to attach before the program starts printing — otherwise you could miss the first few lines.
 
 ## 5. Blink an LED
 
@@ -203,12 +203,41 @@ Timers run independently of your main program, on their own schedule:
 
     forever do { 250 wait }
 } nano.run
-nano.view
+nano.user.view
 ```
 
-Every 5 seconds, `"still alive"` is printed — interleaved with whatever else the program is doing — regardless of what the main `forever do` loop is up to. As with any device output, you need `nano.view` running to actually see it; `Ctrl+C` to detach whenever you like, the timer keeps firing on the device either way.
+Every 5 seconds, `"still alive"` is printed — interleaved with whatever else the program is doing — regardless of what the main `forever do` loop is up to. As with any device output, you need `nano.user.view` running to actually see it; `Ctrl+C` to detach whenever you like, the timer keeps firing on the device either way.
 
-## 8. Make it survive without a PC connected
+## 8. Talk to an I2C device
+
+Wire an I2C device to your board's SDA/SCL pins — a real-time clock module (DS3231) is used here, a cheap and common way to add battery-backed timekeeping to a project.
+
+I2C devices are opened with a name, a bus number, and a 7-bit address — the name is what you'll use afterward, so you never have to repeat the bus/address pair on every call:
+
+```
+{
+    'RTC' 1 0x68 i2c.open
+
+    'RTC' 0x00 D:00 i2c.register.write
+    5000 wait
+    'RTC' 0x00 1 i2c.register.read bcd-> ?
+
+    'RTC' i2c.close
+} nano.run
+nano.user.view
+```
+
+This writes `0` to the RTC's seconds register, waits 5 seconds, then reads that same register back. RTC chips store time values in **BCD** (binary-coded decimal) rather than plain binary — `bcd->` converts a BCD-encoded number to a regular one (the opposite direction, `->bcd`, exists too). Without it, you'd see the raw encoded byte rather than a readable number; here, the output is `5`.
+
+Not sure what's out there on the bus? `i2c.scan` probes the standard address range (`0x08` to `0x77`) and returns the ones that responded:
+
+```
+{ 1 i2c.scan ? } nano.run
+```
+
+The other I2C primitives — `i2c.write`, `i2c.read` — work the same way as their `register` counterparts, but operate on the device directly rather than a specific register; useful for devices that don't follow the register-addressed pattern.
+
+## 9. Make it survive without a PC connected
 
 Once you're happy with a program, you can store it on the device so it runs automatically on every boot — no MOGWAI NANO Studio connection required afterward:
 
@@ -235,9 +264,9 @@ nano.autorun.get      # returns the stored code as a MOGCode block
 nano.autorun.purge    # clears it
 ```
 
-## 9. Naming your device and checking its free memory
+## 10. Naming your device and checking its free memory
 
-Once you have more than one device on your network, telling them apart by IP alone gets tedious. Give a device a persistent name — it survives reboots, and shows up as the `device` field in future `nano.scan`/`nano.select` results:
+Once you have more than one device on your network, telling them apart by IP alone gets tedious. Give a device a persistent name — it survives reboots, and shows up as the `device` field in future `nano.scan`/`nano.user.select` results:
 
 ```
 nano.name.set "Greenhouse Sensor"
@@ -264,7 +293,7 @@ If your program is running *on the device* itself (typically as a stored autorun
 [system: "1.17.0.334" ip: "192.168.1.75" name: "DEVICE1" platform: "ESP32" session: "39122" memory: 49872 target: "ESP32_REV3" mogwai: "0.1.0.0" oem: "MinSizeRel build, chip rev. >= 3, without support for PSRAM"]
 ```
 
-## 10. Reboot cleanly
+## 11. Reboot cleanly
 
 If your program needs to reboot the device itself (for example, after applying a new configuration), call `mogwai.reboot` from within the running script. If you've defined a `MOGWAI.onReboot` function, it runs first, giving you a chance to clean up:
 
@@ -275,7 +304,7 @@ If your program needs to reboot the device itself (for example, after applying a
 } nano.run
 ```
 
-(as always, `"Rebooting, bye!"` would only be visible if you had `nano.view` attached)
+(as always, `"Rebooting, bye!"` would only be visible if you had `nano.user.view` attached)
 
 If you need to force a reboot or halt from MOGWAI NANO Studio *without* running any device-side code — for example, if a device seems stuck — use `nano.reboot` or `nano.halt` instead. These act immediately and bypass `MOGWAI.onReboot` entirely.
 
@@ -286,7 +315,7 @@ nano.halt
 nano.state ?
 ```
 
-## 11. Putting it all together
+## 12. Putting it all together
 
 Here's a complete, self-contained script that ties together everything covered so far: it checks whether you're already connected, discovers and connects to a device if not (handling both a failed connection and an aborted selection), then runs a program and watches its output.
 
@@ -296,7 +325,7 @@ console.clear
 
 if (nano.isConnected not) then
 {
-    nano.select -> 'device'
+    nano.user.select -> 'device'
 
     if (device ->type .record ==) then
     {
@@ -334,7 +363,7 @@ if (nano.isConnected not) then
 guard
 {
     nano.run
-    nano.view
+    nano.user.view
 }
 else
 {
@@ -343,14 +372,14 @@ else
 }
 ```
 
-This is entirely regular MOGWAI code — `if`/`then`/`else`, `mogwai.exit` for early exit on failure, `guard`/`else` to catch a failure in `nano.run`/`nano.view` itself (for example, if the device drops off the network right as the script tries to run something) — orchestrating the connection and the discovery UI on your PC, with only the small inner block ever actually running on the device. A good pattern to reuse and adapt as your own scripts grow.
+This is entirely regular MOGWAI code — `if`/`then`/`else`, `mogwai.exit` for early exit on failure, `guard`/`else` to catch a failure in `nano.run`/`nano.user.view` itself (for example, if the device drops off the network right as the script tries to run something) — orchestrating the connection and the discovery UI on your PC, with only the small inner block ever actually running on the device. A good pattern to reuse and adapt as your own scripts grow.
 
 ### The shortcut version
 
-Everything in the connection block above — scan, list, select, connect — is exactly what `nano.userConnect` does in a single call:
+Everything in the connection block above — scan, list, select, connect — is exactly what `nano.user.connect` does in a single call:
 
 ```
-if (nano.isConnected not) then { nano.userConnect }
+if (nano.isConnected not) then { nano.user.connect }
 ```
 
 Same guided experience, same `true`/`false` outcome as `nano.connect`, one line instead of the block spelled out above. Now that you've seen what it does under the hood, use whichever fits your script better.

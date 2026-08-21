@@ -128,11 +128,11 @@ From **MOGWAI NANO Studio**:
 Not sure of your device's IP? Discover it on the network instead:
 
 ```
-nano.select -> 'device'
+nano.user.select -> 'device'
 if (device ->type .record ==) then { device->ip: nano.connect }
 ```
 
-`nano.select` scans the network, lists the responding devices (platform and IP), and lets you pick one interactively — pushing `null` on the stack if you abort or nothing responds.
+`nano.user.select` scans the network, lists the responding devices (platform and IP), and lets you pick one interactively — pushing `null` on the stack if you abort or nothing responds.
 
 Your device is now blinking an LED, controlled remotely from your PC. 🎉
 
