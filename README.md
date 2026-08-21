@@ -152,9 +152,14 @@ src/MogwaiNano/
 
 ## Roadmap
 
+- [x] I2C support
 - [ ] `.binary`/`B:` support on NANO — for register-level bit manipulation
-- [ ] I2C/SPI helper primitives for common sensors (starting with SSD1306 OLED displays)
+- [ ] SPI, PWM, ADC helper primitives — building on the same pattern already validated with I2C (a DS3231 RTC module)
 - [ ] STM32 and TI validation
+- [ ] ESP32-S3 / PSRAM validation — early testing shows the PSRAM is transparently usable by the managed heap, opening the door to much larger scripts
+- [ ] BLE support
+- [ ] `.mog` library system — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library), building on the existing skill/flag primitives
+- [ ] MOGWAI NANO Studio rebuilt on Avalonia, focused on device monitoring and orchestration (VS Code + the MOGWAI extension remains the recommended way to write and edit code)
 
 ## About
 
