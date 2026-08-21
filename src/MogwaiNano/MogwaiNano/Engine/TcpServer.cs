@@ -38,6 +38,7 @@ namespace MogwaiNano.Engine
         private Thread _senderThread;
         private bool _pauseSending = false;
         private bool _disconnectRequested = false;
+        private bool _connectionBroken = false;
 
         public delegate void MessageReceivedHandler(ServerMessage message);
         public event MessageReceivedHandler MessageReceived;
@@ -130,7 +131,6 @@ namespace MogwaiNano.Engine
                 if (message != null)
                 {
                     AppGlobal.TcpServer.SendMessage(message);
-                    // même si SendMessage plante ici, seul SenderLoop meurt -> jamais le thread d'exécution
                 }
                 else
                 {
@@ -146,19 +146,21 @@ namespace MogwaiNano.Engine
             var idleStopwatch = Stopwatch.StartNew();
 
             _disconnectRequested = false;
+            _connectionBroken = false;
 
-            while (!_shuttingDown && !_disconnectRequested)
+            while (!_shuttingDown && !_disconnectRequested && !_connectionBroken) // <-- ajout de la condition
             {
                 int available = client.Available;
 
                 if (available > 0)
                 {
-                    string json = ReadMessage(stream);
-                    if (json == null)
+                    string nano = ReadMessage(stream);
+
+                    if (nano == null)
                         break;
 
                     idleStopwatch.Restart();
-                    ProcessMessage(json, stream);
+                    ProcessMessage(nano, stream);
                 }
                 else
                 {
@@ -170,7 +172,6 @@ namespace MogwaiNano.Engine
             }
 
             client.Close();
-
             _pauseSending = false;
             _outgoingQueue.Clear();
         }
@@ -208,8 +209,7 @@ namespace MogwaiNano.Engine
             }
             catch
             {
-                // on avale l'erreur : un échec d'envoi ne doit jamais faire tomber le thread appelant,
-                // qu'il s'agisse du thread réseau ou du thread d'exécution du moteur
+                _connectionBroken = true;
             }
         }
 
