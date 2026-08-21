@@ -63,7 +63,7 @@ namespace MogwaiNano.Engine
             _tcpThread.Join(2000);
         }
 
-        private void EnqueueMessage(ServerMessage message)
+        public void EnqueueMessage(ServerMessage message)
         {
             lock (_outgoingLock)
             {
