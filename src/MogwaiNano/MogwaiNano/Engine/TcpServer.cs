@@ -66,12 +66,15 @@ namespace MogwaiNano.Engine
 
         public void EnqueueMessage(ServerMessage message)
         {
-            lock (_outgoingLock)
+            if (!_connectionBroken)
             {
-                if (_outgoingQueue.Count >= MAX_QUEUE_SIZE)
-                    _outgoingQueue.Dequeue();
+                lock (_outgoingLock)
+                {
+                    if (_outgoingQueue.Count >= MAX_QUEUE_SIZE)
+                        _outgoingQueue.Dequeue();
 
-                _outgoingQueue.Enqueue(message);
+                    _outgoingQueue.Enqueue(message);
+                }
             }
         }
 

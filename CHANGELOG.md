@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - If MOGWAI NANO Studio was killed abruptly while a program on the device kept sending console/debug output, a new connection attempt would silently hang for up to 30 seconds (the idle timeout) before succeeding — the failed writes on the old, dead connection were detected but never actually signaled anywhere, leaving the device's TCP accept loop stuck on the stale connection. A shared flag now lets a failed write immediately unblock the read loop, so a fresh reconnection succeeds right away instead of waiting out the timeout
 
+### Known Limitations
+
+- Occasional network disconnections between MOGWAI NANO Studio and a device are expected over WiFi — they can originate on either side (device WiFi hiccups, or a transient network interruption on the PC) and the exact interval is not constant. Reconnection is fast and doesn't require restarting Studio.
+
 ## [0.2.0] - 2026-08-21
 
 ### Added

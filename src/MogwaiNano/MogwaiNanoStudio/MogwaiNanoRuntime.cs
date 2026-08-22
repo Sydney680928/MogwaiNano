@@ -14,6 +14,7 @@
 
 using MOGWAI.Engine;
 using MOGWAI.Objects;
+using System.Diagnostics;
 using System.Text;
 
 namespace MogwaiNanoStudio
@@ -51,10 +52,18 @@ namespace MogwaiNanoStudio
 
             _pingTimer = new Timer(_ =>
             {
-                if (AppGlobal.NanoClient.IsConnected)
-                    AppGlobal.NanoClient.SendMessage(new ServerMessage(SOURCE_NAME, "PING"));
-            
+                try
+                {
+                    if (AppGlobal.NanoClient.IsConnected)
+                        AppGlobal.NanoClient.SendMessage(new ServerMessage(SOURCE_NAME, "PING"));
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"PingTimer exception: {ex.GetType().Name} - {ex.Message}\n{ex.StackTrace}");
+                }
+
             }, null, 10000, 10000);
+
 
             AppGlobal.NanoClient.MessageReceived += NanoClient_MessageReceived;
 

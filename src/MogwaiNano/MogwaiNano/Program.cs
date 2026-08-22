@@ -194,6 +194,7 @@ namespace MogwaiNano
             }
             else if (message.Function == "PING")
             {
+                Debug.WriteLine("PING received / send PONG");
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "PONG"));
             }
         }

@@ -68,7 +68,7 @@ namespace MogwaiNano.Engine
                         string nano = Encoding.UTF8.GetString(buffer, 0, length);
                         var message = ServerMessage.FromNanoFormat(nano);
 
-                        if (message.Source == AppGlobal.EXPECTED_SOURCE && message.Function == "WHO IS HERE")
+                        if (message.Source == AppGlobal.EXPECTED_SOURCE && message.Function == "WHO IS HERE" && !AppGlobal.TcpServer.IsClientConnected)
                             SendDiscoveryResponse(_udpListener, remoteEndPoint);
                     }
                     catch
