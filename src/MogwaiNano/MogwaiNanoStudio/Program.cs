@@ -31,6 +31,12 @@ AppGlobal.NanoRuntime.NanoDebugWrite += (message) =>
 AppGlobal.NanoRuntime.NanoPrint += (message) =>
 {
     if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.DisplayMessages)
+        Console.Write(message);
+};
+
+AppGlobal.NanoRuntime.NanoPrintLn += (message) =>
+{
+    if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.DisplayMessages)
         Console.WriteLine(message);
 };
 

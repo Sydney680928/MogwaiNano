@@ -75,6 +75,11 @@ namespace MogwaiNanoStudio
             "nano.user.connect",
 
             "mogwai.memory",
+            "mogwai.reboot",
+
+            "bcd->",
+            "->bcd",
+            "newData",
 
             "gpio.setMode.input",
             "gpio.setMode.inputPullDown",
@@ -84,7 +89,17 @@ namespace MogwaiNanoStudio
             "gpio.write.high",
             "gpio.write.low",
             "gpio.toggle",
-            "gpio.close"
+            "gpio.close",
+
+            "i2c.open",
+            "i2c.close",
+            "i2c.write",
+            "i2c.register.write",
+            "i2c.read",
+            "i2c.register.read",
+            "i2c.scan",
+
+
             ];
 
         public async Task<EvalResult> ExecuteHostFunction(MogwaiEngine engine, string word)

@@ -50,6 +50,18 @@ namespace MogwaiNano
             return EvalResult.NoError;
         }
 
+        public EvalResult ConsolePrintLn(MogwaiNanoEngine engine, string message)
+        {
+            if (AppGlobal.TcpServer.IsClientConnected)
+            {
+                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "CONSOLE.PRINTLN", message);
+                AppGlobal.TcpServer.EnqueueMessage(msg);
+            }
+
+            return EvalResult.NoError;
+        }
+
+
         public EvalResult ConsolePrint(MogwaiNanoEngine engine, string message)
         {
             if (AppGlobal.TcpServer.IsClientConnected)

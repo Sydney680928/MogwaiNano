@@ -36,6 +36,7 @@ namespace MogwaiNanoStudio
         public event NanoDebugWriteHandler? NanoDebugWrite;
 
         public delegate void NanoPrintHandler(string message);
+        public event NanoPrintHandler? NanoPrintLn;
         public event NanoPrintHandler? NanoPrint;
 
         public bool IsRunning { get; private set; } = false;
@@ -90,6 +91,10 @@ namespace MogwaiNanoStudio
             else if (message.Function == "DEBUG.WRITE")
             {
                 NanoDebugWrite?.Invoke(message.Parameters[0]);
+            }
+            else if (message.Function == "CONSOLE.PRINTLN")
+            {
+                NanoPrintLn?.Invoke(message.Parameters[0]);
             }
             else if (message.Function == "CONSOLE.PRINT")
             {

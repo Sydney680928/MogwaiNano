@@ -207,8 +207,11 @@ namespace MogwaiNano.Engine
             _primitives.Add("or", new PrimitiveDelegate(PrimitiveConditionOr));
             _primitives.Add("xor", new PrimitiveDelegate(PrimitiveConditionXor));
 
+            _primitives.Add("console.println", new PrimitiveDelegate(PrimitiveConsolePrintLn));
+            _primitives.Add("?", new PrimitiveDelegate(PrimitiveConsolePrintLn));
             _primitives.Add("console.print", new PrimitiveDelegate(PrimitiveConsolePrint));
-            _primitives.Add("?", new PrimitiveDelegate(PrimitiveConsolePrint));
+            _primitives.Add("??", new PrimitiveDelegate(PrimitiveConsolePrint));
+
 
             _primitives.Add("EVENT", new PrimitiveDelegate(PrimitiveEvent));
             _primitives.Add("event.fire", new PrimitiveDelegate(PrimitiveEventFire));    
@@ -775,7 +778,7 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveConsolePrint(string name)
+        private EvalResult PrimitiveConsolePrintLn(string name)
         {
             if (StackSize == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
@@ -791,7 +794,7 @@ namespace MogwaiNano.Engine
 
                 StackPush(value);
                 
-                var r = PrimitiveConsolePrint(name);    
+                var r = PrimitiveConsolePrintLn(name);    
 
                 if (r.IsError)
                     return r;
@@ -803,12 +806,51 @@ namespace MogwaiNano.Engine
             {
                 if (n0 is MOGString @string)
                 {
+                    return Delegate.ConsolePrintLn(this, @string.Value);
+                }
+                else
+                {
+                    return Delegate.ConsolePrintLn(this, n0.ToString());
+                }   
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveConsolePrint(string name)
+        {
+            if (StackSize == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var n0 = StackPop();
+
+            if (n0 is MOGRef @ref)
+            {
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+
+                StackPush(value);
+
+                var r = PrimitiveConsolePrint(name);
+
+                if (r.IsError)
+                    return r;
+
+                return EvalResult.NoError;
+            }
+
+            if (Delegate != null)
+            {
+                if (n0 is MOGString @string)
+                {
                     return Delegate.ConsolePrint(this, @string.Value);
                 }
                 else
                 {
                     return Delegate.ConsolePrint(this, n0.ToString());
-                }   
+                }
             }
 
             return EvalResult.NoError;

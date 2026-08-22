@@ -46,6 +46,8 @@ namespace MogwaiNano.Interfaces
 
         EvalResult ConsoleClearScreen(MogwaiNanoEngine engine) => EvalResult.NoError;
 
+        EvalResult ConsolePrintLn(MogwaiNanoEngine engine, string message) => EvalResult.NoError;
+
         EvalResult ConsolePrint(MogwaiNanoEngine engine, string message) => EvalResult.NoError;
 
         #endregion
