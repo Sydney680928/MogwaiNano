@@ -178,6 +178,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
             _primitives.Add("bcd->", new PrimitiveDelegate(PrimitiveBcdToDecimal));
 
+            _primitives.Add("makeData", new PrimitiveDelegate(PrimitiveMakeData));
+
             _primitives.Add("clear", new PrimitiveDelegate(PrimitiveStackClear));
             _primitives.Add("swap", new PrimitiveDelegate(PrimitiveStackSwap));
             _primitives.Add("dup", new PrimitiveDelegate(PrimitiveStackDup));
@@ -1192,6 +1194,29 @@ namespace MogwaiNano.Engine
             }
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+        }
+
+        private EvalResult PrimitiveMakeData(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber))
+            {
+                var n0 = StackPop() as MOGNumber;
+
+                var size = (int)n0.Value;
+                var items = new byte[size];
+                var data = new MOGData(this, items);
+
+                StackPush(data);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
         private EvalResult PrimitiveConditionEqual(string name)
