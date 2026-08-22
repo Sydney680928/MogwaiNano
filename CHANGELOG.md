@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `newData` — creates a zero-initialized `MOGData` of a given size directly (e.g. `1024 newData`), without pushing each byte onto the stack first. Building a large buffer via `repeat { 0 } ->data` allocates one `MOGObject` per byte before conversion, which can exhaust memory on lower-RAM devices even though it works fine on more capable ones; `newData` avoids that transient peak entirely
+
 ### Updated
 
 - `mogwai.info` (device-side) and `nano.info` (Studio-side) records now also include a `skills:` key, listing the same skills queryable via `skills`/`hasSkill` — lets you check a device's capabilities from a single info call, without a separate query
+- **RPN stack storage**: replaced the `ArrayList`-backed execution stack with a dedicated `MOGStack` class using a plain `MOGObject[]` array with manual growth (doubling capacity as needed, starting small to keep the per-scope memory footprint low). Since every value on the stack is already a `MOGObject` reference, this removes `ArrayList`'s generic overhead entirely with no boxing trade-off — measured as a very significant speedup on stack-heavy operations (e.g. building a large `MOGData` buffer by pushing hundreds of values with `repeat` before converting with `->data`)
+- I2C write primitives confirmed working with large multi-byte buffers in a single transaction (not just single bytes or short sequences) — validated by initializing and clearing a full 128x64 OLED display (SSD1306) frame buffer (1024 bytes) in one `i2c.register.write` call
 
 ### Fixed
 
