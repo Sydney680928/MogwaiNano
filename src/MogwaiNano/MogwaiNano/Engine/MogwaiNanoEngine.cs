@@ -36,7 +36,7 @@ namespace MogwaiNano.Engine
 
         private Hashtable _primitives = new();
         private ArrayList _stacks = new();
-        private ArrayList _currentStack = new();
+        private MOGStack _currentStack = new();
         private Hashtable _timers = new();
         private Hashtable _events = new(); 
         private Hashtable _types = new(12);
@@ -417,7 +417,7 @@ namespace MogwaiNano.Engine
             CleanupI2cDevices();
 
             _stacks.Clear();
-            _currentStack = new ArrayList();
+            _currentStack = new MOGStack();
             _stacks.Add(_currentStack);
 
             var glb = _varsContext[0] as VarContext;
@@ -435,7 +435,7 @@ namespace MogwaiNano.Engine
 
         public void AddNewStack()
         {
-            _currentStack = new();
+            _currentStack = new MOGStack();
             _stacks.Add(_currentStack);
         }
 
@@ -444,65 +444,25 @@ namespace MogwaiNano.Engine
             if (_stacks.Count > 1)
             {
                 _stacks.RemoveAt(_stacks.Count - 1);
-                _currentStack = _stacks[_stacks.Count - 1] as ArrayList;
+                _currentStack = _stacks[_stacks.Count - 1] as MOGStack;
             }
         }
 
         public int StackSize => _currentStack.Count;
-
-        public void StackPush(MOGObject item)
-        {
-            _currentStack.Add(item);
-        }
-
-        public MOGObject StackPop()
-        {
-            if (_currentStack.Count > 0)
-            {
-                var item = _currentStack[_currentStack.Count - 1] as MOGObject;
-                _currentStack.RemoveAt(_currentStack.Count - 1);
-                return item;
-            }
-
-            return null;
-        }
-
-        public Type[] StackSign(int count)
-        {
-            if (_currentStack.Count < count)
-                return new Type[0];
-
-            var t = new Type[count];
-            var c = _currentStack.Count - count;
-            var index = 0;
-
-            for (int i = _currentStack.Count - 1; i >= c; i--)
-                t[index++] = _currentStack[i].GetType();
-
-            return t;
-        }
-
+        
+        public void StackPush(MOGObject item) => _currentStack.Push(item);
+        
+        public MOGObject StackPop() => _currentStack.Pop();
+        
+        public Type[] StackSign(int count) => _currentStack.Sign(count);
+        
         public void StackClear() => _currentStack.Clear();
-
-        public bool StackSwap()
-        {
-            if (_currentStack.Count > 1)
-            {
-                var s0 = _currentStack[_currentStack.Count - 1];
-                var s1 = _currentStack[_currentStack.Count - 2];
-
-                _currentStack[_currentStack.Count - 1] = s1;
-                _currentStack[_currentStack.Count - 2] = s0;
-
-                return true;
-            }
-
-            return false;
-        }
-
-        public void StackDup() => StackPush(_currentStack[_currentStack.Count - 1] as MOGObject);
-
-        public void StackDrop() => _currentStack.RemoveAt(_currentStack.Count - 1);
+        
+        public bool StackSwap() => _currentStack.Swap();
+        
+        public void StackDup() => _currentStack.Dup();
+        
+        public void StackDrop() => _currentStack.Drop();
 
         #endregion
 
@@ -1168,7 +1128,7 @@ namespace MogwaiNano.Engine
 
                 for (int i = 0; i < size; i++)
                 {
-                    if (_currentStack[i] is MOGNumber number && (int)number.Value >= 0 && (int)number.Value <= 255)
+                    if (_currentStack.Items[i] is MOGNumber number && (int)number.Value >= 0 && (int)number.Value <= 255)
                     {
 
                     }

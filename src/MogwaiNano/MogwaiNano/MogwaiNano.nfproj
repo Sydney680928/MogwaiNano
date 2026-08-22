@@ -44,6 +44,7 @@
     <Compile Include="Objects\MOGRecord.cs" />
     <Compile Include="Objects\MOGName.cs" />
     <Compile Include="Objects\MOGRef.cs" />
+    <Compile Include="Objects\MOGStack.cs" />
     <Compile Include="Objects\MOGString.cs" />
     <Compile Include="Objects\MOGList.cs" />
     <Compile Include="Objects\MOGKey.cs" />
