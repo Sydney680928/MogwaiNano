@@ -161,7 +161,7 @@ namespace MogwaiNano.Engine
             _disconnectRequested = false;
             _connectionBroken = false;
 
-            while (!_shuttingDown && !_disconnectRequested && !_connectionBroken) // <-- ajout de la condition
+            while (!_shuttingDown && !_disconnectRequested && !_connectionBroken)
             {
                 int available = client.Available;
 
@@ -185,6 +185,7 @@ namespace MogwaiNano.Engine
             }
 
             client.Close();
+
             _pauseSending = false;
             _outgoingQueue.Clear();
         }

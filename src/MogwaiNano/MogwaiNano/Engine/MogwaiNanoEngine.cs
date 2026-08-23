@@ -504,6 +504,32 @@ namespace MogwaiNano.Engine
 
                 return EvalResult.NoError;
             }
+            else if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGString))
+            {
+                // "BB" 456 +
+
+                var s1 = StackPop() as MOGNumber;
+                var s0 = StackPop() as MOGString;
+
+                s0.Value += s1.Value.ToString();
+
+                StackPush(s0);
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGString) && s[1] == typeof(MOGNumber))
+            {
+                // 456 "BB" +
+
+                var s1 = StackPop() as MOGString;
+                var s0 = StackPop() as MOGNumber;
+
+                s1.Value = s0.Value.ToString() + s1.Value;  
+
+                StackPush(s1);
+
+                return EvalResult.NoError;
+            }
             else if (s[1] == typeof(MOGList))
             {
                 // (1 2 3) "TOTO" + 
