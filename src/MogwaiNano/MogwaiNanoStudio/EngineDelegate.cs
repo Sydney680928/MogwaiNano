@@ -430,7 +430,7 @@ namespace MogwaiNanoStudio
 
                 if (s[0] == typeof(MOGString))
                 {
-                    var payload = engine.StackPopString();
+                    var payload = engine.StackPopString();                   
                     return await AppGlobal.NanoRuntime.Send(payload.Value);
                 }
 

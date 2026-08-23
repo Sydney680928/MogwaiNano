@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `newData` — creates a zero-initialized `MOGData` of a given size directly (e.g. `1024 newData`), without pushing each byte onto the stack first. Building a large buffer via `repeat { 0 } ->data` allocates one `MOGObject` per byte before conversion, which can exhaust memory on lower-RAM devices even though it works fine on more capable ones; `newData` avoids that transient peak entirely
+- `nano.send` — sends an arbitrary string to the connected device: `"TIME=15:45" nano.send`. The device fires a `STUDIO_DID_SEND` event on the currently running program, with the received string available as `eventData` (a plain `MOGString`), letting a long-running program (`forever do { ... }`) react to free-form commands from Studio without needing to be stopped and relaunched. No built-in message format is imposed — parsing the string (e.g. a `NAME=value` convention) is entirely up to the receiving script
 
 ### Updated
 
