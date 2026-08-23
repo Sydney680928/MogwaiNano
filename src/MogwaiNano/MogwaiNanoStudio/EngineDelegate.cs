@@ -73,6 +73,7 @@ namespace MogwaiNanoStudio
             "nano.name.set",
             "nano.info",
             "nano.user.connect",
+            "nano.send",
 
             "mogwai.memory",
             "mogwai.reboot",
@@ -419,6 +420,21 @@ namespace MogwaiNanoStudio
             else if (word == "nano.user.view")
             {
                 return await AppGlobal.NanoRuntime.ViewAsync();
+            }
+            else if (word == "nano.send")
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    var payload = engine.StackPopString();
+                    return await AppGlobal.NanoRuntime.Send(payload.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
             }
 
             return EvalResult.NoExternalFunction;

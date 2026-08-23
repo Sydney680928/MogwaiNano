@@ -16,6 +16,7 @@ using MOGWAI.Engine;
 using MOGWAI.Objects;
 using System.Diagnostics;
 using System.Text;
+using System.Xml.Linq;
 
 namespace MogwaiNanoStudio
 {
@@ -515,6 +516,23 @@ namespace MogwaiNanoStudio
                 _engine.StackPushNull();
                 return Task.FromResult(EvalResult.NoError);
             }
+        }
+
+        public async Task<EvalResult> Send(string payload)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "SEND", payload);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0 && response.Parameters[0] != null && response.Parameters[0] == "OK")
+                return EvalResult.NoError;
+
+            return EvalResult.Failure(_engine, Error.BadArgumentValueError);
         }
 
         private async Task WaitNanoProgramDidEnd()

@@ -156,6 +156,16 @@ namespace MogwaiNano
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "NAME.SET", "OK"));
             }
+            else if (message.Function == "SEND")
+            {
+                if (message.Parameters.Length > 0 && message.Parameters[0] != null)
+                {
+                    var payload = message.Parameters[0];
+                    AppGlobal.MogwaiNanoEngine.FireEvent("STUDIO_DID_SEND", new MOGString(AppGlobal.MogwaiNanoEngine, payload));    
+                }
+
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "SEND", "OK"));
+            }
             else if (message.Function == "SESSION.GET")
             {
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "SESSION.GET", AppGlobal.Session.ToString()));

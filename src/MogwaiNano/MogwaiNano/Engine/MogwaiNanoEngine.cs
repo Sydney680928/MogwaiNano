@@ -413,6 +413,8 @@ namespace MogwaiNano.Engine
         {
             ClearTimers();
 
+            ClearEvents();
+
             ClearWaitingFireObjects();
 
             CleanupOpenPins();
