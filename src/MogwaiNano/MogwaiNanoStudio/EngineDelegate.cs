@@ -22,6 +22,9 @@ namespace MogwaiNanoStudio
 {
     internal class EngineDelegate : IDelegate
     {
+        public delegate void NanoConnectEventHandler(string name, string address);
+        public event NanoConnectEventHandler NanoConnect;
+
         public delegate void NanoRunEventHandler(string code);
         public event NanoRunEventHandler? NanoRun;
 
@@ -234,6 +237,11 @@ namespace MogwaiNanoStudio
                     try
                     {
                         AppGlobal.NanoClient.Connect(ip.Value, AppGlobal.TCP_PORT);
+
+                        var name = await AppGlobal.NanoRuntime.GetNameValue();
+
+                        NanoConnect.Invoke(name ?? "unknown name", ip.Value);
+
                         engine.StackPushBoolean(true);
                     }
                     catch
@@ -305,7 +313,12 @@ namespace MogwaiNanoStudio
                     try
                     {
                         AppGlobal.NanoClient.Connect(ip.Value, AppGlobal.TCP_PORT);
-                        _engine.StackPushBoolean(true);
+
+                        var name = await AppGlobal.NanoRuntime.GetNameValue();
+                        
+                        NanoConnect.Invoke(name ?? "unknown name", ip.Value);
+
+                        engine.StackPushBoolean(true);
                     }
                     catch
                     {

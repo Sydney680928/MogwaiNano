@@ -40,7 +40,7 @@ namespace MogwaiNanoStudio
             _tcpClient.Connect(host, port);
 
             _stream = _tcpClient.GetStream();
-            _stream.ReadTimeout = 60000; // ou une valeur cohérente avec ton heartbeat existant
+            _stream.ReadTimeout = 15000;
 
             _running = true;
 
@@ -56,7 +56,7 @@ namespace MogwaiNanoStudio
                 try
                 {
                     SendMessage(new ServerMessage(AppGlobal.SOURCE_NAME, "BYE"));
-                    Thread.Sleep(500); // laisse le temps au message de partir et au device de réagir
+                    Thread.Sleep(1000);
                 }
                 catch
                 {
@@ -67,7 +67,7 @@ namespace MogwaiNanoStudio
             _running = false;
             _stream?.Close();
             _tcpClient?.Close();
-            _receiveThread?.Join(1000); // attend que l'ancien thread soit bien sorti avant de rendre la main
+            _receiveThread?.Join(1000);
         }
 
         public void SendMessage(ServerMessage message)
@@ -112,7 +112,7 @@ namespace MogwaiNanoStudio
                     string? nano = ReadMessage();
 
                     if (nano == null)
-                        break; // connexion fermée proprement
+                        break;
 
                     try
                     {
@@ -123,14 +123,13 @@ namespace MogwaiNanoStudio
                     }
                     catch (Exception ex)
                     {
-                        ConnectionError?.Invoke(this, ex);
-                        // message JSON malformé, on continue à écouter
+                        ConnectionError?.Invoke(this, ex);                      
                     }
                 }
             }
             catch (Exception ex)
             {
-                if (_running) // évite de remonter une erreur si on a fermé nous-mêmes la connexion
+                if (_running)
                     ConnectionError?.Invoke(this, ex);
             }
             finally
@@ -192,7 +191,7 @@ namespace MogwaiNanoStudio
             var broadcastEndpoint = new IPEndPoint(IPAddress.Broadcast, AppGlobal.DISCOVERY_PORT);
 
             var list = new MOGList(engine);
-            var seenAddresses = new HashSet<string>(); // pour la déduplication
+            var seenAddresses = new HashSet<string>();
 
             udpClient.Client.ReceiveTimeout = 1000;
 
@@ -204,7 +203,7 @@ namespace MogwaiNanoStudio
                 if (DateTime.Now >= nextSendTime)
                 {
                     udpClient.Send(data, data.Length, broadcastEndpoint);
-                    nextSendTime = DateTime.Now.AddMilliseconds(250); // réémet toutes les 1/4 secondes
+                    nextSendTime = DateTime.Now.AddMilliseconds(250);
                 }
 
                 try

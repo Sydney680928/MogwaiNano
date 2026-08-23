@@ -40,6 +40,16 @@ AppGlobal.NanoRuntime.NanoPrintLn += (message) =>
         Console.WriteLine(message);
 };
 
+AppGlobal.EngineDelegate.NanoConnect += (name, address) =>
+{
+    Console.Title = $"{name} - {address}";
+};
+
+AppGlobal.NanoClient.Disconnected += (sender, eventArgs) =>
+{
+    Console.Title = "MOGWAI NANO STUDIO";
+};
+
 if (args.Length > 0)
 {
     Console.Title = "MOGWAI NANO STUDIO";
