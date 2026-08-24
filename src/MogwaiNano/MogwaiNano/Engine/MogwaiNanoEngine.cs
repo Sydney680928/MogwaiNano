@@ -173,6 +173,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("-", new PrimitiveDelegate(PrimitiveMathSubstraction));
             _primitives.Add("*", new PrimitiveDelegate(PrimitiveMathMultiplication));
             _primitives.Add("/", new PrimitiveDelegate(PrimitiveMathDivision));
+            _primitives.Add("floor", new PrimitiveDelegate(PrimitiveMathFloor));
+            _primitives.Add("mod", new PrimitiveDelegate(PrimitiveMathModulo));
 
             _primitives.Add("->data", new PrimitiveDelegate(PrimitiveToData));
             _primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
@@ -210,6 +212,13 @@ namespace MogwaiNano.Engine
             _primitives.Add("and", new PrimitiveDelegate(PrimitiveConditionAnd));
             _primitives.Add("or", new PrimitiveDelegate(PrimitiveConditionOr));
             _primitives.Add("xor", new PrimitiveDelegate(PrimitiveConditionXor));
+
+            _primitives.Add("&", new PrimitiveDelegate(PrimitiveBinaryAnd));    
+            _primitives.Add("|", new PrimitiveDelegate(PrimitiveBinaryOr));    
+            _primitives.Add("^", new PrimitiveDelegate(PrimitiveBinaryXor));    
+            _primitives.Add("~", new PrimitiveDelegate(PrimitiveBinaryComplement));    
+            _primitives.Add("<<", new PrimitiveDelegate(PrimitiveLeftShift)); 
+            _primitives.Add(">>", new PrimitiveDelegate(PrimitiveRightShift));
 
             _primitives.Add("console.println", new PrimitiveDelegate(PrimitiveConsolePrintLn));
             _primitives.Add("?", new PrimitiveDelegate(PrimitiveConsolePrintLn));
@@ -726,6 +735,57 @@ namespace MogwaiNano.Engine
             }
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveMathFloor(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+
+            var number = StackPop() as MOGNumber;
+
+            try
+            {
+                var n = new MOGNumber(this, (float)Math.Floor((double)number.Value));
+                StackPush(n);
+                
+                return EvalResult.NoError;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(this, Error.MathematicalError, name, ex.Message);
+            }
+        }
+
+        private EvalResult PrimitiveMathModulo(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var n0 = StackPop() as MOGNumber;
+            var n1 = StackPop() as MOGNumber;
+
+            try
+            {
+                var v = n0.Value % n1.Value;
+                StackPush(new MOGNumber(this, v));
+                
+                return EvalResult.NoError;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(this, Error.MathematicalError, name, ex.Message);
+            }
         }
 
         private EvalResult PrimitiveGetType(string name)
@@ -2309,11 +2369,6 @@ namespace MogwaiNano.Engine
 
                 var tv = recf.Items[keys[i]] as MOGType;
 
-                Debug.WriteLine();
-                Debug.WriteLine($"key={keys[i]}");
-                Debug.WriteLine($"Type Value={pv.Type.Value}");
-                Debug.WriteLine($"Type={tv.Value}");
-
                 // Si incorrect on arrête tout
 
                 if (tv.Value != "any" && tv.Value != pv.Type.Value)
@@ -2449,6 +2504,126 @@ namespace MogwaiNano.Engine
             }
 
             return result;
+        }
+
+        private EvalResult PrimitiveBinaryAnd(string name)
+        {
+            var s = StackSign(2);
+            
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            
+            var n0 = StackPop() as MOGNumber;
+            var n1 = StackPop() as MOGNumber;
+
+            var result = (int)n0.Value & (int)n1.Value;
+            
+            StackPush(new MOGNumber(this, result));
+            
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveBinaryOr(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var n0 = StackPop() as MOGNumber;
+            var n1 = StackPop() as MOGNumber;
+
+            var result = (int)n0.Value | (int)n1.Value;
+
+            StackPush(new MOGNumber(this, result));
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveBinaryXor(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var n0 = StackPop() as MOGNumber;
+            var n1 = StackPop() as MOGNumber;
+
+            var result = (int)n0.Value ^ (int)n1.Value;
+
+            StackPush(new MOGNumber(this, result));
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveBinaryComplement(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var n0 = StackPop() as MOGNumber;
+            var result = ~(int)n0.Value;
+
+            StackPush(new MOGNumber(this, result));
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveRightShift(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n0 = StackPop() as MOGNumber;
+                var n1 = StackPop() as MOGNumber;
+
+                int v = (int)n1.Value >> (int)n0.Value;
+                StackPush(new MOGNumber(this, v));
+                
+                return EvalResult.NoError;
+            }
+            
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveLeftShift(string name)
+        {
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n0 = StackPop() as MOGNumber;
+                var n1 = StackPop() as MOGNumber;
+
+                int v = (int)n1.Value << (int)n0.Value;
+                StackPush(new MOGNumber(this, v));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
         #region SKILLS

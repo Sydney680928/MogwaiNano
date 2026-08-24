@@ -23,7 +23,7 @@ namespace MogwaiNanoStudio
     internal class EngineDelegate : IDelegate
     {
         public delegate void NanoConnectEventHandler(string name, string address);
-        public event NanoConnectEventHandler NanoConnect;
+        public event NanoConnectEventHandler? NanoConnect;
 
         public delegate void NanoRunEventHandler(string code);
         public event NanoRunEventHandler? NanoRun;
@@ -208,7 +208,27 @@ namespace MogwaiNanoStudio
                 if (s[0] == typeof(MOGString))
                 {
                     // run filename
-                    // soon
+
+                    var filename = engine.StackPopString();
+
+                    try
+                    {
+                        var code = File.ReadAllText(filename.Value);
+                        
+                        if (!string.IsNullOrEmpty(code))
+                        {
+                            var function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
+                            return await AppGlobal.NanoRuntime.RunAsync(function.ToStringCode());
+                        }
+                        else
+                        {
+                            return EvalResult.Failure(engine, Error.BadArgumentValueError, word, "empty code provided");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return EvalResult.Failure(engine, Error.FatalError, word, ex.Message);
+                    }
                 }
                 else if (s[0] == typeof(MOGCode))
                 {
@@ -240,7 +260,7 @@ namespace MogwaiNanoStudio
 
                         var name = await AppGlobal.NanoRuntime.GetNameValue();
 
-                        NanoConnect.Invoke(name ?? "unknown name", ip.Value);
+                        NanoConnect?.Invoke(name ?? "unknown name", ip.Value);
 
                         engine.StackPushBoolean(true);
                     }
@@ -388,7 +408,27 @@ namespace MogwaiNanoStudio
                 if (s[0] == typeof(MOGString))
                 {
                     // filename
-                    // soon
+
+                    var filename = engine.StackPopString();
+
+                    try
+                    {
+                        var code = File.ReadAllText(filename.Value);
+
+                        if (!string.IsNullOrEmpty(code))
+                        {
+                            var function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
+                            return await AppGlobal.NanoRuntime.SetAutorunAsync(function.ToStringCode());
+                        }
+                        else
+                        {
+                            return EvalResult.Failure(engine, Error.BadArgumentValueError, word, "empty code provided");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return EvalResult.Failure(engine, Error.FatalError, word, ex.Message);
+                    }
                 }
                 else if (s[0] == typeof(MOGCode))
                 {

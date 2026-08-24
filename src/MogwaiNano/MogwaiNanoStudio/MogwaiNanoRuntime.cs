@@ -165,7 +165,7 @@ namespace MogwaiNanoStudio
 
             if (responseState.Parameters[0] != "RUNNING")
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceIsNotRunningError);
-
+            
             Console.WriteLine();
             Console.WriteLine("──── Start view mode (press CTRL-C to exit) ─────────────");
             Console.WriteLine();
