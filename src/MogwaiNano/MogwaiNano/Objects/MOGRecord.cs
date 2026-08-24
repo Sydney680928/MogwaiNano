@@ -20,6 +20,8 @@ namespace MogwaiNano.Objects
 {
     public class MOGRecord : MOGObject
     {
+        public ArrayList Keys = new ArrayList();
+        
         public Hashtable Items { get; } = new();
 
         public MOGRecord(MogwaiNanoEngine engine) : base(engine, engine.TypeRecord)
@@ -48,7 +50,7 @@ namespace MogwaiNano.Objects
                 if (key == null || value == null)
                     throw new System.Exception("items must be in pairs of MOGKey and MOGObject");
                 
-                Items.Add(key.Value, value);
+                SetItem(key.Value, value);  
             }   
         }
 
@@ -69,6 +71,7 @@ namespace MogwaiNano.Objects
             else
             {
                 Items.Add(key, value);
+                Keys.Add(key);
             }   
         }
 
@@ -82,6 +85,9 @@ namespace MogwaiNano.Objects
                 obj.Items.Add(key, value.Clone());
             }
 
+            foreach (var key in Keys)
+                obj.Keys.Add(key);
+
             obj.UpdateFromOther(this);
 
             return obj;
@@ -94,7 +100,7 @@ namespace MogwaiNano.Objects
             if (AutoEval)
                 sb.Append("!");
 
-            foreach (var key in Items.Keys)
+            foreach (var key in Keys)
             {
                 if (sb.Length > 0)
                     sb.Append(" ");

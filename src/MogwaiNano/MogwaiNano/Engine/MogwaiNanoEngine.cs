@@ -178,6 +178,10 @@ namespace MogwaiNano.Engine
             _primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
             _primitives.Add("bcd->", new PrimitiveDelegate(PrimitiveBcdToDecimal));
 
+            _primitives.Add("->vars", new PrimitiveDelegate(PrimitiveStackToVars));
+            _primitives.Add("->safeVars", new PrimitiveDelegate(PrimitiveStackToSafeVars));
+            _primitives.Add("->params", new PrimitiveDelegate(PrimitiveStackToParams));
+
             _primitives.Add("makeData", new PrimitiveDelegate(PrimitiveMakeData));
 
             _primitives.Add("clear", new PrimitiveDelegate(PrimitiveStackClear));
@@ -2183,15 +2187,279 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
+        private EvalResult PrimitiveStackToVars(string name)
+        {
+            // 10 20 30 ( 'A' 'B' 'C') ->vars -----> A=10 B=20 C=30
+            // [id: 50 name: "SIBUE" x: 'Z'] ->vars -------> id=50 name="SIBUE" x='Z'
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGList))
+            {
+                // Signature 10 20 30 ( 'A' 'B' 'C') ->vars
+
+                var list = StackPop() as MOGList;
+
+                // La liste ne doit comporter QUE des names
+
+                foreach (var item in list.Items)
+                {
+                    if (item is not MOGName)
+                        return EvalResult.Failure(this, Error.BadArgumentTypeError, name, "the list parameter can only contain names.");
+                }
+
+                // La stack doit comporter assez d'éléments
+
+                if (StackSize < list.Items.Count)
+                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name, "the stack does not contain enough elements.");
+
+                // Pour chaque name on prend un item de la stack et on crée une variable avec
+                // On travaille à l'envers pour que les paramètres soient dans le bon sens
+
+                for (int i = list.Items.Count - 1; i >= 0; i--)
+                {
+                    var varName = list.Items[i] as MOGName;
+                    var item = StackPop();
+
+                    var r2 = VarWrite(varName.Value, item!);
+
+                    if (r2 != EvalResult.NoError)
+                        return r2;
+                }
+
+                return EvalResult.NoError;
+            }
+            else if (s[0] == typeof(MOGRecord))
+            {
+                // Signature [id: 50 name: "SIBUE" x: 'Z'] ->vars
+
+                var record = StackPop() as MOGRecord;
+
+                foreach (var key in record!.Items.Keys)
+                {
+                    var item = record.Items[key] as MOGObject;
+                    VarWrite(key as string, item);
+                }
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStackToSafeVars(string name)
+        {
+            // 10 "SIBUE" 'Z' [id: .number name: .string x: .name] ->safeVars -------> id=50 name="SIBUE" x='Z'
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGRecord))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            // On récupère le record de référence et ses clés
+
+            var recf = StackPop() as MOGRecord;
+
+            var keys = new string[recf.Keys.Count];
+            var i = 0;
+
+            foreach (var k in recf.Keys)
+                keys[i++] = k as string;
+
+            // Le record de référence ne doit porter QUE des types
+
+            foreach (var k in keys)
+            {
+                if (recf.Items[k] is not MOGType)
+                    return EvalResult.Failure(this, Error.BadArgumentTypeError, "reference record must have .type values.");
+            }
+
+            // La pile doit au moins contenir le nombre de clés du record de référence
+
+            if (StackSize < recf.Items.Count)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, "the stack does not contain enough elements.");
+
+            // On récupère toute les valeurs depuis la pile
+
+            var values = new ArrayList();
+
+            for (i = 0; i < keys.Length; i++)
+            {
+                var value = StackPop();
+                values.Add(value);
+            }
+
+            // On vérifie la correspondance de types
+
+            var index = 0;
+
+            for (i = keys.Length - 1; i >= 0; i--)
+            {
+                // On lit la valeur
+
+                var pv = values[index++] as MOGObject;
+
+                // On récupère le type attendu
+
+                var tv = recf.Items[keys[i]] as MOGType;
+
+                Debug.WriteLine();
+                Debug.WriteLine($"key={keys[i]}");
+                Debug.WriteLine($"Type Value={pv.Type.Value}");
+                Debug.WriteLine($"Type={tv.Value}");
+
+                // Si incorrect on arrête tout
+
+                if (tv.Value != "any" && tv.Value != pv.Type.Value)
+                    return EvalResult.Failure(this, Error.BadArgumentTypeError, name, $"{tv} expected but {pv.Type} found for '{keys[i]}' parameter");
+            }
+
+            // On crée les variables locales
+
+            index = 0;
+
+            for (i = keys.Length - 1; i >= 0; i--)
+            {
+                var v = values[index++] as MOGObject;
+                var r = VarWrite(keys[i], v);
+
+                if (r != EvalResult.NoError)
+                    return r;
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveStackToParams(string name)
+        {
+            // [id: 50 name: "SIBUE" x: 'Z'] [id: .number name: .string u: (.boolean true)] ->params -------> id=50 name="SIBUE u=true"
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGRecord) || s[1] != typeof(MOGRecord))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var n0 = StackPop() as MOGRecord;
+            var n1 = StackPop() as MOGRecord;
+
+            // On décompose n0 en liste de paramètes ayant type + éventuellement valeur par défaut
+
+            var pDefinitions = new ArrayList();
+
+            foreach (string key in n0.Keys)
+            {
+                // La clé porte un type ou une liste avec (type defaultValue)
+
+                var value = n0.Items[key];
+
+                if (value is MOGType v)
+                {
+                    // OK
+
+                    var np = new ParamDefinition(key, v, null);
+                    pDefinitions.Add(np);
+                }
+                else if (value is MOGList list)
+                {
+                    // La liste doit être composée de 2 élements
+
+                    if (list.Items.Count != 2)
+                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have 2 items (type defaultValue).");
+
+                    // L'item 0 doit être un type
+
+                    if (list.Items[0] is MOGType type)
+                    {
+                        // L'item 1 doit être une valeur du type ou sans importance si type .any
+
+                        if (list.Items[1] is MOGObject defaultValue && (type.Value == "any" || defaultValue.Type.Value == type.Value))
+                        {
+                            // OK
+
+                            var np = new ParamDefinition(key, type, defaultValue);
+                            pDefinitions.Add(np);
+                        }
+                        else
+                        {
+                            return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have a value with the good type in second position.");
+                        }
+                    }
+                    else
+                    {
+                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have a type in first position.");
+                    }
+                }
+                else
+                {
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "parameter definition is a type or a list (type defaultValue).");
+                }
+            }
+
+            foreach (ParamDefinition p in pDefinitions)
+            {
+                if (n1.Keys.Contains(p.VarName) && n1.Items[p.VarName] is MOGObject pv)
+                {
+                    // On a une valeur fournie pour ce paramètre
+                    // Il doit être du bon type (sauf si le type attendu est .any)
+
+                    if (p.Type.Value == "any" || pv.Type.Value == p.Type.Value)
+                    {
+                        // Tout est OK
+                        // La valeur a le bon type
+                        // On peut prendre en compte la valeur
+
+                        p.Value = pv;
+                    }
+                    else
+                    {
+                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{p.VarName}: type is invalid !", $"{p.Type} expected", $"{pv.Type} provided");
+                    }
+                }
+                else
+                {
+                    // On n'a pas de valeur fournie pour ce paramètre
+                    // Si on a une valeur par défaut c'est pas grave, sinon erreur !
+
+                    if (p.Value == null)
+                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{p.VarName}: parameter is mandatory !");
+                }
+            }
+
+            // On crée les variables
+            // Normalement on ne devrait pas avoir de valeur à null
+            // Pour le moment on ne bloque pas, on place juste MOGNull comme valeur dans ce cas là
+
+            EvalResult result = EvalResult.NoError;
+
+            foreach (ParamDefinition pdef in pDefinitions)
+            {
+                result = VarWrite(pdef.VarName, pdef.Value ?? new MOGNull(this));
+
+                if (result != EvalResult.NoError)
+                    break;
+            }
+
+            return result;
+        }
+
         #region SKILLS
 
         private EvalResult PrimitiveGetSkills(string name)
         {
             var list = new MOGList(this);
-            
+
             foreach (var skill in _skills)
                 list.AddItem(new MOGString(this, skill));
- 
+
             StackPush(list);
 
             return EvalResult.NoError;
@@ -3120,9 +3388,29 @@ namespace MogwaiNano.Engine
             }
 
             _i2cDevices.Clear();
-        }   
+        }
 
         #endregion
+
+        #endregion
+
+        #region INTERNALS CLASSES
+
+        private class ParamDefinition
+        {
+            public string VarName { get; set; }
+
+            public MOGType Type { get; set; }
+
+            public MOGObject Value { get; set; }
+
+            public ParamDefinition(string varName, MOGType type, MOGObject? value)
+            {
+                VarName = varName;
+                Type = type;
+                Value = value;
+            }
+        }
 
         #endregion
     }

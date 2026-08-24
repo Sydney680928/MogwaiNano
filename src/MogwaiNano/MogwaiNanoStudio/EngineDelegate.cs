@@ -83,7 +83,7 @@ namespace MogwaiNanoStudio
 
             "bcd->",
             "->bcd",
-            "newData",
+            "makeData",
 
             "gpio.setMode.input",
             "gpio.setMode.inputPullDown",
