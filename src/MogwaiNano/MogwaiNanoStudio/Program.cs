@@ -50,6 +50,11 @@ AppGlobal.NanoClient.Disconnected += (sender, eventArgs) =>
     Console.Title = "MOGWAI NANO STUDIO";
 };
 
+AppGlobal.NanoRuntime.NanoSendMessage += (message) =>
+{
+    Debug.WriteLine($"[NANO] {message}");
+};  
+
 if (args.Length > 0)
 {
     Console.Title = "MOGWAI NANO STUDIO";

@@ -30,8 +30,6 @@ namespace MogwaiNano.Interfaces
 
         EvalResult EngineDidResume(MogwaiNanoEngine engine) => EvalResult.NoError;
 
-        EvalResult MessageReceivedFromRuntime(MogwaiNanoEngine engine, string message, MOGObject parameter) => EvalResult.NoError;
-
         #endregion
 
         #region DEBUG

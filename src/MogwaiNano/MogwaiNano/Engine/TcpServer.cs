@@ -210,7 +210,7 @@ namespace MogwaiNano.Engine
             }
         }
 
-        private void SendMessage(ServerMessage message)
+        public void SendMessage(ServerMessage message)
         {
             var stream = _tcpClient?.GetStream();
 

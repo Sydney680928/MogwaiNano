@@ -40,6 +40,10 @@ namespace MogwaiNanoStudio
         public event NanoPrintHandler? NanoPrintLn;
         public event NanoPrintHandler? NanoPrint;
 
+        public delegate void NanoSendMessageHandler(string message);
+        public event NanoSendMessageHandler? NanoSendMessage;
+
+
         public bool IsRunning { get; private set; } = false;
 
         public bool DisplayMessages { get; set; } = false;
@@ -100,6 +104,10 @@ namespace MogwaiNanoStudio
             else if (message.Function == "CONSOLE.PRINT")
             {
                 NanoPrint?.Invoke(message.Parameters[0]);
+            }
+            else if (message.Function == "SEND.MESSAGE")
+            {
+                NanoSendMessage?.Invoke(message.Parameters[0]);
             }
         }
 
