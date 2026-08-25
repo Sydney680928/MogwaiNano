@@ -76,7 +76,8 @@ namespace MogwaiNano.Engine
             _invalidNameError = RegisterError("MW.46", "invalid name error");
             _unableToWriteValueError = RegisterError("MW.47", "unable to write value in var error");
             _unknownWordError = RegisterError("MW.50", "unknown word error");
-            
+            _fatalError = RegisterError("MW.!!!", "fatal error");
+
             _gpioUnknownPinError = RegisterError("MW.500", "gpio unknown pin error");
             
             _i2cDeviceAlreadyOpenedError = RegisterError("MW.510", "i2c device already opened error");             
@@ -161,6 +162,11 @@ namespace MogwaiNano.Engine
 
         public override string ToString()
         {
+            if (Message == null || Code == null)
+            {
+
+            }
+
             return $"{Message} ({Code})";
         }
     }

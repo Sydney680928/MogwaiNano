@@ -88,8 +88,12 @@ namespace MogwaiNano.Objects
 
         public override MOGObject Clone()
         {
-            var obj = new MOGData(Engine, Items);
+            var newItems = new byte[Items.Length];
+            Array.Copy(Items, newItems, Items.Length);
+
+            var obj = new MOGData(Engine, newItems);
             obj.UpdateFromOther(this);
+            
             return obj;
         }
 

@@ -55,6 +55,8 @@ namespace MogwaiNano.Engine
         private Hashtable _i2cDevices = new(2);
         private string[] _skills = { "GPIO", "I2C" };
         private ArrayList _flags = new();
+        private EvalResult _lastResult;
+        private Error _lastError;
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -73,7 +75,18 @@ namespace MogwaiNano.Engine
         public readonly MOGType TypeReference;
         public readonly MOGType TypeAny;
 
-        public Error LastError { get; set; } = Error.None;
+        public Error LastError
+        {
+            get
+            {
+                if (_lastError == null)
+                    _lastError = Error.None;
+
+                return _lastError;
+            }
+
+            set { _lastError = value; }
+        }
 
         public MOGObject CurrentEvalObject { get; set; }
 
@@ -87,7 +100,18 @@ namespace MogwaiNano.Engine
 
         public Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
-        public EvalResult LastResult { get; private set; } = EvalResult.NoError;
+        public EvalResult LastResult
+        {
+            get
+            {
+                if (_lastResult == null)
+                    _lastResult = EvalResult.NoError;
+
+                return _lastResult;
+            }
+
+            private set { _lastResult = value; }
+        }
 
         public string[] Skills => _skills;
 
@@ -319,13 +343,15 @@ namespace MogwaiNano.Engine
 
         public EvalResult Run(string code, bool debugMode = false)
         {
+            Debug.WriteLine($"run: GC: {GC.Run(true)} bytes free");
+
             try
             {
                 IsRunning = true;
 
                 Reset();
 
-                GC.Run(true);
+                Debug.WriteLine($"before parsing: GC: {GC.Run(true)} bytes free");
 
                 // _debugMode = debugMode
 
@@ -339,6 +365,8 @@ namespace MogwaiNano.Engine
                 try
                 {
                     program = new MOGFunction(this, code);
+                    code = null;
+                    Debug.WriteLine($"after parsing: GC: {GC.Run(true)} bytes free");
                 }
                 catch (Exception ex)
                 {
@@ -1079,7 +1107,7 @@ namespace MogwaiNano.Engine
                 var value = VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(this, Error.UnknownNameError, name);
 
                 StackPush(value);
                 StackPush(item);
@@ -1088,6 +1116,8 @@ namespace MogwaiNano.Engine
 
                 if (r.IsError)
                     return r;
+
+                StackDrop();
 
                 return EvalResult.NoError;
             }
@@ -1161,7 +1191,7 @@ namespace MogwaiNano.Engine
                 var value = VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(this, Error.UnknownNameError, name);
 
                 StackPush(value);
                 StackPush(item);
@@ -2916,34 +2946,58 @@ namespace MogwaiNano.Engine
             if (s.Length == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
-            if (s[0] != typeof(MOGData) || s[1] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            if (s[0] == typeof(MOGData) && s[1] == typeof(MOGName))
+            {   
+                var data = StackPop() as MOGData;
+                var deviceName = StackPop() as MOGName;
 
-            var data = StackPop() as MOGData;
-            var deviceName = StackPop() as MOGName;
+                if (!_i2cDevices.Contains(deviceName.Value))
+                    return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
 
-            if (!_i2cDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+                var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
 
-            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
-
-            try
-            {
-                var r = i2cDevice.Write(data.ToSpanByte());
-
-                if (r.Status == I2cTransferStatus.FullTransfer)
+                try
                 {
-                    return EvalResult.NoError;
+                    var r = i2cDevice.Write(data.ToSpanByte());
+
+                    if (r.Status == I2cTransferStatus.FullTransfer)
+                    {
+                        return EvalResult.NoError;
+                    }
+                    else
+                    {
+                        return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
                 }
             }
-            catch (Exception ex)
+            else if (s[0] == typeof(MOGRef) && s[1] == typeof(MOGName))
             {
-                return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
+                var @ref = StackPop() as MOGRef;
+                var deviceName = StackPop() as MOGName;
+
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+
+                StackPush(deviceName);
+                StackPush(value);
+
+                var r = PrimitiveI2cWrite(name);
+
+                if (r.IsError)
+                    return r;
+
+                StackDrop();
+
+                return EvalResult.NoError;
             }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
         private EvalResult PrimitiveI2cRegisterWrite(string name)
@@ -2955,45 +3009,67 @@ namespace MogwaiNano.Engine
             if (s.Length == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
-            if (s[0] != typeof(MOGData) || s[1] != typeof(MOGNumber) || s[2] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
-
-            var data = StackPop() as MOGData;
-            var register = StackPop() as MOGNumber;
-            var deviceName = StackPop() as MOGName;
-
-            if (!_i2cDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
-
-            if (register.Value < 0 || register.Value > 255)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
-
-            var registerAddress = (byte)register.Value;
-
-            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
-
-            try
+            if (s[0] == typeof(MOGData) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGName))
             {
-                byte[] buffer = new byte[1 + data.Items.Length];
-                buffer[0] = registerAddress;
-                Array.Copy(data.Items, 0, buffer, 1, data.Items.Length);
+                var data = StackPop() as MOGData;
+                var register = StackPop() as MOGNumber;
+                var deviceName = StackPop() as MOGName;
 
-                var span = new SpanByte(buffer);
-                var r = i2cDevice.Write(span);
+                if (!_i2cDevices.Contains(deviceName.Value))
+                    return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
 
-                if (r.Status == I2cTransferStatus.FullTransfer)
+                if (register.Value < 0 || register.Value > 255)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
+
+                var registerAddress = (byte)register.Value;
+
+                var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+
+                try
                 {
+                    var r = i2cDevice.WriteByte(registerAddress);
+
+                    if (r.Status != I2cTransferStatus.FullTransfer)
+                        return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+
+                    r = i2cDevice.Write(data.ToSpanByte());
+
+                    if (r.Status != I2cTransferStatus.FullTransfer)
+                        return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+
                     return EvalResult.NoError;
                 }
-                else
+                catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
                 }
             }
-            catch (Exception ex)
+            else if (s[0] == typeof(MOGRef) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGName))
             {
-                return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
+                var @ref = StackPop() as MOGRef;
+                var register = StackPop() as MOGNumber;
+                var deviceName = StackPop() as MOGName;
+
+                var value = VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+
+                StackPush(deviceName);
+                StackPush(register);
+                StackPush(value);   
+
+                var r = PrimitiveI2cRegisterWrite(name);
+
+                if (r.IsError)
+                    return r;
+
+                StackDrop();
+
+                return EvalResult.NoError;
             }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
         private EvalResult PrimitiveI2cRead(string name)
@@ -3574,7 +3650,7 @@ namespace MogwaiNano.Engine
 
             public MOGObject Value { get; set; }
 
-            public ParamDefinition(string varName, MOGType type, MOGObject? value)
+            public ParamDefinition(string varName, MOGType type, MOGObject value)
             {
                 VarName = varName;
                 Type = type;
