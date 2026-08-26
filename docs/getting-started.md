@@ -237,7 +237,7 @@ Not sure what's out there on the bus? `i2c.scan` probes the standard address ran
 
 The other I2C primitives — `i2c.write`, `i2c.read` — work the same way as their `register` counterparts, but operate on the device directly rather than a specific register; useful for devices that don't follow the register-addressed pattern.
 
-I2C writes aren't limited to single bytes — a `MOGData` of any size can be sent in one call, useful for devices like OLED displays that need a whole frame buffer written at once. `makeData` creates a zero-initialized `MOGData` of a given size directly, which is the safer choice for larger buffers on lower-RAM devices (building the same buffer by pushing hundreds of individual values with `repeat` before converting with `->data` works fine on more capable boards, but can run out of memory on smaller ones):
+I2C writes aren't limited to single bytes — a `MOGData` of any size can be sent in one call, useful for devices like OLED displays that need a whole frame buffer written at once. `makeData` creates a `MOGData` of a given size filled with a given byte value directly, which is the safer choice for larger buffers on lower-RAM devices (building the same buffer by pushing hundreds of individual values with `repeat` before converting with `->data` works fine on more capable boards, but can run out of memory on smaller ones):
 
 ```
 {
@@ -245,7 +245,7 @@ I2C writes aren't limited to single bytes — a `MOGData` of any size can be sen
 
     # ... display initialization sequence omitted ...
 
-    1024 makeData -> 'buffer'
+    1024 0 makeData -> 'buffer'
     'OLED' 0x40 &buffer i2c.register.write   # clears the entire 128x64 frame buffer in one transaction
 
     'OLED' i2c.close

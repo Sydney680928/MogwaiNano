@@ -336,7 +336,7 @@ namespace MogwaiNanoStudio
 
                         var name = await AppGlobal.NanoRuntime.GetNameValue();
                         
-                        NanoConnect.Invoke(name ?? "unknown name", ip.Value);
+                        NanoConnect?.Invoke(name ?? "unknown name", ip.Value);
 
                         engine.StackPushBoolean(true);
                     }

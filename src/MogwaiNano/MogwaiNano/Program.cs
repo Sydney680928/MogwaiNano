@@ -185,18 +185,20 @@ namespace MogwaiNano
                 }
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(
-                    AppGlobal.NanoParameters.Name,
-                    "INFO.GET",
-                    AppGlobal.NanoParameters.Name,
-                    AppGlobal.MogwaiNanoEngine.Version.ToString(),
-                    AppGlobal.IpAddress,
-                    AppGlobal.Session.ToString(),
-                    SystemInfo.Platform,
-                    SystemInfo.TargetName,
-                    SystemInfo.OEMString,
-                    SystemInfo.Version.ToString(),
-                    memory.ToString(),
-                    sb.ToString()));
+                        AppGlobal.NanoParameters.Name,
+                        "INFO.GET",
+                        AppGlobal.NanoParameters.Name,
+                        AppGlobal.MogwaiNanoEngine.Version.ToString(),
+                        AppGlobal.IpAddress,
+                        AppGlobal.Session.ToString(),
+                        SystemInfo.Platform,
+                        SystemInfo.TargetName,
+                        SystemInfo.OEMString,
+                        SystemInfo.Version.ToString(),
+                        memory.ToString(),
+                        sb.ToString(),
+                        AppGlobal.MogwaiNanoEngine.FrugalMode.ToString()
+                    ));
             }
             else if (message.Function == "LAST.RESULT.GET")
             {

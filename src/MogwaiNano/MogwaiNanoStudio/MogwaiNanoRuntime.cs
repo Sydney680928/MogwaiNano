@@ -438,7 +438,7 @@ namespace MogwaiNanoStudio
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
             
-            if (response.Parameters == null || response.Parameters.Length < 9)
+            if (response.Parameters == null || response.Parameters.Length < 10)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid info response from device.");
 
             if (int.TryParse(response.Parameters[8], out int memory))
@@ -468,6 +468,8 @@ namespace MogwaiNanoStudio
                 }
 
                 record.SetItem("skills", list);
+
+                record.SetBoolean("frugalMode", response.Parameters[10] == "True");
 
                 _engine.StackPush(record);
 

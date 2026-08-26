@@ -115,6 +115,8 @@ namespace MogwaiNano.Engine
 
         public string[] Skills => _skills;
 
+        public bool FrugalMode { get; set; } = false;
+
         public MogwaiNanoEngine()
         {
             // load types
@@ -274,6 +276,7 @@ namespace MogwaiNano.Engine
             _primitives.Add("mogwai.sendMessage", new PrimitiveDelegate(PrimitiveSendMessageToStudio));
             _primitives.Add("mogwai.reboot", new PrimitiveDelegate(PrimitiveMogwaiReboot));
             _primitives.Add("mogwai.info", new PrimitiveDelegate(PrimitiveMogwaiInfo));
+            _primitives.Add("mogwai.frugalMode", new PrimitiveDelegate(PrimitiveMogwaiFrugalMode));
 
             _primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
             _primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
@@ -351,8 +354,6 @@ namespace MogwaiNano.Engine
 
                 Reset();
 
-                Debug.WriteLine($"before parsing: GC: {GC.Run(true)} bytes free");
-
                 // _debugMode = debugMode
 
                 var stopwatch = Stopwatch.StartNew();
@@ -366,7 +367,6 @@ namespace MogwaiNano.Engine
                 {
                     program = new MOGFunction(this, code);
                     code = null;
-                    Debug.WriteLine($"after parsing: GC: {GC.Run(true)} bytes free");
                 }
                 catch (Exception ex)
                 {
@@ -471,6 +471,8 @@ namespace MogwaiNano.Engine
 
             HaltRequested = false;
             BreakRequested = false;
+
+            FrugalMode = true;
         }
 
         public void Halt() => HaltRequested = true;
@@ -803,7 +805,7 @@ namespace MogwaiNano.Engine
 
             try
             {
-                var v = n0.Value % n1.Value;
+                var v = n1.Value % n0.Value;
                 StackPush(new MOGNumber(this, v));
 
                 return EvalResult.NoError;
@@ -1107,7 +1109,7 @@ namespace MogwaiNano.Engine
                 var value = VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name);
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.Value);
 
                 StackPush(value);
                 StackPush(item);
@@ -1116,8 +1118,6 @@ namespace MogwaiNano.Engine
 
                 if (r.IsError)
                     return r;
-
-                StackDrop();
 
                 return EvalResult.NoError;
             }
@@ -1320,17 +1320,25 @@ namespace MogwaiNano.Engine
 
         private EvalResult PrimitiveMakeData(string name)
         {
-            var s = StackSign(1);
+            var s = StackSign(2);
 
             if (s.Length == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
-            if (s[0] == typeof(MOGNumber))
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n0 = StackPop() as MOGNumber;
+                var initValue = StackPop() as MOGNumber;
+                var size = StackPop() as MOGNumber;
 
-                var size = (int)n0.Value;
-                var items = new byte[size];
+                var items = new byte[(int)size.Value];
+                var value = (byte)initValue.Value;
+
+                if (value != 0)
+                {
+                    for (int i = 0; i < items.Length; i++)
+                        items[i] = value;
+                }
+
                 var data = new MOGData(this, items);
 
                 StackPush(data);
@@ -2199,9 +2207,31 @@ namespace MogwaiNano.Engine
 
             record.SetItem("skills", skills);
 
+            record.SetItem("frugalMode", new MOGBoolean(this, FrugalMode)); 
+
             StackPush(record);
 
             return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveMogwaiFrugalMode(string name)
+        {
+            // true or false frugalMode
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] == typeof(MOGBoolean))
+            {
+                var b = StackPop() as MOGBoolean;
+                FrugalMode = b.Value;
+                
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
         }
 
         private EvalResult PrimitiveSendMessageToStudio(string name)
@@ -3027,12 +3057,11 @@ namespace MogwaiNano.Engine
 
                 try
                 {
-                    var r = i2cDevice.WriteByte(registerAddress);
-
-                    if (r.Status != I2cTransferStatus.FullTransfer)
-                        return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
-
-                    r = i2cDevice.Write(data.ToSpanByte());
+                    byte[] buffer = new byte[1 + data.Items.Length];
+                    buffer[0] = registerAddress;
+                    Array.Copy(data.Items, 0, buffer, 1, data.Items.Length);
+                    var span = new SpanByte(buffer);
+                    var r = i2cDevice.Write(span);
 
                     if (r.Status != I2cTransferStatus.FullTransfer)
                         return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
@@ -3053,7 +3082,7 @@ namespace MogwaiNano.Engine
                 var value = VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(this, Error.UnknownNameError, name);
 
                 StackPush(deviceName);
                 StackPush(register);
@@ -3491,7 +3520,13 @@ namespace MogwaiNano.Engine
                         var @event = _events[name] as MOGEvent;
                         var primitiveSto = new MOGPrimitive(this, "STO");
 
-                        @event = @event.Clone() as MOGEvent; ;
+                        @event = @event.Clone() as MOGEvent;
+
+                        if (@event.Function.Items == null)
+                        {
+                            if (!@event.Function.Parse())
+                                return EvalResult.Failure(this, Error.UnableToFireEventError, $"unable to fire event '{name}'", "parse error");
+                        }
 
                         @event.Function.Items.Insert(0, primitiveSto);
                         @event.Function.Items.Insert(0, new MOGName(this, "eventData"));

@@ -88,8 +88,6 @@ namespace MogwaiNano.Objects
             foreach (var key in Keys)
                 obj.Keys.Add(key);
 
-            obj.UpdateFromOther(this);
-
             return obj;
         }
 

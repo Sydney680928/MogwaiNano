@@ -91,9 +91,7 @@ namespace MogwaiNano.Objects
             var newItems = new byte[Items.Length];
             Array.Copy(Items, newItems, Items.Length);
 
-            var obj = new MOGData(Engine, newItems);
-            obj.UpdateFromOther(this);
-            
+            var obj = new MOGData(Engine, newItems);           
             return obj;
         }
 

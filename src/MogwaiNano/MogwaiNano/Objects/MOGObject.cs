@@ -32,11 +32,6 @@ namespace MogwaiNano.Objects
 
         public abstract MOGObject Clone();
 
-        public virtual void UpdateFromOther(MOGObject other)
-        {
-            AutoEval = other.AutoEval;
-        }
-
         public virtual EvalResult EngineEval()
         {
             Engine.StackPush(this);

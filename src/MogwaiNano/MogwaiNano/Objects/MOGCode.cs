@@ -15,13 +15,17 @@
 using MogwaiNano.Engine;
 using System;
 using System.Collections;
+using System.Diagnostics;
 using System.Text;
+using GC = nanoFramework.Runtime.Native.GC;
 
 namespace MogwaiNano.Objects
 {
     public class MOGCode : MOGObject
     {
-        public ArrayList Items { get; } = new();
+        public ArrayList Items { get; private set; }
+
+        public string Content { get; protected set; }
 
         public MOGCode(MogwaiNanoEngine engine) : base(engine, engine.TypeCode)
         {
@@ -31,6 +35,7 @@ namespace MogwaiNano.Objects
         public MOGCode(MogwaiNanoEngine engine, ArrayList items) : this(engine)
         {
             Items = items;
+            Content = ToStringCode();
 
             if (Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
             {
@@ -41,13 +46,31 @@ namespace MogwaiNano.Objects
 
         public MOGCode(MogwaiNanoEngine engine, string content) : this(engine)
         {
-            var parser = new Parser(engine);
-            Items = parser.Parse(content);
+            Content = content;
+        }
 
-            if (Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
+        public bool Parse()
+        {
+            if (Content == null)
+                return false;
+
+            try
             {
-                AutoEval = true;
-                Items.RemoveAt(0);
+                var parser = new Parser(Engine);
+                Items = parser.Parse(Content);
+                parser = null;
+
+                if (Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
+                {
+                    AutoEval = true;
+                    Items.RemoveAt(0);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
             }
         }
 
@@ -56,68 +79,118 @@ namespace MogwaiNano.Objects
             if (Engine.HaltRequested)
                 return EvalResult.Failure(Engine, Error.HaltEncounteredError);
 
+            if (Content == null && Items == null)
+                return EvalResult.Failure(Engine, Error.FatalError, "unabled to execute code, content and items are empty");    
+
             EvalResult result = EvalResult.NoError;
 
-            if (Items.Count > 0)
+            try
             {
-                foreach (MOGObject item in Items)
+                if (Items == null)
                 {
-                    if (result != EvalResult.NoError)
-                        break;
-
-                    if (Engine.HasWaitingFireObjects)
-                        result = Engine.ExecuteWaitingFireObjects();
-
-                    if (result != EvalResult.NoError)
-                        break;
-
-                    if (Engine.BreakRequested)
-                        break;
-
-                    if (Engine.HaltRequested)
-                        return EvalResult.Failure(Engine, Error.HaltEncounteredError);
-
-                    Engine.CurrentEvalObject = item.Clone();
-
-                    try
-                    {
-                        result = Engine.CurrentEvalObject.EngineEval();
-                    }
-                    catch (Exception ex)
-                    {
-                        result = EvalResult.Failure(Engine, Error.FatalError, ex.Message);
-                    }
-
-                    if (result.IsError)
-                        break;
+                    if (!Parse())
+                        return EvalResult.Failure(Engine, Error.ParseError);
                 }
-            }
-            else
-            {
-                if (Engine.HasWaitingFireObjects)
-                    return Engine.ExecuteWaitingFireObjects();
-            }
 
-            return result;
+                if (Items.Count > 0)
+                {
+                    foreach (MOGObject item in Items)
+                    {
+                        if (result != EvalResult.NoError)
+                            break;
+
+                        if (Engine.HasWaitingFireObjects)
+                            result = Engine.ExecuteWaitingFireObjects();
+
+                        if (result != EvalResult.NoError)
+                            break;
+
+                        if (Engine.BreakRequested)
+                            break;
+
+                        if (Engine.HaltRequested)
+                            return EvalResult.Failure(Engine, Error.HaltEncounteredError);
+
+                        if (Engine.FrugalMode)
+                        {
+                            Engine.CurrentEvalObject = item;
+                        }
+                        else
+                        {
+                            Engine.CurrentEvalObject = item.Clone();
+                        }
+
+                        try
+                        {
+                            result = Engine.CurrentEvalObject.EngineEval();
+                        }
+                        catch (Exception ex)
+                        {
+                            result = EvalResult.Failure(Engine, Error.FatalError, ex.Message);
+                        }
+
+                        if (result.IsError)
+                            break;
+                    }
+                }
+                else
+                {
+                    if (Engine.HasWaitingFireObjects)
+                        return Engine.ExecuteWaitingFireObjects();
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(Engine, Error.FatalError, ex.Message);
+            }
+            finally
+            {
+                if (Engine.FrugalMode)
+                    Items = null;
+            }
         }
 
         public override MOGObject Clone()
         {
-            var obj = new MOGCode(Engine);
+            var obj = new MOGCode(Engine, Content);
 
-            foreach (MOGObject item in Items)
-                obj.Items.Add(item.Clone());
-
-            obj.UpdateFromOther(this);
+            if (Engine.FrugalMode)
+            {
+                obj.AutoEval = Content.StartsWith("!");
+            }
+            else
+            {
+                if (Items != null)
+                {
+                    foreach (MOGObject item in Items)
+                        obj.Items.Add(item.Clone());
+                }
+            }
 
             return obj;
         }
 
         public MOGFunction ToFunction()
         {
-            var obj = new MOGFunction(Engine, Items);
-            obj.UpdateFromOther(this);
-            return obj;
+            if (Engine.FrugalMode)
+            {
+                var obj = new MOGFunction(Engine, Content);
+                return obj;
+            }
+            else
+            {
+                var obj = new MOGFunction(Engine, Items);
+
+                if (Items != null)
+                {                   
+                    obj.AutoEval = AutoEval;
+                    obj.Content = Content;
+                }
+
+                return obj;
+            }
         }
 
         public override EvalResult EngineEval()
@@ -136,24 +209,33 @@ namespace MogwaiNano.Objects
 
         public string ToStringCode()
         {
-            var sb = new StringBuilder();
-
-            if (AutoEval)
-                sb.Append("! ");
-
-            for (int i = 0; i < Items.Count; i++)
+            if (Items != null)
             {
-                sb.Append(Items[i].ToString());
+                var sb = new StringBuilder();
 
-                if (i < Items.Count - 1)
+                if (AutoEval)
+                    sb.Append("! ");
+
+                for (int i = 0; i < Items.Count; i++)
                 {
-                    sb.Append(" ");
+                    sb.Append(Items[i].ToString());
+
+                    if (i < Items.Count - 1)
+                    {
+                        sb.Append(" ");
+                    }
                 }
+
+                return sb.ToString();
+            }
+            else if (Content != null)
+            {
+                return Content;
             }
 
-            return sb.ToString();
+            return "*** !!! ***";
         }
 
-        public override string ToString() => "{" + ToStringCode() + "}";  
+        public override string ToString() => "{" + ToStringCode() + "}";
     }
 }

@@ -28,7 +28,6 @@ namespace MogwaiNano.Objects
         public override MOGObject Clone()
         {
             var obj = new MOGNumber(Engine, Value);
-            obj.UpdateFromOther(this);
             return obj;
         }
 

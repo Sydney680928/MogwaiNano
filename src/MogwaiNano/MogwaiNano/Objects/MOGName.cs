@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using MogwaiNano.Engine;
+using System.Diagnostics;
 
 namespace MogwaiNano.Objects
 {
@@ -28,7 +29,6 @@ namespace MogwaiNano.Objects
         public override MOGObject Clone()
         {
             var obj = new MOGName(Engine, Value);
-            obj.UpdateFromOther(this);
             return obj;
         }
 

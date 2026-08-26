@@ -49,7 +49,6 @@ namespace MogwaiNano.Objects
         public override MOGObject Clone()
         {
             var obj = new MOGWord(Engine, Value);
-            obj.UpdateFromOther(this);
             return obj;
         }
 

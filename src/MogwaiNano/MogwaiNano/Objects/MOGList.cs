@@ -66,8 +66,6 @@ namespace MogwaiNano.Objects
             foreach (MOGObject item in Items)
                 obj.Items.Add(item.Clone());
 
-            obj.UpdateFromOther(this);
-
             return obj;
         }
 

@@ -15,6 +15,9 @@
 using MogwaiNano.Engine;
 using System;
 using System.Collections;
+using System.Diagnostics;
+using System.Text;
+using GC = nanoFramework.Runtime.Native.GC;
 
 namespace MogwaiNano.Objects
 {
@@ -62,15 +65,24 @@ namespace MogwaiNano.Objects
 
         public override MOGObject Clone()
         {
-            var obj = new MOGFunction(Engine);
+            var obj = new MOGFunction(Engine, Content);
 
-            foreach (MOGObject item in Items)
-                obj.Items.Add(item.Clone());
-
-            obj.UpdateFromOther(this);
+            if (Engine.FrugalMode)
+            {
+                obj.AutoEval = Content.StartsWith("!");
+            }
+            else
+            {
+                if (Items != null)
+                {
+                    foreach (MOGObject item in Items)
+                        obj.Items.Add(item.Clone());
+                }
+            }
 
             return obj;
         }
+
 
         public override string ToString() => $"«{ToStringCode()}»";
     }
