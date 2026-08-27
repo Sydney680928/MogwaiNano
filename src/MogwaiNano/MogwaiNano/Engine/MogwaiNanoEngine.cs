@@ -472,7 +472,7 @@ namespace MogwaiNano.Engine
             HaltRequested = false;
             BreakRequested = false;
 
-            FrugalMode = true;
+            FrugalMode = false;
         }
 
         public void Halt() => HaltRequested = true;
