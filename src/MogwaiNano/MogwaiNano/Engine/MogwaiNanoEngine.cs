@@ -1768,6 +1768,7 @@ namespace MogwaiNano.Engine
                 var start = StackPop() as MOGNumber;
 
                 var direction = (end!.Value - start!.Value) > 0 ? 1 : -1;
+                var varLoop = new MOGNumber(this, 0);
 
                 EvalResult result = EvalResult.NoError;
 
@@ -1779,7 +1780,8 @@ namespace MogwaiNano.Engine
                         break;
                     }
 
-                    result = VarWrite(varName.Value, new MOGNumber(this, i));
+                    varLoop.Value = i;
+                    result = VarWrite(varName.Value, varLoop);
 
                     if (result != EvalResult.NoError)
                         break;
@@ -1814,8 +1816,9 @@ namespace MogwaiNano.Engine
                 var start = StackPop() as MOGNumber;
 
                 var direction = (end.Value - start.Value) > 0 ? 1 : -1;
-
                 step.Value = Math.Abs(step.Value) * direction;
+                
+                var varLoop = new MOGNumber(this, 0);
 
                 EvalResult result = EvalResult.NoError;
 
@@ -1827,7 +1830,8 @@ namespace MogwaiNano.Engine
                         break;
                     }
 
-                    result = VarWrite(varName.Value, new MOGNumber(this, i));
+                    varLoop.Value = i;
+                    result = VarWrite(varName.Value, varLoop);
 
                     if (result != EvalResult.NoError)
                         break;
