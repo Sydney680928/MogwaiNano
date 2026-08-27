@@ -78,7 +78,9 @@ namespace MogwaiNanoStudio
 
         private void NanoClient_Disconnected(object? sender, EventArgs e)
         {
-            IsRunning = false;
+            // IsRunning = false;
+
+            NanoPrintLn?.Invoke("\ndevice disconnected !\n");
         }
 
         private void NanoClient_MessageReceived(object? sender, ServerMessage message)
@@ -164,38 +166,34 @@ namespace MogwaiNanoStudio
         {
             if (!AppGlobal.NanoClient.IsConnected)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
-
-            var messageState = new ServerMessage(SOURCE_NAME, "STATE.GET");
-            var responseState = await SendMessageAndWaitResponse(messageState);
-
-            if (responseState == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
-
-            if (responseState.Parameters[0] != "RUNNING")
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceIsNotRunningError);
-            
+                
             Console.WriteLine();
             Console.WriteLine("──── Start view mode (press CTRL-C to exit) ─────────────");
             Console.WriteLine();
 
-            IsRunning = true;   
             ExitViewModeRequested = false;
-            DisplayMessages = true;
-            ViewMode = true;
 
-            await WaitNanoProgramDidEnd();
+            if (IsRunning)
+            {                
+                DisplayMessages = true;
+                ViewMode = true;
+
+                await WaitNanoProgramDidEnd();
+            }
+
+            DisplayMessages = false;
 
             if (!ExitViewModeRequested)
             {
                 Console.WriteLine();
-
+                Console.WriteLine();
+                
                 var messageLastResult = new ServerMessage(SOURCE_NAME, "LAST.RESULT.GET");
                 var responseLastResult = await SendMessageAndWaitResponse(messageLastResult);
 
                 if (responseLastResult == null)
                 {
-                    Console.WriteLine("device unreachable !");
-                    Console.WriteLine("unabled to get program result.");
+                    Console.WriteLine("unabled to get program result !");
                 }
                 else
                 {
@@ -593,11 +591,9 @@ namespace MogwaiNanoStudio
                     return;
                 }
             }
-
-            DisplayMessages = false;
         }
 
-        private async Task<ServerMessage?> WaitResponse(string function, int timeout = 5000)
+        private async Task<ServerMessage?> WaitResponse(string function, int timeout = 15000)
         {
             var deadline = DateTime.Now.AddMilliseconds(timeout);
             ServerMessage? messageReceived = null;
@@ -618,7 +614,7 @@ namespace MogwaiNanoStudio
             return messageReceived;
         }
 
-        private async Task<ServerMessage?> SendMessageAndWaitResponse(ServerMessage sourceMessage, int timeout = 5000)
+        private async Task<ServerMessage?> SendMessageAndWaitResponse(ServerMessage sourceMessage, int timeout = 15000)
         {
             try
             {

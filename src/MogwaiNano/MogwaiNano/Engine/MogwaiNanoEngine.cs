@@ -28,6 +28,8 @@ namespace MogwaiNano.Engine
 {
     public class MogwaiNanoEngine
     {
+        private const int IDLE_EVERY_N_ITERATIONS = 10;
+        
         private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
 
         private delegate EvalResult PrimitiveDelegate(string name);
@@ -57,6 +59,8 @@ namespace MogwaiNano.Engine
         private ArrayList _flags = new();
         private EvalResult _lastResult;
         private Error _lastError;
+        private int _iterationCount = 0;
+        private object _lastResultLock = new(); 
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -104,13 +108,20 @@ namespace MogwaiNano.Engine
         {
             get
             {
-                if (_lastResult == null)
-                    _lastResult = EvalResult.NoError;
+                lock (_lastResultLock)
+                {
+                    if (_lastResult == null)
+                        _lastResult = EvalResult.NoError;
 
-                return _lastResult;
+                    return _lastResult;
+                }
             }
 
-            private set { _lastResult = value; }
+            private set 
+            { 
+                lock(_lastResultLock)
+                    _lastResult = value;
+            }
         }
 
         public string[] Skills => _skills;
@@ -327,6 +338,17 @@ namespace MogwaiNano.Engine
             }
         }
 
+        public void Idle()
+        {
+            _iterationCount++;
+
+            if (_iterationCount % IDLE_EVERY_N_ITERATIONS == 0)
+            {
+                _iterationCount = 0;
+                Thread.Sleep(1);
+            }
+        }
+
         public bool IsValidName(string name, bool withPrimitiveChecking)
         {
             if (string.IsNullOrEmpty(name))
@@ -422,10 +444,11 @@ namespace MogwaiNano.Engine
 
                 // _debugMode = false;
 
+                LastResult = result;
+
                 if (Delegate != null)
                     Delegate.ProgramEnd(this, result!);
-
-                LastResult = result;
+              
                 return result;
             }
             finally
@@ -1735,7 +1758,7 @@ namespace MogwaiNano.Engine
             var s = StackSign(4);
 
             if (s.Length == 0)
-                EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGName) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
             {

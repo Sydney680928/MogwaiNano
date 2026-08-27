@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using MogwaiNano.Engine;
+using MogwaiNano.Interfaces;
 using System;
 using System.Collections;
 using System.Diagnostics;
@@ -51,11 +52,11 @@ namespace MogwaiNano.Objects
 
         public bool Parse()
         {
-            if (Content == null)
-                return false;
-
             try
             {
+                if (Content == null)
+                    return false;
+
                 var parser = new Parser(Engine);
                 Items = parser.Parse(Content);
                 parser = null;
@@ -68,7 +69,7 @@ namespace MogwaiNano.Objects
 
                 return true;
             }
-            catch (Exception ex)
+            catch
             {
                 return false;
             }
@@ -131,12 +132,20 @@ namespace MogwaiNano.Objects
 
                         if (result.IsError)
                             break;
+
+                        Engine.Idle();
                     }
                 }
                 else
                 {
                     if (Engine.HasWaitingFireObjects)
+                    {
                         return Engine.ExecuteWaitingFireObjects();
+                    }
+                    else
+                    {
+                        Engine.Idle();
+                    }
                 }
 
                 return result;

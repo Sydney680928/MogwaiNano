@@ -40,7 +40,7 @@ namespace MogwaiNanoStudio
             _tcpClient.Connect(host, port);
 
             _stream = _tcpClient.GetStream();
-            _stream.ReadTimeout = 15000;
+            _stream.ReadTimeout = 5000;
 
             _running = true;
 
@@ -105,6 +105,10 @@ namespace MogwaiNanoStudio
 
         private void ReceiveLoop()
         {
+            const int MAX_CONSECUTIVE_FAILURES = 2;
+
+            int consecutiveFailures = 0;
+
             try
             {
                 while (_running)
@@ -112,18 +116,27 @@ namespace MogwaiNanoStudio
                     string? nano = ReadMessage();
 
                     if (nano == null)
-                        break;
+                    {
+                        consecutiveFailures++;
+
+                        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES)
+                            break;
+
+                        Thread.Sleep(50);
+                        continue;
+                    }
+
+                    consecutiveFailures = 0;
 
                     try
                     {
                         var message = ServerMessage.FromNanoFormat(nano);
-
                         if (message != null)
                             MessageReceived?.Invoke(this, message);
                     }
                     catch (Exception ex)
                     {
-                        ConnectionError?.Invoke(this, ex);                      
+                        ConnectionError?.Invoke(this, ex);
                     }
                 }
             }
@@ -141,18 +154,26 @@ namespace MogwaiNanoStudio
 
         private string? ReadMessage()
         {
-            byte[] lengthBuffer = new byte[4];
-            if (!ReadExactly(lengthBuffer, 4))
+            try
+            {
+                byte[] lengthBuffer = new byte[4];
+                if (!ReadExactly(lengthBuffer, 4))
+                    return null;
+
+                int messageLength = (lengthBuffer[0] << 24) | (lengthBuffer[1] << 16) | (lengthBuffer[2] << 8) | lengthBuffer[3];
+
+                byte[] payloadBuffer = new byte[messageLength];
+
+                if (!ReadExactly(payloadBuffer, messageLength))
+                    return null;
+
+                return Encoding.UTF8.GetString(payloadBuffer, 0, payloadBuffer.Length);
+            }
+            catch (Exception ex)
+            {
+                ConnectionError?.Invoke(this, ex);
                 return null;
-
-            int messageLength = (lengthBuffer[0] << 24) | (lengthBuffer[1] << 16) | (lengthBuffer[2] << 8) | lengthBuffer[3];
-
-            byte[] payloadBuffer = new byte[messageLength];
-            
-            if (!ReadExactly(payloadBuffer, messageLength))
-                return null;
-
-            return Encoding.UTF8.GetString(payloadBuffer, 0, payloadBuffer.Length);
+            }
         }
 
         private bool ReadExactly(byte[] buffer, int count)

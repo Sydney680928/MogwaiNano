@@ -27,6 +27,7 @@ namespace MogwaiNano.Engine
             {
                 if (_noError == null)
                     _noError = new EvalResult();
+                
                 return _noError;
             }
         }
