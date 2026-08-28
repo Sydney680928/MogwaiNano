@@ -85,9 +85,8 @@ Console.WriteLine("█ █ █ █   █ █  ██ █ █ █ █████
 Console.WriteLine("█   █ █   █ █   █ ██ ██ █   █  █    █  ██ █   █ █  ██ █   █");
 Console.WriteLine("█   █  ███   ███  █   █ █   █ ███   █   █ █   █ █   █  ███ ");
 Console.WriteLine();
-Console.WriteLine("MOGWAI NANO STUDIO");
-Console.WriteLine($"Version {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0"}");
-Console.WriteLine("(c) 2026 Stéphane Sibué");
+Console.WriteLine($"MOGWAI NANO STUDIO version {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0"}");
+Console.WriteLine("(c) 2026 Stéphane SIBUE");
 Console.WriteLine();
 Console.WriteLine(MogwaiEngine.RuntimePrompt);
 Console.WriteLine();

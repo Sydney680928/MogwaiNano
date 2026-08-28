@@ -103,6 +103,18 @@ namespace MogwaiNanoStudio
             "i2c.register.read",
             "i2c.scan",
 
+            "ssd1306.init",
+            "ssd1306.close",
+            "ssd1306.clear",
+            "ssd1306.refresh",
+            "ssd1306.printString",
+            "ssd1306.drawString",
+            "ssd1306.drawPixel",
+            "ssd1306.drawHorizontalLine",
+            "ssd1306.drawVerticalLine",
+            "ssd1306.drawRectangle",    
+            "ssd1306.drawFilledRectangle",
+            "ssd1306.drawBitmap"
 
             ];
 
@@ -301,6 +313,9 @@ namespace MogwaiNanoStudio
             {
                 // nano.user.connect = nano.user.select + nano.connect
                 // true if connected, false if not or no device selected
+
+                Console.WriteLine();
+                Console.WriteLine("MOGWAI NANO DEVICES ON THE NETWORK");           
 
                 var r = await AppGlobal.NanoRuntime.Select();
 

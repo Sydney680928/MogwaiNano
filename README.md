@@ -37,7 +37,7 @@ The device only ever executes this minimal form — no complex parser, no syntac
 ## Why two runtimes?
 
 - **MOGWAI NANO Studio** (PC) — full syntactic sugar, an integrated editor, network device discovery, and orchestration logic written in regular MOGWAI.
-- **MOGWAI NANO** (device) — a minimal, rigorously disciplined RPN interpreter with GPIO, I2C, SPI, PWM, ADC, timers, and event support.
+- **MOGWAI NANO** (device) — a minimal, rigorously disciplined RPN interpreter with GPIO, I2C (including a dedicated SSD1306 OLED display driver), SPI, PWM, ADC, timers, and event support.
 
 This separation means the device firmware stays small and stable, while the desktop side can evolve freely — including reusing the existing [MOGWAI VS Code extension](https://github.com/Sydney680928/mogwai) with zero modification, since from the editor's point of view, you're just writing MOGWAI.
 
@@ -52,8 +52,9 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 
 ## Key features
 
-- **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`)
-- **Hardware support** — GPIO (digital I/O, interrupts) today; I2C, SPI, PWM and ADC packages already validated, primitives coming in upcoming releases
+- **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags
+- **Hardware support** — GPIO (digital I/O, interrupts) and I2C today; a dedicated SSD1306 OLED display driver built on top of I2C; SPI, PWM and ADC coming in upcoming releases
+- **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~54KB-RAM devices
 - **Timers** — one-shot and recurring, running independently of your main program
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
 - **Network protocol** — UDP discovery + reliable TCP communication, with automatic disconnection detection and clean recovery
@@ -153,12 +154,14 @@ src/MogwaiNano/
 ## Roadmap
 
 - [x] I2C support
+- [x] SSD1306 OLED display support (128x64, I2C Fast Mode)
 - [ ] `.binary`/`B:` support on NANO — for register-level bit manipulation
 - [ ] SPI, PWM, ADC helper primitives — building on the same pattern already validated with I2C (a DS3231 RTC module)
 - [ ] STM32 and TI validation
 - [ ] ESP32-S3 / PSRAM validation — early testing shows the PSRAM is transparently usable by the managed heap, opening the door to much larger scripts
 - [ ] BLE support
 - [ ] `.mog` library system — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library), building on the existing skill/flag primitives
+- [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the `.mog` library system above on more capable boards
 - [ ] MOGWAI NANO Studio rebuilt on Avalonia, focused on device monitoring and orchestration (VS Code + the MOGWAI extension remains the recommended way to write and edit code)
 
 ## About

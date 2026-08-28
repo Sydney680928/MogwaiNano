@@ -57,7 +57,7 @@ namespace MogwaiNano.Engine
         private Hashtable _openPins = new(3);
         private GpioController _gpioController = new();
         private Hashtable _i2cDevices = new(2);
-        private string[] _skills = { "GPIO", "I2C" };
+        private string[] _skills = { "GPIO", "I2C", "SSD1306" };
         private ArrayList _flags = new();
         private EvalResult _lastResult;
         private Error _lastError;
@@ -3378,7 +3378,7 @@ namespace MogwaiNano.Engine
             if (s.Length == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
             {
                 var center = StackPop() as MOGBoolean;
                 var size = StackPop() as MOGNumber;
@@ -3415,7 +3415,7 @@ namespace MogwaiNano.Engine
             if (s.Length == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
             {
                 var center = StackPop() as MOGBoolean;
                 var size = StackPop() as MOGNumber;

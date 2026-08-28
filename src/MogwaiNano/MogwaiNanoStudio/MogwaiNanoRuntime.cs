@@ -489,6 +489,8 @@ namespace MogwaiNanoStudio
             {
                 while (true)
                 {
+                    Console.WriteLine();
+
                     var c = 0;
 
                     foreach (var item in list.Items)
@@ -501,7 +503,8 @@ namespace MogwaiNanoStudio
 
                             if (target != null && ip != null && name != null)
                             {
-                                Console.WriteLine($"{c}: {name.Value.PadRight(20)} - {ip.Value} - {target.Value.PadRight(20)}");
+                                var n = name.Value.Length > 30 ? name.Value.Substring(0, 30) : name.Value;
+                                Console.WriteLine($"{c}: {n.PadRight(30)} - {ip.Value.PadRight(15)} - {target.Value}");
                                 c++;
                             }
                         }

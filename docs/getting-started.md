@@ -252,7 +252,28 @@ I2C writes aren't limited to single bytes — a `MOGData` of any size can be sen
 } nano.run
 ```
 
-## 9. Make it survive without a PC connected
+## 9. Drive a 128x64 OLED display
+
+That last example shows what driving a display in pure I2C looks like — enough to prove the concept, but drawing anything more than a solid block gets slow and tedious fast. For a common 128x64 SSD1306 OLED display specifically, MOGWAI NANO includes a dedicated set of native primitives instead, built on a real display driver rather than hand-rolled I2C commands. This is the one part of MOGWAI NANO that's tied to a specific piece of hardware — it only supports the SSD1306 at 128x64 over I2C Fast Mode, not OLED displays in general.
+
+```
+{
+    1 0x3C ssd1306.init
+
+    0 0 "Hello, MOGWAI!" 1 false ssd1306.drawString
+    10 20 40 15 true ssd1306.drawFilledRectangle
+    ssd1306.refresh
+
+    5000 wait
+    ssd1306.close
+} nano.run
+```
+
+`ssd1306.drawString` takes pixel coordinates for precise placement (`x y text size center`) — there's also `ssd1306.printString`, which uses character-grid coordinates instead (`x=0 y=1` meaning the start of the second text line), closer to writing to a text console. Both only update the in-memory frame buffer; nothing appears on the physical screen until `ssd1306.refresh` is called, so you can batch several drawing calls together before paying for a single screen update.
+
+The rest of the family covers the basics: `ssd1306.clear`, `ssd1306.drawPixel`, `ssd1306.drawHorizontalLine`/`ssd1306.drawVerticalLine`, `ssd1306.drawRectangle` (outline) and `ssd1306.drawFilledRectangle`, and `ssd1306.drawBitmap` for drawing a raw `MOGData` buffer as a 1-bit-per-pixel image.
+
+## 10. Make it survive without a PC connected
 
 Once you're happy with a program, you can store it on the device so it runs automatically on every boot — no MOGWAI NANO Studio connection required afterward:
 
@@ -279,7 +300,7 @@ nano.autorun.get      # returns the stored code as a MOGCode block
 nano.autorun.purge    # clears it
 ```
 
-## 10. Naming your device and checking its free memory
+## 11. Naming your device and checking its free memory
 
 Once you have more than one device on your network, telling them apart by IP alone gets tedious. Give a device a persistent name — it survives reboots, and shows up as the `device` field in future `nano.scan`/`nano.user.select` results:
 
@@ -311,7 +332,7 @@ nano.user.view
 
 As with the earlier `nano.user.view` example, the `1000 wait` gives the view mode time to fully attach before the program prints anything — skip it and you risk missing the very first output. Without `nano.user.view` at all, nothing from `?`/`console.print` is displayed, `mogwai.info` included.
 
-## 11. Reboot cleanly
+## 12. Reboot cleanly
 
 If your program needs to reboot the device itself (for example, after applying a new configuration), call `mogwai.reboot` from within the running script. If you've defined a `MOGWAI.onReboot` function, it runs first, giving you a chance to clean up:
 
@@ -333,7 +354,7 @@ nano.halt
 nano.state ?
 ```
 
-## 12. Putting it all together
+## 13. Putting it all together
 
 Here's a complete, self-contained script that ties together everything covered so far: it checks whether you're already connected, discovers and connects to a device if not (handling both a failed connection and an aborted selection), then runs a program and watches its output.
 
