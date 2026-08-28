@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+## [0.3.0] - 2026-08-28
+
+### Added
+
 - `makeData` — creates a `MOGData` of a given size, filled with a given byte value (e.g. `1024 0 makeData` for 1024 zero bytes, `1023 0xFF makeData` for 1023 bytes all set to `0xFF`), without pushing each byte onto the stack first. Building a large buffer via `repeat { 0 } ->data` allocates one `MOGObject` per byte before conversion, which can exhaust memory on lower-RAM devices even though it works fine on more capable ones; `makeData` avoids that transient peak entirely
 - `nano.send` — sends an arbitrary string to the connected device: `"TIME=15:45" nano.send`. The device fires a `STUDIO_DID_SEND` event on the currently running program, with the received string available as `eventData` (a plain `MOGString`), letting a long-running program (`forever do { ... }`) react to free-form commands from Studio without needing to be stopped and relaunched. No built-in message format is imposed — parsing the string (e.g. a `NAME=value` convention) is entirely up to the receiving script
 - `->vars`, `->safeVars`, `->params` — ported with 100% functional parity from the desktop MOGWAI engine. `->vars` extracts values from a record or the stack straight into matching local variables, with no type checking beyond raising an error if the stack doesn't have enough elements. `->safeVars` does the same but also validates each value's type against a declared record, and is what `to ... with [...] do` uses automatically for typed function parameters. `->params` validates a named-parameter record (with optional default values) against a declared shape, raising an error if a required parameter is missing or mistyped, and silently ignoring extras
@@ -160,6 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.1.0
