@@ -67,6 +67,10 @@ namespace MogwaiNano
                 string code = File.ReadAllText(@"I:\autorun.mog");
                 AppGlobal.MogwaiNanoEngine.RunAsync(code);
             }
+            else
+            {
+                Debug.WriteLine("Ready.");
+            }
 
             Thread.Sleep(Timeout.Infinite);
         }

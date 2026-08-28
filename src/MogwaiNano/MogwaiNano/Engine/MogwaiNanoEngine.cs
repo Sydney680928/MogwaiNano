@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Iot.Device.Ssd13xx;
+using Iot.Device.Ssd13xx.Samples;
 using MogwaiNano.Interfaces;
 using MogwaiNano.Objects;
 using nanoFramework.Runtime.Native;
@@ -22,6 +24,7 @@ using System.Device.I2c;
 using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
+using static Iot.Device.Ssd13xx.Ssd13xx;
 using GC = nanoFramework.Runtime.Native.GC;
 
 namespace MogwaiNano.Engine
@@ -51,7 +54,6 @@ namespace MogwaiNano.Engine
         private string _pendingRunCode;
         private bool _pendingDebugMode;
         private Thread _runThread;
-        private Thread _aliveThread;
         private Hashtable _openPins = new(3);
         private GpioController _gpioController = new();
         private Hashtable _i2cDevices = new(2);
@@ -61,6 +63,7 @@ namespace MogwaiNano.Engine
         private Error _lastError;
         private int _iterationCount = 0;
         private object _lastResultLock = new(); 
+        private Ssd1306 _ssd1306;
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -307,6 +310,19 @@ namespace MogwaiNano.Engine
             _primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
             _primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
 
+            _primitives.Add("ssd1306.init", new PrimitiveDelegate(PrimitiveSsd1306Init));
+            _primitives.Add("ssd1306.close", new PrimitiveDelegate(PrimitiveSsd1306Close));
+            _primitives.Add("ssd1306.clear", new PrimitiveDelegate(PrimitiveSsd1306Clear));  
+            _primitives.Add("ssd1306.printString", new PrimitiveDelegate(PrimitiveSsd1306PrintString));
+            _primitives.Add("ssd1306.drawString", new PrimitiveDelegate(PrimitiveSsd1306DrawString));
+            _primitives.Add("ssd1306.refresh", new PrimitiveDelegate(PrimitiveSsd1306Refresh));
+            _primitives.Add("ssd1306.drawPixel", new PrimitiveDelegate(PrimitiveSsd1306DrawPixel));
+            _primitives.Add("ssd1306.drawHorizontalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHorizontalLine));
+            _primitives.Add("ssd1306.drawVerticalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHVerticalLine));
+            _primitives.Add("ssd1306.drawRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawRectangle));
+            _primitives.Add("ssd1306.drawFilledRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawFilledRectangle));
+            _primitives.Add("ssd1306.drawBitmap", new PrimitiveDelegate(PrimitiveSsd1306DrawBitmap));
+
             _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
             _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
             _primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));
@@ -482,6 +498,12 @@ namespace MogwaiNano.Engine
             CleanupOpenPins();
 
             CleanupI2cDevices();
+
+            if (_ssd1306 != null)
+            {
+                _ssd1306.Dispose();
+                _ssd1306 = null;
+            }
 
             _stacks.Clear();
             _currentStack = new MOGStack();
@@ -3266,6 +3288,379 @@ namespace MogwaiNano.Engine
             StackPush(list);
 
             return EvalResult.NoError;
+        }
+
+        #endregion
+
+        #region SSD1306 OLED SCREEN
+
+        private EvalResult PrimitiveSsd1306Init(string name)
+        {
+            // bus address ssd1306.init
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var address = StackPop() as MOGNumber;
+                var bus = StackPop() as MOGNumber;
+
+                if (_ssd1306 != null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsOpenedError, name);
+
+                int busNumber = (int)bus.Value;
+                int addressNumber = (int)address.Value;
+
+                if (busNumber < 1 || busNumber > 2)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C bus number must be between 1 and 2");
+                
+                if (addressNumber < 0 || addressNumber > 127)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C address number must be between 0 and 127");
+
+                if (_ssd1306 != null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsOpenedError, name);
+
+                try
+                {
+                    I2cConnectionSettings settings = new(busNumber, addressNumber, I2cBusSpeed.FastMode);
+                    I2cDevice i2cDevice = I2cDevice.Create(settings);
+
+                    _ssd1306 = new(i2cDevice, DisplayResolution.OLED128x64);
+                    _ssd1306.ClearScreen();
+                }
+                catch (Exception ex)
+                {
+                    if (_ssd1306 != null)
+                    {
+                        _ssd1306.Dispose();
+                        _ssd1306 = null;
+                    }
+
+                    return EvalResult.Failure(this, Error.Ssd1306InitError, name, "failed to initialize ssd1306 display", $"bus {busNumber}", $"address {addressNumber:X2}", ex.Message);
+                }
+                
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSsd1306Close(string name)
+        {
+            if (_ssd1306 != null)
+            { 
+                _ssd1306.Dispose();
+                _ssd1306 = null;
+            }   
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveSsd1306Clear(string name)
+        {
+            if (_ssd1306 == null)
+                return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+            
+            _ssd1306.ClearScreen();
+            
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveSsd1306PrintString(string name)
+        {
+            // x y text size center ssd1306.printString
+
+            var s = StackSign(5);
+            
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
+            {
+                var center = StackPop() as MOGBoolean;
+                var size = StackPop() as MOGNumber;
+                var text = StackPop() as MOGString;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    if (_ssd1306.Font == null)
+                        _ssd1306.Font = new BasicFont();
+
+                    _ssd1306.Write((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
+                    return EvalResult.NoError;  
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+        }
+
+        private EvalResult PrimitiveSsd1306DrawString(string name)
+        {
+            // x y text size center ssd1306.drawString
+
+            var s = StackSign(5);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
+            {
+                var center = StackPop() as MOGBoolean;
+                var size = StackPop() as MOGNumber;
+                var text = StackPop() as MOGString;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    if (_ssd1306.Font == null)
+                        _ssd1306.Font = new BasicFont();
+
+                    _ssd1306.DrawString((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSsd1306Refresh(string name)
+        {
+            if (_ssd1306 == null)
+                return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+            _ssd1306.Display();
+
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveSsd1306DrawPixel(string name)
+        {
+            // x y true ssd1306.drawPixel   
+
+            var s = StackSign(3);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber))
+            {
+                var set = StackPop() as MOGBoolean;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+                
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    _ssd1306.DrawPixel((int)x.Value, (int)y.Value, set.Value);
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSsd1306DrawHorizontalLine(string name)
+        {
+            // x y len true ssd1306.drawHorizontalLine  
+
+            var s = StackSign(4);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
+            {
+                var set = StackPop() as MOGBoolean;
+                var len = StackPop() as MOGNumber;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    _ssd1306.DrawHorizontalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSsd1306DrawHVerticalLine(string name)
+        {
+            // x y len true ssd1306.drawVerticalLine 
+
+            var s = StackSign(4);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
+            {
+                var set = StackPop() as MOGBoolean;
+                var len = StackPop() as MOGNumber;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    _ssd1306.DrawVerticalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSsd1306DrawRectangle(string name)
+        {
+            // x y w h true ssd1306.drawRectangle
+
+            var s = StackSign(5);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
+            {
+                var set = StackPop() as MOGBoolean;
+                var height = StackPop() as MOGNumber;
+                var width = StackPop() as MOGNumber;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    int vx = (int)x.Value;
+                    int vy = (int)y.Value;
+                    int vw = (int)width.Value;
+                    int vh = (int)height.Value;
+
+                    _ssd1306.DrawHorizontalLine(vx, vy, vw,  set.Value);
+                    _ssd1306.DrawVerticalLine(vx + vw - 1,vy, vh, set.Value);
+                    _ssd1306.DrawHorizontalLine(vx, vy + vh - 1, vw, set.Value);
+                    _ssd1306.DrawVerticalLine(vx, vy, vh, set.Value);
+                    
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSsd1306DrawFilledRectangle(string name)
+        {
+            // x y w h true ssd1306.drawFilledRectangle
+
+            var s = StackSign(5);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
+            {
+                var set = StackPop() as MOGBoolean;
+                var height = StackPop() as MOGNumber;
+                var width = StackPop() as MOGNumber;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    _ssd1306.DrawFilledRectangle((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value,set.Value);
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSsd1306DrawBitmap(string name)
+        {
+            // x y w h data size ssd1306.drawBitmap
+
+            var s = StackSign(6);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGData) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber) && s[5] == typeof(MOGNumber))
+            {
+                var size = StackPop() as MOGNumber;
+                var data = StackPop() as MOGData;
+                var height = StackPop() as MOGNumber;
+                var width = StackPop() as MOGNumber;
+                var y = StackPop() as MOGNumber;
+                var x = StackPop() as MOGNumber;
+
+                if (_ssd1306 == null)
+                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+
+                try
+                {
+                    _ssd1306.DrawBitmap((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value, data.Items, (byte)size.Value);
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
         #endregion
