@@ -85,6 +85,8 @@ namespace MogwaiNanoStudio
 
         private void NanoClient_MessageReceived(object? sender, ServerMessage message)
         {
+            Debug.WriteLine($"\nMessage received {message}");
+
             if (message.Function == "PROGRAM.DID.START")
             {
                 IsRunning = true;

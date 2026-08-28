@@ -14,6 +14,7 @@
 
 using MOGWAI.Engine;
 using MOGWAI.Objects;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -40,7 +41,7 @@ namespace MogwaiNanoStudio
             _tcpClient.Connect(host, port);
 
             _stream = _tcpClient.GetStream();
-            _stream.ReadTimeout = 5000;
+            _stream.ReadTimeout = 15000;
 
             _running = true;
 
@@ -105,10 +106,6 @@ namespace MogwaiNanoStudio
 
         private void ReceiveLoop()
         {
-            const int MAX_CONSECUTIVE_FAILURES = 2;
-
-            int consecutiveFailures = 0;
-
             try
             {
                 while (_running)
@@ -117,20 +114,14 @@ namespace MogwaiNanoStudio
 
                     if (nano == null)
                     {
-                        consecutiveFailures++;
-
-                        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES)
-                            break;
-
                         Thread.Sleep(50);
                         continue;
                     }
 
-                    consecutiveFailures = 0;
-
                     try
                     {
                         var message = ServerMessage.FromNanoFormat(nano);
+                        
                         if (message != null)
                             MessageReceived?.Invoke(this, message);
                     }
@@ -157,6 +148,7 @@ namespace MogwaiNanoStudio
             try
             {
                 byte[] lengthBuffer = new byte[4];
+                
                 if (!ReadExactly(lengthBuffer, 4))
                     return null;
 
@@ -181,19 +173,27 @@ namespace MogwaiNanoStudio
             if (_stream == null)
                 return false;
 
-            int totalRead = 0;
-
-            while (totalRead < count)
+            try
             {
-                int bytesRead = _stream.Read(buffer, totalRead, count - totalRead);
+                int totalRead = 0;
 
-                if (bytesRead == 0)
-                    return false;
+                while (totalRead < count)
+                {
+                    int bytesRead = _stream.Read(buffer, totalRead, count - totalRead);
 
-                totalRead += bytesRead;
+                    if (bytesRead == 0)
+                        return false;
+
+                    totalRead += bytesRead;
+                }
+
+                return true;
             }
-
-            return true;
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                return false;
+            }
         }
 
         public void Dispose() => Disconnect();
