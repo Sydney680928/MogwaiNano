@@ -345,7 +345,7 @@ namespace MogwaiNano.Engine
             if (_iterationCount % IDLE_EVERY_N_ITERATIONS == 0)
             {
                 _iterationCount = 0;
-                Thread.Sleep(1);
+                Thread.Sleep(0);
             }
         }
 
