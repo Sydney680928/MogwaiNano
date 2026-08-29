@@ -1073,7 +1073,7 @@ namespace MogwaiNano.Engine
 
             while (stopwatch.Elapsed.TotalMilliseconds <= v.Value)
             {
-                Thread.Sleep(10);
+                Thread.Sleep(0);
 
                 var result = ExecuteWaitingFireObjects();
 

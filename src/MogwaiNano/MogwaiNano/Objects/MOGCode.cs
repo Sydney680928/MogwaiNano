@@ -48,6 +48,7 @@ namespace MogwaiNano.Objects
         public MOGCode(MogwaiNanoEngine engine, string content) : this(engine)
         {
             Content = content;
+            AutoEval = Content.StartsWith("!");
         }
 
         public bool Parse()
