@@ -42,5 +42,10 @@ namespace MogwaiNano.Objects
         {
             return EngineEval();
         }
+
+        public virtual string ToStringCode()
+        {
+            return ToString();
+        }   
     }
 }

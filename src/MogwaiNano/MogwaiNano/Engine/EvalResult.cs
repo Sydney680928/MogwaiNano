@@ -38,9 +38,21 @@ namespace MogwaiNano.Engine
         
         public TimeSpan Duration { get; set; }
 
-        public bool IsError => Error != Error.None;
+        public bool IsError
+        {
+            get
+            {
+                return Error != Error.None;
+            }
+        }
         
-        public bool IsSuccess => Error == Error.None;
+        public bool IsSuccess
+        {
+            get
+            {
+                return Error == Error.None;
+            }
+        }
 
         public EvalResult()
         {

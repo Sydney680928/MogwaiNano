@@ -217,7 +217,7 @@ namespace MogwaiNano.Objects
 
         public override EvalResult UserEval() => Execute();
 
-        public string ToStringCode()
+        public override string ToStringCode()
         {
             if (Items != null)
             {

@@ -27,12 +27,15 @@ namespace MogwaiNano.Engine
             _haltEncounteredError,
             _unableToFireEventError,
             _operationNotSupportedError,
+
             _tooFewArgumentsError,
             _badArgumentTypeError,
             _badArgumentValueError,
+
             _divisionByZeroError,
             _mathematicalError,
             _convertError,
+
             _unknownNameError,
             _nameAlreadyExistsError,
             _functionAlreadyExistsError,
@@ -40,7 +43,9 @@ namespace MogwaiNano.Engine
             _nameAlreadyUsedByVarError,
             _invalidNameError,
             _unableToWriteValueError,
+
             _unknownWordError,
+
             _fatalError,
 
             _gpioUnknownPinError,
