@@ -326,6 +326,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("ssd1306.drawFilledRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawFilledRectangle));
             _primitives.Add("ssd1306.drawBitmap", new PrimitiveDelegate(PrimitiveSsd1306DrawBitmap));
 
+            _primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
+
             _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
             _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
             _primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));
@@ -3848,6 +3850,41 @@ namespace MogwaiNano.Engine
                 catch (Exception ex)
                 {
                     return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        #endregion
+
+        #region DEVICE
+
+        private EvalResult PrimitiveDeviceSetPinFunction(string name)
+        {
+            // pin setvalue device.setPin
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);  
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var setValue = StackPop() as MOGNumber;
+                var pin = StackPop() as MOGNumber;  
+
+                if (pin.Value < 0)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+                if (SystemInfo.Platform == "ESP32")
+                {
+                    nanoFramework.Hardware.Esp32.Configuration.SetPinFunction((int)pin.Value, (nanoFramework.Hardware.Esp32.DeviceFunction)(int)setValue.Value);
+                    return EvalResult.NoError;
+                }
+                else
+                {
+                    return EvalResult.Failure(this, Error.PlatformNotSupportedError, name);
                 }
             }
 

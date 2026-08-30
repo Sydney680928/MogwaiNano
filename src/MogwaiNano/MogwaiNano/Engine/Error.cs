@@ -59,7 +59,9 @@ namespace MogwaiNano.Engine
             _ssd1306InitError,
             _ssd1306IsClosedError,
             _ssd1306IsOpenedError,
-            _ssd1306OperationError
+            _ssd1306OperationError,
+
+            _platformNotSupportedError
 
             ;
 
@@ -109,6 +111,8 @@ namespace MogwaiNano.Engine
             _ssd1306IsClosedError = RegisterError("MW.521", "ssd1306 already closed error");
             _ssd1306IsOpenedError = RegisterError("MW.522", "ssd1306 already opened error");
             _ssd1306OperationError = RegisterError("MW.523", "ssd1306 operation error");
+
+            _platformNotSupportedError = RegisterError("MW.530", "platform not supported error");
         }
 
         private static Error RegisterError(string code, string message)
@@ -179,6 +183,8 @@ namespace MogwaiNano.Engine
         public static Error Ssd1306IsOpenedError { get { EnsureInitialized(); return _ssd1306IsOpenedError; } }
 
         public static Error Ssd1306OperationError { get { EnsureInitialized(); return _ssd1306OperationError; } }
+
+        public static Error PlatformNotSupportedError { get { EnsureInitialized(); return _platformNotSupportedError; } }
 
         public string Code { get; set; }
         
