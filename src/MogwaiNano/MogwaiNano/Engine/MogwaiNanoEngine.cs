@@ -2824,10 +2824,13 @@ namespace MogwaiNano.Engine
 
             if (n2 is MOGString s)
             {
+                if (start >= s.Value.Length)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
                 if (count <= 0)
                     count = s.Value.Length;
 
-                if (start + count >= s!.Value.Length)
+                if (start + count >= s.Value.Length)
                     count = s.Value.Length - start;
 
                 try

@@ -9,6 +9,8 @@
 
 **Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
+> **A note on memory:** MOGWAI NANO runs comfortably on a plain ESP32 for simple, focused scripts (GPIO, a single sensor). For anything more composite — a display, several I2C devices, sustained network activity, all running together over a long session — an ESP32-S3 board **with PSRAM** is strongly recommended. See [Memory considerations](#memory-considerations) below for why.
+
 > If MOGWAI NANO looks useful to you, a ⭐ helps others discover it — thank you!
 
 ---
@@ -54,18 +56,30 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 
 - **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags
 - **Hardware support** — GPIO (digital I/O, interrupts) and I2C today; a dedicated SSD1306 OLED display driver built on top of I2C; SPI, PWM and ADC coming in upcoming releases
-- **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~54KB-RAM devices
+- **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~40KB-RAM devices
 - **Timers** — one-shot and recurring, running independently of your main program
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
 - **Network protocol** — UDP discovery + reliable TCP communication, with automatic disconnection detection and clean recovery
 - **Persistent autorun** — store code to run automatically on every boot, for standalone production deployments
 - **Cross-platform** — the exact same compiled binary runs on ESP32 and Raspberry Pi Pico W
 
+## Memory considerations
+
+A plain ESP32 gives MOGWAI NANO roughly 40KB of free RAM to work with once the firmware and networking stack are up. That's enough for straightforward scripts, but two things compound on this constrained platform:
+
+- **Long-running programs are prone to memory fragmentation.** Programs that allocate and release many objects over time (loops, repeated function calls, string building) can end up with free memory scattered across many small fragments rather than one usable block — so a script can fail to allocate even when the total "free" figure looks comfortable, even after forcing a garbage collection.
+- **Running several subsystems together compounds this quickly.** A display, I2C sensors, and sustained network traffic (Studio requests, background timers) all running in the same long session were measured to trigger real instability from this — not corrupted behavior, but outright allocation failures — well before the total memory looked exhausted.
+
+None of this is a bug to "just fix" — it's a direct, measured consequence of running an interpreted RPN language on top of a managed CLR, on top of a real-time OS, on a few tens of kilobytes of RAM. **An ESP32-S3 board with PSRAM changes this picture completely.** With several megabytes available instead of tens of kilobytes, the same fragmentation risk is structurally still there, but never gets anywhere close to being a practical problem — a composite project (display + sensors + long network sessions) that showed real instability on a plain ESP32 ran rock-solid for hours straight on an ESP32-S3 with PSRAM in side-by-side testing, with no configuration changes to the script itself.
+
+**Recommendation:** use a plain ESP32 for small, single-purpose scripts. Reach for an ESP32-S3 with PSRAM as soon as your project combines more than one or two hardware subsystems, runs for extended periods, or you simply want the extra headroom. See also `mogwai.frugalMode` above, which helps on constrained boards but doesn't eliminate this class of issue on its own.
+
 ## Supported platforms
 
 | Platform | Status |
 |---|---|
-| ESP32 | ✅ Tested — recommended |
+| ESP32 | ✅ Tested — best for small, single-purpose scripts (see [Memory considerations](#memory-considerations)) |
+| ESP32-S3 (with PSRAM) | ✅ Tested — recommended for composite projects (display, multiple sensors, long-running sessions) |
 | Raspberry Pi Pico W | ⚠️ Runtime tested and working, but WiFi configuration currently blocked (see Quick Start note) |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
@@ -158,7 +172,7 @@ src/MogwaiNano/
 - [ ] `.binary`/`B:` support on NANO — for register-level bit manipulation
 - [ ] SPI, PWM, ADC helper primitives — building on the same pattern already validated with I2C (a DS3231 RTC module)
 - [ ] STM32 and TI validation
-- [ ] ESP32-S3 / PSRAM validation — early testing shows the PSRAM is transparently usable by the managed heap, opening the door to much larger scripts
+- [x] ESP32-S3 / PSRAM validation — confirmed transparently usable by the managed heap, and confirmed to resolve the memory-fragmentation instability seen on plain ESP32 under sustained, multi-subsystem load (see [Memory considerations](#memory-considerations))
 - [ ] BLE support
 - [ ] `.mog` library system — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library), building on the existing skill/flag primitives
 - [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the `.mog` library system above on more capable boards

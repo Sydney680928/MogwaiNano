@@ -42,17 +42,14 @@ namespace MogwaiNano
             Debug.WriteLine($"Device name: {AppGlobal.NanoParameters.Name}");
             Debug.WriteLine($"Session: {AppGlobal.Session}");
 
-            if (!ConnectToWifi())
+            if (ConnectToWifi())
             {
-                Debug.WriteLine("Program stopping.");
-                return;
+                AppGlobal.TcpServer.MessageReceived += TcpServer_MessageReceived;
+
+                AppGlobal.TcpServer.StartTcpServer();
+
+                AppGlobal.UdpServer.StartUdpServer();
             }
-
-            AppGlobal.TcpServer.MessageReceived += TcpServer_MessageReceived;
-
-            AppGlobal.TcpServer.StartTcpServer();
-
-            AppGlobal.UdpServer.StartUdpServer();
 
             var @delegate = new MogwaiNanoDelegate(AppGlobal.MogwaiNanoEngine);
             AppGlobal.MogwaiNanoEngine.Delegate = @delegate;
