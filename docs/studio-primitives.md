@@ -2,7 +2,7 @@
 
 These are the extended primitives exposed by **MOGWAI NANO Studio** — the desktop companion application. They're regular MOGWAI host functions, available anywhere in the desktop MOGWAI engine when run from Studio, and let you discover, connect to, and orchestrate a MOGWAI NANO device from your PC.
 
-This page only covers Studio's own `nano.*` primitives. For the canonical language that actually runs *on* the device (sent via `nano.run`), see the [Shared Primitives Reference](shared-primitives.md); for device-side hardware primitives (`gpio.*`, `i2c.*`, `ssd1306.*`, timers, events), see the [Getting Started guide](getting-started.md) and the [CHANGELOG](../CHANGELOG.md).
+This page only covers Studio's own `nano.*` primitives. For everything that actually runs *on* the device (sent via `nano.run`) — canonical language, hardware primitives (`gpio.*`, `i2c.*`, `ssd1306.*`), timers, events — see the [NANO Primitives Reference](nano-primitives.md).
 
 > **Naming convention:** primitives that interact directly with the console (user input or on-screen display) are prefixed with `user` — `nano.user.select`, `nano.user.connect`, `nano.user.view`. Primitives that only exchange data with the device, with no console interaction of their own, don't carry that prefix (`nano.connect`, `nano.scan`, `nano.run`, etc.).
 

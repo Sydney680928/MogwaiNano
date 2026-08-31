@@ -162,7 +162,7 @@ src/MogwaiNano/
 ## Documentation
 
 - [Getting started guide](docs/getting-started.md) — step-by-step NANO tutorial (connect, GPIO, timers, events)
-- [Shared primitives reference](docs/shared-primitives.md) — primitives common to both MOGWAI and MOGWAI NANO
+- [NANO primitives reference](docs/nano-primitives.md) — complete, exhaustive reference for every primitive in the device runtime, marking which are shared with desktop MOGWAI and which are NANO-only
 - [Studio primitives reference](docs/studio-primitives.md) — the full `nano.*` command set exposed by MOGWAI NANO Studio (connection, discovery, running code, device state, autorun)
 - [Network protocol](docs/) *(coming soon)*
 

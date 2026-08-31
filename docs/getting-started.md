@@ -425,6 +425,6 @@ Same guided experience, same `true`/`false` outcome as `nano.connect`, one line 
 
 ## What's next
 
-- Browse the [shared primitives reference](shared-primitives.md) for everything common to MOGWAI and MOGWAI NANO
+- Browse the [NANO primitives reference](nano-primitives.md) for the complete list of everything available in the device runtime
 - Check the [CHANGELOG](../CHANGELOG.md) for the full list of NANO-specific primitives (`gpio.*`, `timer.*`, `nano.*`, event handling)
 - I2C, SPI, PWM and ADC support is on the roadmap — GPIO is fully available today
