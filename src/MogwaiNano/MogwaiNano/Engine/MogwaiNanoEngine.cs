@@ -1354,7 +1354,7 @@ namespace MogwaiNano.Engine
 
                 var items = new byte[size];
 
-                for (int i = 0; i < size; i++)
+                for (int i = size - 1; i >= 0; i--)
                 {
                     var n = StackPop() as MOGNumber;
                     items[i] = (byte)n.Value;
@@ -2933,7 +2933,7 @@ namespace MogwaiNano.Engine
             var list = new MOGList(this);
 
             foreach (var skill in _skills)
-                list.AddItem(new MOGString(this, skill));
+                list.AddItem(new MOGName(this, skill));
 
             StackPush(list);
 
@@ -2947,10 +2947,10 @@ namespace MogwaiNano.Engine
             if (s.Length == 0)
                 return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
-            if (s[0] != typeof(MOGString))
+            if (s[0] != typeof(MOGName))
                 return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
 
-            var skillName = StackPop() as MOGString;
+            var skillName = StackPop() as MOGName;
             var skillValue = skillName.Value.ToUpper();
 
             foreach (var skill in _skills)
