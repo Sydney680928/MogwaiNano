@@ -73,7 +73,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 | `->data` | 🔗 | `v1 v2 ... vN N ->data` → `.data` | Pops `N` numbers (each `0`-`255`) and builds a `MOGData` from them, in push order |
 | `->bcd` | ⚙️ | `n ->bcd` | Converts a decimal number to BCD encoding (e.g. `35 ->bcd` → `0x35`) |
 | `bcd->` | ⚙️ | `n bcd->` | Converts a BCD-encoded number back to decimal (e.g. `0x35 bcd->` → `35`) |
-| `->format` | 🔗 | `n "mask" ->format` → `.string` | Converts a number to a string using a format mask, e.g. `50 "000" ->format` → `"050"` |
+| `->format` | 🔗 | `n "spec" ->format` → `.string` | Converts a number to a string using a .NET **standard** numeric format specifier — nanoFramework only supports `D`/`F`/`G`/`N`/`X` (with an optional precision digit), not custom format strings like `"000"`. E.g. `50 "D3" ->format` → `"050"` |
 | `->num` | 🔗 | `"str" ->num` → `.number` | Converts a string to a number; raises an error if it isn't a valid one |
 | `sub` | 🔗 | `v start extent sub` | Extracts a part of a `MOGString`, `MOGList`, `MOGData` or `.binary` value by start position and extent. An extent of `0` means "to the end". Also accepts a `MOGRef` (`&variable`) in place of `v`, dereferenced transparently |
 | `makeData` | ⚙️ | `size value makeData` → `.data` | Creates a `MOGData` of a given size, filled with a given byte value, without pushing each byte individually — avoids a memory spike compared to building the same buffer with `repeat`/`->data` |
@@ -275,7 +275,7 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 | Primitive | Signature | Description |
 |---|---|---|
-| `device.setPinFunction` | `pin function device.setPinFunction` | Dynamically reassigns a pin's function — e.g. designating I2C clock/data pins on a board where the default I2C bus isn't pre-wired (like `ESP32_S3_OCTAL`). `function` is a raw numeric value from the platform's own function enum (e.g. `nanoFramework.Hardware.Esp32`'s `DeviceFunction` — `131328`/`131329` for `I2C1_DATA`/`I2C1_CLOCK`), not a MOGWAI NANO abstraction — look up the right value in the platform package's source for the pin function you need. Detects the running platform at runtime and only invokes the platform-specific API when it matches, returning a clean error otherwise — this keeps the `.bin` universal across platforms rather than requiring a separate build per target. Currently implemented for ESP32 only; other platforms return a clean "unsupported" error |
+| `device.setPinFunction` | `pin function device.setPinFunction` | Dynamically reassigns a pin's function — e.g. designating I2C clock/data pins on a board where the default I2C bus isn't pre-wired (like `ESP32_S3_OCTAL`). `function` is a raw numeric value from the platform's own function enum (e.g. `nanoFramework.Hardware.Esp32`'s `DeviceFunction` — `131328`/`131329` for `I2C1_DATA`/`I2C1_CLOCK`), not a MOGWAI NANO abstraction — see the [ESP32 DeviceFunction values reference](esp32-device-function-values.md) for the complete list (SPI, I2C, serial, PWM, ADC, I2S, SDMMC). Detects the running platform at runtime and only invokes the platform-specific API when it matches, returning a clean error otherwise — this keeps the `.bin` universal across platforms rather than requiring a separate build per target. Currently implemented for ESP32 only; other platforms return a clean "unsupported" error |
 
 ---
 
