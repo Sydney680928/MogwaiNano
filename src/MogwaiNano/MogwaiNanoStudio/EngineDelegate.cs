@@ -239,7 +239,7 @@ namespace MogwaiNanoStudio
                     }
                     catch (Exception ex)
                     {
-                        return EvalResult.Failure(engine, Error.FatalError, word, ex.Message);
+                        return EvalResult.Failure(engine, Error.ParseError, word, ex.Message);
                     }
                 }
                 else if (s[0] == typeof(MOGCode))

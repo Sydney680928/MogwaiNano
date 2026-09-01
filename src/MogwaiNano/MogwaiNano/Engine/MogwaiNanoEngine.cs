@@ -1340,16 +1340,12 @@ namespace MogwaiNano.Engine
                 if (size > StackSize)
                     return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
 
+                var types = StackSign(size);
+
                 for (int i = 0; i < size; i++)
                 {
-                    if (_currentStack.Items[i] is MOGNumber number && (int)number.Value >= 0 && (int)number.Value <= 255)
-                    {
-
-                    }
-                    else
-                    {
+                    if (types[i] != typeof(MOGNumber))
                         return EvalResult.Failure(this, Error.BadArgumentValueError, name, "only numbers between 0 and 255 are allowed.");
-                    }
                 }
 
                 var items = new byte[size];
@@ -2784,11 +2780,17 @@ namespace MogwaiNano.Engine
             {
                 var format = StackPop() as MOGString;   
                 var number = StackPop() as MOGNumber;
-                var formatted = number.Value.ToString(format.Value);
 
-                StackPush(new MOGString(this, formatted));
-
-                return EvalResult.NoError;
+                try
+                {
+                    var result = number.Value.ToString(format.Value);
+                    StackPush(new MOGString(this, result));
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, ex.Message);
+                }
             }
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
