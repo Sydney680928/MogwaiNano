@@ -73,7 +73,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 | `->data` | 🔗 | `v1 v2 ... vN N ->data` → `.data` | Pops `N` numbers (each `0`-`255`) and builds a `MOGData` from them, in push order |
 | `->bcd` | ⚙️ | `n ->bcd` | Converts a decimal number to BCD encoding (e.g. `35 ->bcd` → `0x35`) |
 | `bcd->` | ⚙️ | `n bcd->` | Converts a BCD-encoded number back to decimal (e.g. `0x35 bcd->` → `35`) |
-| `->format` | 🔗 | `n "spec" ->format` → `.string` | Converts a number to a string using a .NET **standard** numeric format specifier — nanoFramework only supports `D`/`F`/`G`/`N`/`X` (with an optional precision digit), not custom format strings like `"000"`. E.g. `50 "D3" ->format` → `"050"` |
+| `->format` | 🔗 | `n "spec" ->format` → `.string` | Converts a number to a string using a .NET **standard** numeric format specifier — nanoFramework only supports `D`/`F`/`G`/`N`/`X` (with an optional precision digit), not custom format strings like `"000"`. E.g. `50 "D3" ->format` → `"050"`. Since `D` and `X` only apply to integers in .NET while `MOGNumber` is `float`-backed, the number is automatically cast to an integer first when the specifier is `D` or `X` (truncating any decimal part); `F`/`G`/`N` work directly on the float value with no cast |
 | `->num` | 🔗 | `"str" ->num` → `.number` | Converts a string to a number; raises an error if it isn't a valid one |
 | `sub` | 🔗 | `v start extent sub` | Extracts a part of a `MOGString`, `MOGList`, `MOGData` or `.binary` value by start position and extent. An extent of `0` means "to the end". Also accepts a `MOGRef` (`&variable`) in place of `v`, dereferenced transparently |
 | `makeData` | ⚙️ | `size value makeData` → `.data` | Creates a `MOGData` of a given size, filled with a given byte value, without pushing each byte individually — avoids a memory spike compared to building the same buffer with `repeat`/`->data` |
@@ -246,7 +246,24 @@ All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather th
 
 ---
 
-## 9. SSD1306 OLED display
+## 9. PWM
+
+All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, following the same pattern as I2C. Requires the pin to already be configured for PWM via `device.setPinFunction` (see [ESP32 DeviceFunction values reference](esp32-device-function-values.md)) beforehand.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `pwm.open` | `'name' pin frequency dutyCycle pwm.open` | Creates and starts-ready a named PWM channel on `pin`, at `frequency` (Hz, must be greater than `0`) and `dutyCycle` — given as a **percentage** (`0`-`100`), not a fraction. Refuses to reopen an already-used name. Fails cleanly if the pin can't provide a PWM channel |
+| `pwm.start` | `'name' pwm.start` | Starts the named channel's output |
+| `pwm.stop` | `'name' pwm.stop` | Stops the named channel's output |
+| `pwm.close` | `'name' pwm.close` | Stops (if running) and releases the named channel |
+
+**Not yet available:** changing frequency or duty cycle after opening a channel. To change either, close the channel and reopen it with new values. This also sidesteps a platform caveat — some PWM implementations recommend fixing the frequency at creation rather than changing it on a running channel.
+
+**Note on pairs:** PWM channels operate in pairs sharing the same frequency (e.g. `PWM1`/`PWM2`). For two independent frequencies running at once, use channels at least two apart in the `DeviceFunction` numbering — see the [ESP32 DeviceFunction values reference](esp32-device-function-values.md).
+
+---
+
+## 10. SSD1306 OLED display
 
 All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `nanoFramework.Iot.Device.Ssd13xx` binding, built after dense per-pixel drawing in pure RPN proved impractically slow. Fixed to 128x64 resolution over I2C Fast Mode; only one display instance is supported at a time (no naming).
 
@@ -269,7 +286,7 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ---
 
-## 10. Device-level platform access
+## 11. Device-level platform access
 
 ⚙️ **NANO-only.**
 
@@ -292,4 +309,5 @@ MOGWAI uses structured `MW.xx` error codes.
 | `MW.500`–`MW.509` | GPIO |
 | `MW.510`–`MW.519` | I2C |
 | `MW.520`–`MW.529` | SSD1306 |
+| `MW.530`–`MW.539` | PWM |
 | `MW.!!!` | Fatal |

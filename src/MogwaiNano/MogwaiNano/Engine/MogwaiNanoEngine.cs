@@ -21,6 +21,7 @@ using System;
 using System.Collections;
 using System.Device.Gpio;
 using System.Device.I2c;
+using System.Device.Pwm;
 using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
@@ -57,13 +58,14 @@ namespace MogwaiNano.Engine
         private Hashtable _openPins = new(3);
         private GpioController _gpioController = new();
         private Hashtable _i2cDevices = new(2);
-        private string[] _skills = { "GPIO", "I2C", "SSD1306" };
+        private string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM" };
         private ArrayList _flags = new();
         private EvalResult _lastResult;
         private Error _lastError;
         private int _iterationCount = 0;
         private object _lastResultLock = new(); 
         private Ssd1306 _ssd1306;
+        private Hashtable _pwmChannels = new(2);
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -326,6 +328,11 @@ namespace MogwaiNano.Engine
             _primitives.Add("ssd1306.drawFilledRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawFilledRectangle));
             _primitives.Add("ssd1306.drawBitmap", new PrimitiveDelegate(PrimitiveSsd1306DrawBitmap));
 
+            _primitives.Add("pwm.open", new PrimitiveDelegate(PrimitivePwmOpen));
+            _primitives.Add("pwm.close", new PrimitiveDelegate(PrimitivePwmClose));
+            _primitives.Add("pwm.start", new PrimitiveDelegate(PrimitivePwmStart));
+            _primitives.Add("pwm.stop", new PrimitiveDelegate(PrimitivePwmStop));
+
             _primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
 
             _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
@@ -503,6 +510,8 @@ namespace MogwaiNano.Engine
             CleanupOpenPins();
 
             CleanupI2cDevices();
+
+            CleanupPwmChannels();
 
             if (_ssd1306 != null)
             {
@@ -2783,7 +2792,18 @@ namespace MogwaiNano.Engine
 
                 try
                 {
-                    var result = number.Value.ToString(format.Value);
+                    string result;
+                    char specifier = format.Value.Length > 0 ? format.Value[0].ToUpper() : ' ';
+
+                    if (specifier == 'D' || specifier == 'X')
+                    {
+                        result = ((int)number.Value).ToString(format.Value);
+                    }
+                    else
+                    {
+                        result = number.Value.ToString(format.Value);
+                    }
+
                     StackPush(new MOGString(this, result));
                     return EvalResult.NoError;
                 }
@@ -3490,6 +3510,136 @@ namespace MogwaiNano.Engine
 
         #endregion
 
+        #region PWM
+
+        private EvalResult PrimitivePwmOpen(string name)
+        {
+            // 'name' pin frequency dutyCycle pwm.open
+
+            var s = StackSign(4);
+            
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGName))
+            {
+                var dutyCycle = StackPop() as MOGNumber;
+                var frequency = StackPop() as MOGNumber;
+                var pin = StackPop() as MOGNumber;
+                var pwmName = StackPop() as MOGName;    
+
+                if (dutyCycle.Value < 0 || dutyCycle.Value > 100)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "PWM duty cycle must be between 0 and 100");
+                
+                if (frequency.Value <= 0)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "PWM frequency must be greater than 0");
+                
+                if (_pwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(this, Error.PwmAlreadyOpenedError, name);
+                
+                int nPin = (int)pin.Value;
+
+                try
+                {
+                    var pwmChannel = PwmChannel.CreateFromPin(nPin, (int)frequency.Value, dutyCycle.Value / 100.0);
+                    
+                    if (pwmChannel == null)
+                        return EvalResult.Failure(this, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}");
+
+                    _pwmChannels.Add(pwmName.Value, pwmChannel);
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}", ex.Message);
+                }
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitivePwmClose(string name)
+        {
+            // 'name' pwm.close
+
+            var s = StackSign(1);
+            
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var pwmName = StackPop() as MOGName;
+
+                if (!_pwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(this, Error.PwmUnknownNameError, name);
+                
+                var pwmChannel = _pwmChannels[pwmName.Value] as PwmChannel;               
+                pwmChannel.Stop();
+                pwmChannel.Dispose();
+               
+                _pwmChannels.Remove(pwmName.Value);
+                
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitivePwmStart(string name)
+        {
+            // name pwm.start
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var pwmName = StackPop() as MOGName;
+
+                if (!_pwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(this, Error.PwmUnknownNameError, name);
+
+                var pwmChannel = _pwmChannels[pwmName.Value] as PwmChannel;
+                pwmChannel.Start();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+
+        private EvalResult PrimitivePwmStop(string name)
+        {
+            // name pwm.stop
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var pwmName = StackPop() as MOGName;
+
+                if (!_pwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(this, Error.PwmUnknownNameError, name);
+
+                var pwmChannel = _pwmChannels[pwmName.Value] as PwmChannel;
+                pwmChannel.Stop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        #endregion
+
         #region SSD1306 OLED SCREEN
 
         private EvalResult PrimitiveSsd1306Init(string name)
@@ -3884,7 +4034,15 @@ namespace MogwaiNano.Engine
 
                 if (SystemInfo.Platform == "ESP32")
                 {
-                    nanoFramework.Hardware.Esp32.Configuration.SetPinFunction((int)pin.Value, (nanoFramework.Hardware.Esp32.DeviceFunction)(int)setValue.Value);
+                    try
+                    {
+                        nanoFramework.Hardware.Esp32.Configuration.SetPinFunction((int)pin.Value, (nanoFramework.Hardware.Esp32.DeviceFunction)(int)setValue.Value);
+                    }
+                    catch (Exception ex)
+                    {
+                        return EvalResult.Failure(this, Error.PlatformNotSupportedError, name, ex.Message);
+                    }
+
                     return EvalResult.NoError;
                 }
                 else
@@ -4324,6 +4482,19 @@ namespace MogwaiNano.Engine
             }
 
             _i2cDevices.Clear();
+        }
+
+        private void CleanupPwmChannels()
+        {
+            foreach (var key in _pwmChannels.Keys)
+            {
+                var pwmChannel = _pwmChannels[key] as PwmChannel;
+
+                pwmChannel.Stop();
+                pwmChannel.Dispose();
+            }
+
+            _pwmChannels.Clear();
         }
 
         #endregion

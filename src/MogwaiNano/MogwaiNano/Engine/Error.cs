@@ -61,6 +61,10 @@ namespace MogwaiNano.Engine
             _ssd1306IsOpenedError,
             _ssd1306OperationError,
 
+            _pwmAlreadyOpenedError,
+            _pwmOpenError,
+            _pwmUnknownNameError,
+
             _platformNotSupportedError
 
             ;
@@ -112,7 +116,11 @@ namespace MogwaiNano.Engine
             _ssd1306IsOpenedError = RegisterError("MW.522", "ssd1306 already opened error");
             _ssd1306OperationError = RegisterError("MW.523", "ssd1306 operation error");
 
-            _platformNotSupportedError = RegisterError("MW.530", "platform not supported error");
+            _pwmAlreadyOpenedError = RegisterError("MW.530", "pwm already opened error");  
+            _pwmOpenError = RegisterError("MW.531", "pwm open error");  
+            _pwmUnknownNameError = RegisterError("MW.532", "pwm unknown name error");
+
+            _platformNotSupportedError = RegisterError("MW.540", "platform not supported error");
         }
 
         private static Error RegisterError(string code, string message)
@@ -183,6 +191,12 @@ namespace MogwaiNano.Engine
         public static Error Ssd1306IsOpenedError { get { EnsureInitialized(); return _ssd1306IsOpenedError; } }
 
         public static Error Ssd1306OperationError { get { EnsureInitialized(); return _ssd1306OperationError; } }
+
+        public static Error PwmAlreadyOpenedError { get { EnsureInitialized(); return _pwmAlreadyOpenedError; } }
+
+        public static Error PwmOpenError { get { EnsureInitialized(); return _pwmOpenError; } }
+
+        public static Error PwmUnknownNameError { get { EnsureInitialized(); return _pwmUnknownNameError; } }   
 
         public static Error PlatformNotSupportedError { get { EnsureInitialized(); return _platformNotSupportedError; } }
 
