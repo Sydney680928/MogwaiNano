@@ -65,6 +65,10 @@ namespace MogwaiNano.Engine
             _pwmOpenError,
             _pwmUnknownNameError,
 
+            _adcAlreadyOpenedError,
+            _adcOpenError,
+            _adcUnknownNameError,
+
             _platformNotSupportedError
 
             ;
@@ -120,7 +124,11 @@ namespace MogwaiNano.Engine
             _pwmOpenError = RegisterError("MW.531", "pwm open error");  
             _pwmUnknownNameError = RegisterError("MW.532", "pwm unknown name error");
 
-            _platformNotSupportedError = RegisterError("MW.540", "platform not supported error");
+            _adcAlreadyOpenedError = RegisterError("MW.540", "adc already opened error");
+            _adcOpenError = RegisterError("MW.541", "adc open error");
+            _adcUnknownNameError = RegisterError("MW.542", "adc unknown name error");
+
+            _platformNotSupportedError = RegisterError("MW.590", "platform not supported error");
         }
 
         private static Error RegisterError(string code, string message)
@@ -196,7 +204,13 @@ namespace MogwaiNano.Engine
 
         public static Error PwmOpenError { get { EnsureInitialized(); return _pwmOpenError; } }
 
-        public static Error PwmUnknownNameError { get { EnsureInitialized(); return _pwmUnknownNameError; } }   
+        public static Error PwmUnknownNameError { get { EnsureInitialized(); return _pwmUnknownNameError; } }
+
+        public static Error AdcAlreadyOpenedError { get { EnsureInitialized(); return _adcAlreadyOpenedError; } }
+
+        public static Error AdcOpenError { get { EnsureInitialized(); return _adcOpenError; } }
+
+        public static Error AdcUnknownNameError { get { EnsureInitialized(); return _adcUnknownNameError; } }
 
         public static Error PlatformNotSupportedError { get { EnsureInitialized(); return _platformNotSupportedError; } }
 

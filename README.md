@@ -9,7 +9,7 @@
 
 **Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
-> **A note on memory:** MOGWAI NANO runs comfortably on a plain ESP32 for simple, focused scripts (GPIO, a single sensor). For anything more composite — a display, several I2C devices, sustained network activity, all running together over a long session — an ESP32-S3 board **with PSRAM** is strongly recommended. See [Memory considerations](#memory-considerations) below for why.
+> **A note on memory:** MOGWAI NANO is not recommended on a plain ESP32 (no PSRAM) beyond the simplest, single-purpose scripts. An ESP32-S3 board with PSRAM is strongly recommended for anything more composite — a display, several I2C devices, sustained network activity, all running together over a long session. See [Memory considerations](#memory-considerations) below for why.
 
 > If MOGWAI NANO looks useful to you, a ⭐ helps others discover it — thank you!
 
@@ -72,13 +72,13 @@ A plain ESP32 gives MOGWAI NANO roughly 40KB of free RAM to work with once the f
 
 None of this is a bug to "just fix" — it's a direct, measured consequence of running an interpreted RPN language on top of a managed CLR, on top of a real-time OS, on a few tens of kilobytes of RAM. **An ESP32-S3 board with PSRAM changes this picture completely.** With several megabytes available instead of tens of kilobytes, the same fragmentation risk is structurally still there, but never gets anywhere close to being a practical problem — a composite project (display + sensors + long network sessions) that showed real instability on a plain ESP32 ran rock-solid for hours straight on an ESP32-S3 with PSRAM in side-by-side testing, with no configuration changes to the script itself.
 
-**Recommendation:** use a plain ESP32 for small, single-purpose scripts. Reach for an ESP32-S3 with PSRAM as soon as your project combines more than one or two hardware subsystems, runs for extended periods, or you simply want the extra headroom. See also `mogwai.frugalMode` above, which helps on constrained boards but doesn't eliminate this class of issue on its own.
+**Recommendation:** an ESP32-S3 board with PSRAM is the platform we'd point you toward for any real project — the peace of mind of not fighting memory fragmentation is worth it as soon as your script does more than one simple thing. As a rough, untested rule of thumb, at least 1MB of PSRAM should give the runtime enough breathing room — our own testing was done on a board with several megabytes available, so consider this an estimate rather than a validated minimum. We expect to refine this figure over time as the runtime evolves and its own memory footprint changes. A plain ESP32 remains fine for small, single-purpose scripts (a single sensor, basic GPIO) where the tighter memory budget is unlikely to ever be an issue. See also `mogwai.frugalMode` above, which helps on constrained boards but doesn't eliminate this class of issue on its own.
 
 ## Supported platforms
 
 | Platform | Status |
 |---|---|
-| ESP32 | ✅ Tested — best for small, single-purpose scripts (see [Memory considerations](#memory-considerations)) |
+| ESP32 | ✅ Tested — usable for small, single-purpose scripts only (see [Memory considerations](#memory-considerations)); not recommended for anything more composite |
 | ESP32-S3 (with PSRAM) | ✅ Tested — recommended for composite projects (display, multiple sensors, long-running sessions) |
 | Raspberry Pi Pico W | ⚠️ Runtime tested and working, but WiFi configuration currently blocked (see Quick Start note) |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |

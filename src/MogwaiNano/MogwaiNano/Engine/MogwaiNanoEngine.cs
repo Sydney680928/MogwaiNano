@@ -19,6 +19,7 @@ using MogwaiNano.Objects;
 using nanoFramework.Runtime.Native;
 using System;
 using System.Collections;
+using System.Device.Adc;
 using System.Device.Gpio;
 using System.Device.I2c;
 using System.Device.Pwm;
@@ -58,7 +59,7 @@ namespace MogwaiNano.Engine
         private Hashtable _openPins = new(3);
         private GpioController _gpioController = new();
         private Hashtable _i2cDevices = new(2);
-        private string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM" };
+        private string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM", "ADC" };
         private ArrayList _flags = new();
         private EvalResult _lastResult;
         private Error _lastError;
@@ -66,6 +67,8 @@ namespace MogwaiNano.Engine
         private object _lastResultLock = new(); 
         private Ssd1306 _ssd1306;
         private Hashtable _pwmChannels = new(2);
+        private Hashtable _adcChannels = new(2);
+        private AdcController _adcController;
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -333,6 +336,12 @@ namespace MogwaiNano.Engine
             _primitives.Add("pwm.start", new PrimitiveDelegate(PrimitivePwmStart));
             _primitives.Add("pwm.stop", new PrimitiveDelegate(PrimitivePwmStop));
 
+            _primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));   
+            _primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
+            _primitives.Add("adc.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
+            _primitives.Add("adc.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
+            _primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));    
+
             _primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
 
             _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
@@ -512,6 +521,8 @@ namespace MogwaiNano.Engine
             CleanupI2cDevices();
 
             CleanupPwmChannels();
+
+            CleanupAdcChannels();
 
             if (_ssd1306 != null)
             {
@@ -3612,7 +3623,6 @@ namespace MogwaiNano.Engine
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
-
         private EvalResult PrimitivePwmStop(string name)
         {
             // name pwm.stop
@@ -3636,6 +3646,133 @@ namespace MogwaiNano.Engine
             }
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        #endregion
+
+        #region ADC
+
+        private EvalResult PrimitiveAdcOpen(string name)
+        {
+
+            // 'name' channel adc.open
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGName))
+            {
+                var channel = StackPop() as MOGNumber;
+                var adcName = StackPop() as MOGName;
+             
+                if (_adcChannels.Contains(adcName.Value))
+                    return EvalResult.Failure(this, Error.AdcAlreadyOpenedError, name);
+
+                int nChannel = (int)channel.Value;
+
+                try
+                {
+                    if (_adcController == null)
+                        _adcController = new AdcController();
+
+                    var adcChannel = _adcController.OpenChannel(nChannel);
+
+                    _adcChannels.Add(adcName.Value, adcChannel);
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.AdcOpenError, name, $"failed to open ADC channel {nChannel}", ex.Message);
+                }
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveAdcClose(string name)
+        {
+            // 'name' adc.close
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var adcName = StackPop() as MOGName;
+
+                if (!_adcChannels.Contains(adcName.Value))
+                    return EvalResult.Failure(this, Error.AdcUnknownNameError, name);
+
+                var adcChannel = _adcChannels[adcName.Value] as AdcChannel;
+                adcChannel.Dispose();
+
+                _adcChannels.Remove(adcName.Value);
+
+                if (_adcChannels.Count == 0)
+                    _adcController = null;
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveAdcReadValue(string name)
+        {
+            // name adc.readValue
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var adcName = StackPop() as MOGName;
+
+                if (!_adcChannels.Contains(adcName.Value))
+                    return EvalResult.Failure(this, Error.AdcUnknownNameError, name);
+
+                var adcChannel = _adcChannels[adcName.Value] as AdcChannel;
+                var value = adcChannel.ReadValue();
+
+                StackPush(new MOGNumber(this, value));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveAdcGetMaxValue(string name)
+        {
+            // adc.maxValue
+
+            if (_adcController == null)
+                _adcController = new AdcController();
+
+            var maxValue = _adcController.MaxValue;
+            StackPush(new MOGNumber(this, maxValue));
+            
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveAdcGetResolutionInBits(string name)
+        {
+            // adc.resolutionInBits
+
+            if (_adcController == null)
+                _adcController = new AdcController();
+
+            var resolutionInBits = _adcController.ResolutionInBits;
+            StackPush(new MOGNumber(this, resolutionInBits));
+
+            return EvalResult.NoError;
         }
 
         #endregion
@@ -4482,6 +4619,18 @@ namespace MogwaiNano.Engine
             }
 
             _i2cDevices.Clear();
+        }
+
+        private void CleanupAdcChannels()
+        {
+            foreach (var key in _adcChannels.Keys)
+            {
+                var adcChannel = _adcChannels[key] as AdcChannel;
+                adcChannel.Dispose();
+            }
+
+            _adcChannels.Clear();
+            _adcController = null;
         }
 
         private void CleanupPwmChannels()

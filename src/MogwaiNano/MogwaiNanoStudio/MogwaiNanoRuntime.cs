@@ -464,7 +464,7 @@ namespace MogwaiNanoStudio
                     var sks = response.Parameters[9].Split('\n');
 
                     foreach (var sk in sks)
-                        list.AddString(sk);
+                        list.AddName(sk);
                 }
 
                 record.SetItem("skills", list);

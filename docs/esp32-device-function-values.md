@@ -2,6 +2,83 @@
 
 Extracted from `nanoFramework.Hardware.Esp32`'s `DeviceFunction` enum (v1.6.42). These are the numeric values to pass as the `function` parameter to `device.setPinFunction pin function`.
 
+This applies to the classic `ESP32_REV3` target. Other ESP32 variants (like `ESP32_S3_OCTAL`) may not follow the same default pin mapping at all — on those boards, `device.setPinFunction` may be required even for buses (like I2C) that need no configuration whatsoever on `ESP32_REV3`.
+
+## Default pin mapping on `ESP32_REV3`
+
+Before reaching for `device.setPinFunction`, check whether the pin you need is already wired by default — no configuration needed in that case. This is nanoFramework's own default mapping, straight from the [official ESP32 Pin Out documentation](https://docs.nanoframework.net/content/esp32/esp32_pin_out.html).
+
+### I2C (already wired by default)
+
+| Bus | Data | Clock |
+|---|---|---|
+| I2C1 | GPIO 18 | GPIO 19 |
+| I2C2 | GPIO 25 | GPIO 26 |
+
+This is exactly why `ESP32_REV3` never needs `device.setPinFunction` for I2C — the default bus is already usable as-is with `i2c.open`.
+
+### SPI (already wired by default)
+
+| Bus | MOSI | MISO | Clock |
+|---|---|---|---|
+| SPI1 | GPIO 23 | GPIO 25 | GPIO 19 |
+| SPI2 | undefined | undefined | undefined |
+
+### Serial (COM)
+
+| Port | TX | RX | RTS | CTS |
+|---|---|---|---|---|
+| COM1 (reserved for debugging when enabled) | GPIO 1 | GPIO 3 | GPIO 19 | GPIO 22 |
+| COM2 | undefined | undefined | undefined | undefined |
+| COM3 | undefined | undefined | undefined | undefined |
+
+### PWM — undefined by default
+
+All 16 PWM channels have no pin assigned at startup — `device.setPinFunction` is always required to use PWM on `ESP32_REV3`. Channels `PWM0`-`PWM7` use a low-precision timer; `PWM8`-`PWM15` use a high-resolution timer — pick based on the precision your use case needs (a passive buzzer doesn't care much; driving something more time-sensitive might).
+
+### ADC — fixed GPIO mapping, no `device.setPinFunction` needed
+
+Unlike PWM, ADC channels map to fixed GPIOs and don't need `device.setPinFunction` — just pass the right channel number to `adc.open`.
+
+| Channel | Internal controller | GPIO | Notes |
+|---|---|---|---|
+| 0 | ADC1 | 36 | See restrictions below |
+| 1 | ADC1 | 37 | |
+| 2 | ADC1 | 38 | |
+| 3 | ADC1 | 39 | See restrictions below |
+| 4 | ADC1 | 32 | |
+| 5 | ADC1 | 33 | |
+| 6 | ADC1 | 34 | |
+| 7 | ADC1 | 35 | |
+| 8 | ADC1 | 36 | Internal temperature sensor (VP) — see restrictions |
+| 9 | ADC1 | 39 | Internal Hall sensor (VN) — see restrictions |
+| 10 | ADC2 | 4 | Unavailable while WiFi is active |
+| 11 | ADC2 | 0 | Strapping pin — unavailable while WiFi is active |
+| 12 | ADC2 | 2 | Strapping pin — unavailable while WiFi is active |
+| 13 | ADC2 | 15 | Strapping pin — unavailable while WiFi is active |
+| 14 | ADC2 | 13 | Unavailable while WiFi is active |
+| 15 | ADC2 | 12 | Unavailable while WiFi is active |
+| 16 | ADC2 | 14 | Unavailable while WiFi is active |
+| 17 | ADC2 | 27 | Unavailable while WiFi is active |
+| 18 | ADC2 | 25 | Unavailable while WiFi is active |
+| 19 | ADC2 | 26 | Unavailable while WiFi is active |
+
+**Restrictions:**
+- **Channels 10-19 (all `ADC2`) can't be used while WiFi is active** — throws `CLR_E_PIN_UNAVAILABLE`. Since MOGWAI NANO relies on WiFi for its entire connectivity model, **channels 0-9 (all `ADC1`) are the only practical choice** for any real project
+- The Hall sensor (channel 9) and temperature sensor (channel 8) can't be used at the same time as channels 0 and 3
+- GPIO 0, 2, 15 (channels 11-13) are strapping pins — check your board's schematic before using them for anything, boot behavior can be affected
+
+### DAC
+
+| DAC | GPIO |
+|---|---|
+| DAC1 | 25 |
+| DAC2 | 26 |
+
+---
+
+## `DeviceFunction` numeric values (for `device.setPinFunction`)
+
 ## SPI
 
 | Function | Value |
