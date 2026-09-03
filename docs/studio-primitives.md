@@ -15,6 +15,16 @@ This page only covers Studio's own `nano.*` primitives. For everything that actu
 | `nano.isConnected` | `nano.isConnected` → `.boolean` | Tests whether a device is currently connected |
 | `nano.user.connect` | `nano.user.connect` → `.boolean` | Guided connection shortcut combining discovery, interactive selection, and connection in one call: scans for devices, lists the ones that responded for the user to pick from, and connects to the selected one. Pushes `true` on a successful connection, `false` if nothing responded, no device was selected, or the connection failed — same boolean convention as `nano.connect` |
 
+## Units (reusable code libraries)
+
+A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device's flash, that gets parsed and executed once on demand to declare functions — a library, in effect (e.g. a set of RTC helper functions). A unit is a `MOGFunction` under the hood, so it goes through the exact same execution machinery as any other code — no separate caching or `frugalMode` behavior to think about. It's meant to declare functions once, not to be run repeatedly as regular logic.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `nano.units.install` | `"file" nano.units.install` → `.boolean` | Parses a local `.mog` file and sends its canonical form to the device for permanent storage (under `I:\mogwai\units` on the device's flash) — no limit on how many units can be stored. The unit's name is the source file's name (e.g. `C:\folder\code.mog` installs as unit `code.mog`). Pushes `false` if the file can't be found, can't be opened, or its content fails to parse into a canonical form; `true` otherwise. Useful for a script that installs whatever units a program needs (if not already present) before running it |
+| `nano.units.purge` | `'unit' nano.units.purge` → `.boolean` | Removes a stored unit. Pushes `true` on success, `false` otherwise |
+| `nano.units.list` | `nano.units.list` → `.list` | Returns the names of all units currently stored on the device |
+
 ## Discovery
 
 | Primitive | Signature | Description |

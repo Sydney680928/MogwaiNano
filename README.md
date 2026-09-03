@@ -176,8 +176,8 @@ src/MogwaiNano/
 - [ ] STM32 and TI validation
 - [x] ESP32-S3 / PSRAM validation — confirmed transparently usable by the managed heap, and confirmed to resolve the memory-fragmentation instability seen on plain ESP32 under sustained, multi-subsystem load (see [Memory considerations](#memory-considerations))
 - [ ] BLE support
-- [ ] `.mog` library system — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library), building on the existing skill/flag primitives
-- [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the `.mog` library system above on more capable boards
+- [x] `.mog` library system ("units") — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library)
+- [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the units system above on more capable boards
 - [ ] MOGWAI NANO Studio rebuilt on Avalonia, focused on device monitoring and orchestration (VS Code + the MOGWAI extension remains the recommended way to write and edit code)
 
 ## About
