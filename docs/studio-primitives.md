@@ -23,7 +23,7 @@ A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device'
 |---|---|---|
 | `nano.units.install` | `"file" nano.units.install` → `.boolean` | Parses a local `.mog` file and sends its canonical form to the device for permanent storage (under `I:\mogwai\units` on the device's flash) — no limit on how many units can be stored. The unit's name is the source file's name (e.g. `C:\folder\code.mog` installs as unit `code.mog`). Pushes `false` if the file can't be found, can't be opened, or its content fails to parse into a canonical form; `true` otherwise. Useful for a script that installs whatever units a program needs (if not already present) before running it |
 | `nano.units.purge` | `'unit' nano.units.purge` → `.boolean` | Removes a stored unit. Pushes `true` on success, `false` otherwise |
-| `nano.units.list` | `nano.units.list` → `.list` | Returns the names of all units currently stored on the device |
+| `nano.units` | `nano.units` → `.list` | Returns the names of all units currently stored on the device |
 
 ## Discovery
 
@@ -49,7 +49,7 @@ A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device'
 | `nano.state` | `nano.state` → `.name` | Queries the connected device's current execution state (`IDLE`/`RUNNING`) |
 | `nano.isRunning` | `nano.isRunning` → `.boolean` | Tests whether a program is currently running on the device |
 | `nano.memory` | `nano.memory` → `.number` | Free RAM on the device, in bytes (`GC.Run(false)` result — non-blocking, doesn't force a collection) |
-| `nano.info` | `nano.info` → `.record` | Remote equivalent of the device-side `mogwai.info`, returning the same record (system version, IP, device name, platform, session, free memory, target, MOGWAI NANO version, OEM build details, and a `skills:` list) without needing a `nano.run` round-trip |
+| `nano.info` | `nano.info` → `.record` | Remote equivalent of the device-side `mogwai.info`, returning the same record (system version, IP, device name, platform, session, free memory, target, MOGWAI NANO version, OEM build details, a `skills:` list, and a `units:` list of stored unit names) without needing a `nano.run` round-trip |
 | `nano.lastResult` | `nano.lastResult` → `.string` | Returns the full result message from the last program run on the device — whichever way it ended, successfully or not. On a program that fails without producing any output of its own, this is the way to find out why: it reports the underlying error rather than leaving you with a silent failure |
 | `nano.session` | `nano.session` → `.string` | Returns the connected device's session identifier directly, as a string — the same value found in the `session` field of `nano.scan`/`nano.info` results, without needing a full scan or info call |
 | `nano.name` | `nano.name` → `.string` | Reads the connected device's name |
