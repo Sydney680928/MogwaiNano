@@ -79,7 +79,7 @@ namespace MogwaiNanoStudio
             "nano.send",
 
             "nano.units.install",
-            "nano.units.list",
+            "nano.units",
             "nano.units.purge",
 
             "mogwai.memory",
@@ -560,9 +560,9 @@ namespace MogwaiNanoStudio
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
             }
-            else if (word == "nano.units.list")
+            else if (word == "nano.units")
             {
-                return await AppGlobal.NanoRuntime.GetUnitsList();
+                return await AppGlobal.NanoRuntime.GetUnits();
             }
             else if (word == "nano.units.purge")
             {

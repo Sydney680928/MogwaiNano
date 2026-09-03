@@ -554,26 +554,29 @@ namespace MogwaiNano.Engine
 
         public void Halt() => HaltRequested = true;
 
-        public string[] GetUnits()
+        public string[] Units
         {
-            try
+            get
             {
-                var unitsFolder = @"I:\mogwai\units";
-                var unitFiles = Directory.GetFiles(unitsFolder);
-
-                var unitNames = new string[unitFiles.Length];
-
-                for (int i = 0; i < unitFiles.Length; i++)
+                try
                 {
-                    var fileName = Path.GetFileName(unitFiles[i]);
-                    unitNames[i] = fileName;
-                }
+                    var unitsFolder = @"I:\mogwai\units";
+                    var unitFiles = Directory.GetFiles(unitsFolder);
 
-                return unitNames;
-            }
-            catch
-            {
-                return new string[0];
+                    var unitNames = new string[unitFiles.Length];
+
+                    for (int i = 0; i < unitFiles.Length; i++)
+                    {
+                        var fileName = Path.GetFileName(unitFiles[i]);
+                        unitNames[i] = fileName;
+                    }
+
+                    return unitNames;
+                }
+                catch
+                {
+                    return new string[0];
+                }
             }
         }
 
@@ -2341,6 +2344,13 @@ namespace MogwaiNano.Engine
 
             record.SetItem("skills", skills);
 
+            var units = new MOGList(this);
+
+            foreach (var unit in Units)
+                units.AddItem(new MOGString(this, unit));
+
+            record.SetItem("units", units); 
+
             record.SetItem("frugalMode", new MOGBoolean(this, FrugalMode)); 
 
             StackPush(record);
@@ -2993,7 +3003,7 @@ namespace MogwaiNano.Engine
         {
             var list = new MOGList(this);
 
-            foreach (var unit in GetUnits())
+            foreach (var unit in Units)
                 list.AddItem(new MOGName(this, unit));
            
             StackPush(list);

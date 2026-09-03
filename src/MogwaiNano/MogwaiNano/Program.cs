@@ -183,14 +183,24 @@ namespace MogwaiNano
             {
                 var memory = GC.Run(false);
 
-                var sb = new StringBuilder();
+                var skillsBuilder = new StringBuilder();
 
                 foreach (var skill in AppGlobal.MogwaiNanoEngine.Skills)
                 {
-                    if (sb.Length > 0)
-                        sb.Append('\n');
+                    if (skillsBuilder.Length > 0)
+                        skillsBuilder.Append('\n');
 
-                    sb.Append(skill);
+                    skillsBuilder.Append(skill);
+                }
+
+                var unitsBuilder = new StringBuilder();
+
+                foreach (var unit in AppGlobal.MogwaiNanoEngine.Units)
+                {
+                    if (unitsBuilder.Length > 0)
+                        unitsBuilder.Append('\n');
+
+                    unitsBuilder.Append(unit);
                 }
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(
@@ -205,8 +215,9 @@ namespace MogwaiNano
                         SystemInfo.OEMString,
                         SystemInfo.Version.ToString(),
                         memory.ToString(),
-                        sb.ToString(),
-                        AppGlobal.MogwaiNanoEngine.FrugalMode.ToString()
+                        skillsBuilder.ToString(),
+                        AppGlobal.MogwaiNanoEngine.FrugalMode.ToString(),
+                        unitsBuilder.ToString()
                     ));
             }
             else if (message.Function == "LAST.RESULT.GET")
@@ -247,7 +258,7 @@ namespace MogwaiNano
             {
                 try
                 {
-                    var units = AppGlobal.MogwaiNanoEngine.GetUnits();
+                    var units = AppGlobal.MogwaiNanoEngine.Units;
 
                     var sb = new StringBuilder();
 

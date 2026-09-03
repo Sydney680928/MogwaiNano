@@ -438,7 +438,7 @@ namespace MogwaiNanoStudio
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
             
-            if (response.Parameters == null || response.Parameters.Length < 10)
+            if (response.Parameters == null || response.Parameters.Length < 11)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid info response from device.");
 
             if (int.TryParse(response.Parameters[8], out int memory))
@@ -457,17 +457,29 @@ namespace MogwaiNanoStudio
 
                 record.SetNumber("memory", memory);
 
-                var list = new MOGList(_engine);
+                var skillsList = new MOGList(_engine);
 
                 if (!string.IsNullOrEmpty(response.Parameters[9]))
                 {
                     var sks = response.Parameters[9].Split('\n');
 
                     foreach (var sk in sks)
-                        list.AddName(sk);
+                        skillsList.AddName(sk);
                 }
 
-                record.SetItem("skills", list);
+                record.SetItem("skills", skillsList);
+
+                var unitsList = new MOGList(_engine);
+
+                if (!string.IsNullOrEmpty(response.Parameters[11]))
+                {
+                    var units = response.Parameters[11].Split('\n');
+
+                    foreach (var unit in units)
+                        unitsList.AddName(unit);
+                }
+
+                record.SetItem("units", unitsList);
 
                 record.SetBoolean("frugalMode", response.Parameters[10] == "True");
 
@@ -498,7 +510,7 @@ namespace MogwaiNanoStudio
             return EvalResult.NoError;
         }
         
-        public async Task<EvalResult> GetUnitsList()
+        public async Task<EvalResult> GetUnits()
         {
             if (!AppGlobal.NanoClient.IsConnected)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
