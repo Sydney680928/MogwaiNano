@@ -445,6 +445,8 @@ namespace MogwaiNano.Engine
 
                 EvalResult result = program.Execute();
 
+                program = null;
+
                 HaltRequested = false;
                 //ExitRequested = false;
                 //ReturnRequested = false;
@@ -477,7 +479,7 @@ namespace MogwaiNano.Engine
                 stopwatch.Stop();
                 result.Duration = stopwatch.Elapsed;
 
-                // Reset(_keepAlive);
+                Reset();
 
                 // _debugMode = false;
 

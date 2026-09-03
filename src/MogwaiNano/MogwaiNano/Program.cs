@@ -42,6 +42,16 @@ namespace MogwaiNano
             Debug.WriteLine($"Device name: {AppGlobal.NanoParameters.Name}");
             Debug.WriteLine($"Session: {AppGlobal.Session}");
 
+            try
+            {
+                Directory.CreateDirectory(@"I:\mogwai\units");
+                Debug.WriteLine($"Units folder OK.");  
+            }
+            catch
+            {
+                Debug.WriteLine($"Unabled to create units folder !");              
+            }
+
             if (ConnectToWifi())
             {
                 AppGlobal.TcpServer.MessageReceived += TcpServer_MessageReceived;
@@ -54,12 +64,11 @@ namespace MogwaiNano
             var @delegate = new MogwaiNanoDelegate(AppGlobal.MogwaiNanoEngine);
             AppGlobal.MogwaiNanoEngine.Delegate = @delegate;
 
-            Debug.WriteLine($"Memory: {GC.Run(true)} bytes free");
+            Debug.WriteLine($"Memory: {GC.Run(true)} bytes free.");
 
             if (File.Exists(@"I:\autorun.mog"))
             {
-                Debug.WriteLine("autorun.mog found.");
-                Debug.WriteLine("running...");
+                Debug.WriteLine("autorun.mog found, running...");
 
                 string code = File.ReadAllText(@"I:\autorun.mog");
                 AppGlobal.MogwaiNanoEngine.RunAsync(code);
