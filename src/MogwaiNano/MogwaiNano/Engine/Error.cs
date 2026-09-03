@@ -69,6 +69,9 @@ namespace MogwaiNano.Engine
             _adcOpenError,
             _adcUnknownNameError,
 
+            _unknownUnitError,
+            _unableToReadUnitError,
+
             _platformNotSupportedError
 
             ;
@@ -127,6 +130,9 @@ namespace MogwaiNano.Engine
             _adcAlreadyOpenedError = RegisterError("MW.540", "adc already opened error");
             _adcOpenError = RegisterError("MW.541", "adc open error");
             _adcUnknownNameError = RegisterError("MW.542", "adc unknown name error");
+
+            _unknownUnitError = RegisterError("MW.580", "unit not found error");
+            _unableToReadUnitError = RegisterError("MW.581", "unable to read unit error");
 
             _platformNotSupportedError = RegisterError("MW.590", "platform not supported error");
         }
@@ -211,6 +217,10 @@ namespace MogwaiNano.Engine
         public static Error AdcOpenError { get { EnsureInitialized(); return _adcOpenError; } }
 
         public static Error AdcUnknownNameError { get { EnsureInitialized(); return _adcUnknownNameError; } }
+
+        public static Error UnknownUnitError { get { EnsureInitialized(); return _unknownUnitError; } }
+
+        public static Error UnableToReadUnitError { get { EnsureInitialized(); return _unableToReadUnitError; } }
 
         public static Error PlatformNotSupportedError { get { EnsureInitialized(); return _platformNotSupportedError; } }
 

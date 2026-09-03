@@ -78,6 +78,10 @@ namespace MogwaiNanoStudio
             "nano.user.connect",
             "nano.send",
 
+            "nano.units.install",
+            "nano.units.list",
+            "nano.units.purge",
+
             "mogwai.memory",
             "mogwai.reboot",
 
@@ -115,6 +119,8 @@ namespace MogwaiNanoStudio
             "ssd1306.drawRectangle",    
             "ssd1306.drawFilledRectangle",
             "ssd1306.drawBitmap"
+
+            
 
             ];
 
@@ -226,7 +232,7 @@ namespace MogwaiNanoStudio
                     try
                     {
                         var code = File.ReadAllText(filename.Value);
-                        
+
                         if (!string.IsNullOrEmpty(code))
                         {
                             var function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
@@ -315,7 +321,7 @@ namespace MogwaiNanoStudio
                 // true if connected, false if not or no device selected
 
                 Console.WriteLine();
-                Console.WriteLine("MOGWAI NANO DEVICES ON THE NETWORK");           
+                Console.WriteLine("MOGWAI NANO DEVICES ON THE NETWORK");
 
                 var r = await AppGlobal.NanoRuntime.Select();
 
@@ -350,7 +356,7 @@ namespace MogwaiNanoStudio
                         AppGlobal.NanoClient.Connect(ip.Value, AppGlobal.TCP_PORT);
 
                         var name = await AppGlobal.NanoRuntime.GetNameValue();
-                        
+
                         NanoConnect?.Invoke(name ?? "unknown name", ip.Value);
 
                         engine.StackPushBoolean(true);
@@ -498,8 +504,79 @@ namespace MogwaiNanoStudio
 
                 if (s[0] == typeof(MOGString))
                 {
-                    var payload = engine.StackPopString();                   
+                    var payload = engine.StackPopString();
                     return await AppGlobal.NanoRuntime.Send(payload.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.units.install")
+            {
+                // "filename" nano.units.install
+
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    // filename
+
+                    var filename = engine.StackPopString();
+                    string code;
+
+                    try
+                    {
+                        code = File.ReadAllText(filename.Value);
+                    }
+                    catch (Exception ex)
+                    {
+                        return EvalResult.Failure(engine, Error.FileOperationError, word, ex.Message);
+                    }
+
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        MOGFunction function;
+
+                        var unitName = Path.GetFileName(filename.Value);
+
+                        try
+                        {
+                            function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            return EvalResult.Failure(engine, Error.ParseError, word, ex.Message);
+                        }
+
+                        return await AppGlobal.NanoRuntime.InstallUnitAsync(unitName, function.ToStringCode());
+                    }
+                    else
+                    {
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, word, "empty code provided");
+                    }
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.units.list")
+            {
+                return await AppGlobal.NanoRuntime.GetUnitsList();
+            }
+            else if (word == "nano.units.purge")
+            {
+                // 'unit' nano.units.purge
+
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGName))
+                {
+                    var unitName = engine.StackPopName();
+                    return await AppGlobal.NanoRuntime.PurgeUnitAsync(unitName.Value);
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);

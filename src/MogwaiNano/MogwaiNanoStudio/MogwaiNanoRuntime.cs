@@ -481,6 +481,76 @@ namespace MogwaiNanoStudio
             }        
         }
 
+        public async Task<EvalResult> InstallUnitAsync(string unitName, string code)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "UNITS.INSTALL", unitName, code);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            var result = response.Parameters[0] ?? "!";
+            _engine.StackPushBoolean(result == "OK");
+
+            return EvalResult.NoError;
+        }
+        
+        public async Task<EvalResult> GetUnitsList()
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "UNITS.LIST");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response != null && response.Parameters != null && response.Parameters[0] != null)
+            {
+                if (response.Parameters[0] == "OK")
+                {
+                    var unitsList = response.Parameters[1].Split('\n');
+                    var mogList = new MOGList(_engine);
+                    
+                    foreach (var unit in unitsList)
+                    {
+                        if (!string.IsNullOrWhiteSpace(unit))
+                            mogList.AddName(unit);
+                    }
+                    
+                    _engine.StackPush(mogList);
+                    
+                    return EvalResult.NoError;
+                }
+                else
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Failed to retrieve units list from device.");
+                }
+            }
+            else
+            {
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+            }
+        }
+
+        public async Task<EvalResult> PurgeUnitAsync(string unitName)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+            
+            var message = new ServerMessage(SOURCE_NAME, "UNITS.PURGE", unitName);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            var result = response.Parameters[0] ?? "!";
+            _engine.StackPushBoolean(result == "OK");
+
+            return EvalResult.NoError;
+        }
+
         public Task<EvalResult> Select()
         {
             var list = AppGlobal.NanoClient.Scan(_engine);

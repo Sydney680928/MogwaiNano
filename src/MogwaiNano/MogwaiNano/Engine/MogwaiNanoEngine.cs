@@ -24,6 +24,7 @@ using System.Device.Gpio;
 using System.Device.I2c;
 using System.Device.Pwm;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using System.Threading;
 using static Iot.Device.Ssd13xx.Ssd13xx;
@@ -299,6 +300,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("mogwai.reboot", new PrimitiveDelegate(PrimitiveMogwaiReboot));
             _primitives.Add("mogwai.info", new PrimitiveDelegate(PrimitiveMogwaiInfo));
             _primitives.Add("mogwai.frugalMode", new PrimitiveDelegate(PrimitiveMogwaiFrugalMode));
+            _primitives.Add("mogwai.units", new PrimitiveDelegate(PrimitiveGetUnits));
+            _primitives.Add("mogwai.units.run", new PrimitiveDelegate(PrimitiveRunUnit));
 
             _primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
             _primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
@@ -550,6 +553,29 @@ namespace MogwaiNano.Engine
         }
 
         public void Halt() => HaltRequested = true;
+
+        public string[] GetUnits()
+        {
+            try
+            {
+                var unitsFolder = @"I:\mogwai\units";
+                var unitFiles = Directory.GetFiles(unitsFolder);
+
+                var unitNames = new string[unitFiles.Length];
+
+                for (int i = 0; i < unitFiles.Length; i++)
+                {
+                    var fileName = Path.GetFileName(unitFiles[i]);
+                    unitNames[i] = fileName;
+                }
+
+                return unitNames;
+            }
+            catch
+            {
+                return new string[0];
+            }
+        }
 
         #region STACK
 
@@ -2960,6 +2986,75 @@ namespace MogwaiNano.Engine
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
+
+        #region UNITS
+
+        private EvalResult PrimitiveGetUnits(string name)
+        {
+            var list = new MOGList(this);
+
+            foreach (var unit in GetUnits())
+                list.AddItem(new MOGName(this, unit));
+           
+            StackPush(list);
+            
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveRunUnit(string name)
+        {
+            // 'unitName' runUnit
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGName))
+                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
+            var unitName = StackPop() as MOGName;
+            var unitFilename = Path.Combine(@"I:\mogwai\units", unitName.Value);
+
+            if (File.Exists(unitFilename))
+            {
+                string unitCode;
+
+                try
+                {
+                    unitCode = File.ReadAllText(unitFilename);
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.UnableToReadUnitError, name, unitName.Value, ex.Message);
+                }
+
+                MOGFunction function;
+
+                try
+                {
+                    function = new MOGFunction(this, unitCode);
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.ParseError, name, unitName.Value, ex.Message);
+                }
+                    
+                var r = function.Execute();
+                function = null;
+
+                if (r.IsError)
+                    return r;
+
+                return EvalResult.NoError;
+            }
+            else
+            {
+                return EvalResult.Failure(this, Error.UnknownUnitError, name, unitName.Value);
+            }
+        } 
+
+        #endregion
 
         #region SKILLS
 

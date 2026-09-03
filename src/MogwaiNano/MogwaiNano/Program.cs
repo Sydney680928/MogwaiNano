@@ -99,7 +99,6 @@ namespace MogwaiNano
             else if (message.Function == "AUTORUN.SET")
             {
                 // On stocke le code dans I:\autorun.mogwai pour qu'il soit exécuté au démarrage
-                // Le code est encodé en base64 pour éviter les problèmes d'encodage
 
                 var code = message.Parameters[0];
                 File.WriteAllText(AppGlobal.AUTORUN_FILE, code);
@@ -148,7 +147,7 @@ namespace MogwaiNano
             }
             else if (message.Function == "MEMORY.GET")
             {
-                var memory = GC.Run(false);  
+                var memory = GC.Run(false);
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "MEMORY.GET", memory.ToString()));
             }
             else if (message.Function == "NAME.GET")
@@ -161,7 +160,7 @@ namespace MogwaiNano
                 {
                     var newName = message.Parameters[0];
                     AppGlobal.NanoParameters.Name = newName;
-                    AppGlobal.NanoParameters.Save(AppGlobal.PARAMETERS_FILE);                  
+                    AppGlobal.NanoParameters.Save(AppGlobal.PARAMETERS_FILE);
                 }
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "NAME.SET", "OK"));
@@ -171,7 +170,7 @@ namespace MogwaiNano
                 if (message.Parameters.Length > 0 && message.Parameters[0] != null)
                 {
                     var payload = message.Parameters[0];
-                    AppGlobal.MogwaiNanoEngine.FireEvent("STUDIO_DID_SEND", new MOGString(AppGlobal.MogwaiNanoEngine, payload));    
+                    AppGlobal.MogwaiNanoEngine.FireEvent("STUDIO_DID_SEND", new MOGString(AppGlobal.MogwaiNanoEngine, payload));
                 }
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "SEND", "OK"));
@@ -191,7 +190,7 @@ namespace MogwaiNano
                     if (sb.Length > 0)
                         sb.Append('\n');
 
-                    sb.Append(skill);                  
+                    sb.Append(skill);
                 }
 
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(
@@ -218,6 +217,83 @@ namespace MogwaiNano
             {
                 Debug.WriteLine("PING received / send PONG");
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "PONG"));
+            }
+            else if (message.Function == "UNITS.INSTALL")
+            {
+                // On stocke le code dans I:\unitName
+
+                if (message.Parameters.Length < 2)
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.INSTALL", "ERROR", "Missing parameters"));
+                    return;
+                }
+
+                var unitName = message.Parameters[0];
+                var code = message.Parameters[1];
+                var filename = $@"I:\mogwai\units\{unitName}";
+
+                try
+                {
+
+                    File.WriteAllText(filename, code);
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.INSTALL", "OK"));
+                }
+                catch (Exception ex)
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.INSTALL", "ERROR", ex.Message));
+                }
+            }
+            else if (message.Function == "UNITS.LIST")
+            {
+                try
+                {
+                    var units = AppGlobal.MogwaiNanoEngine.GetUnits();
+
+                    var sb = new StringBuilder();
+
+                    for (int i = 0; i < units.Length; i++)
+                    {
+                        if (sb.Length > 0)
+                            sb.Append("\n");
+
+                        sb.Append(units[i]);
+                    }
+
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.LIST", "OK", sb.ToString()));
+                }
+                catch (Exception ex)
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.LIST", "ERROR", ex.Message));
+                }
+            }
+            else if (message.Function == "UNITS.PURGE")
+            {
+                if (message.Parameters.Length > 0 && message.Parameters[0] != null)
+                {
+                    var filename = Path.Combine(@"I:\mogwai\units",  message.Parameters[0]);
+
+                    if (File.Exists(filename))
+                    {
+                        try
+                        {
+                            File.Delete(filename);
+                            AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.PURGE", "OK"));
+                        }
+                        catch (Exception ex)
+                        {
+                            AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.PURGE", "ERROR", ex.Message));
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.PURGE", "ERROR", "Unit not found"));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.PURGE", "ERROR", "Missing parameters"));
+                }       
             }
         }
 
