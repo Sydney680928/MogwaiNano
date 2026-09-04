@@ -272,6 +272,7 @@ namespace MogwaiNano.Engine
             _primitives.Add("->format", new PrimitiveDelegate(PrimitiveToFormat));
             _primitives.Add("sub", new PrimitiveDelegate(PrimitiveSub));
             _primitives.Add("->num", new PrimitiveDelegate(PrimitiveToNumber));
+            _primitives.Add("->str", new PrimitiveDelegate(PrimitiveToString));
 
             _primitives.Add("EVENT", new PrimitiveDelegate(PrimitiveEvent));
             _primitives.Add("event.fire", new PrimitiveDelegate(PrimitiveEventFire));
@@ -292,6 +293,10 @@ namespace MogwaiNano.Engine
             _primitives.Add("flag.isClear", new PrimitiveDelegate(PrimitiveFlagIsClear));
 
             _primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
+
+            _primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));    
+            _primitives.Add("error.reset", new PrimitiveDelegate(PrimitiveErrorReset));
+            _primitives.Add("error.throw", new PrimitiveDelegate(PrimitiveErrorThrow));
 
             _primitives.Add("mogwai.halt", new PrimitiveDelegate(PrimitiveHalt));
             _primitives.Add("mogwai.memory", new PrimitiveDelegate(PrimitiveGetMemory));
@@ -323,7 +328,7 @@ namespace MogwaiNano.Engine
 
             _primitives.Add("ssd1306.init", new PrimitiveDelegate(PrimitiveSsd1306Init));
             _primitives.Add("ssd1306.close", new PrimitiveDelegate(PrimitiveSsd1306Close));
-            _primitives.Add("ssd1306.clear", new PrimitiveDelegate(PrimitiveSsd1306Clear));  
+            _primitives.Add("ssd1306.clear", new PrimitiveDelegate(PrimitiveSsd1306Clear));
             _primitives.Add("ssd1306.printString", new PrimitiveDelegate(PrimitiveSsd1306PrintString));
             _primitives.Add("ssd1306.drawString", new PrimitiveDelegate(PrimitiveSsd1306DrawString));
             _primitives.Add("ssd1306.refresh", new PrimitiveDelegate(PrimitiveSsd1306Refresh));
@@ -339,11 +344,11 @@ namespace MogwaiNano.Engine
             _primitives.Add("pwm.start", new PrimitiveDelegate(PrimitivePwmStart));
             _primitives.Add("pwm.stop", new PrimitiveDelegate(PrimitivePwmStop));
 
-            _primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));   
+            _primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));
             _primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
             _primitives.Add("adc.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
             _primitives.Add("adc.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
-            _primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));    
+            _primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));
 
             _primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
 
@@ -357,6 +362,8 @@ namespace MogwaiNano.Engine
             _primitives.Add("FOREVER", new PrimitiveDelegate(PrimitiveForever));
             _primitives.Add("DEFUNC", new PrimitiveDelegate(PrimitiveDefunc));
             _primitives.Add("FOREACH", new PrimitiveDelegate(PrimitiveForeach));
+            _primitives.Add("TRAP", new PrimitiveDelegate(PrimitiveTrap));
+            _primitives.Add("GUARD", new PrimitiveDelegate(PrimitiveGuard));
         }
 
         private void RunLoop()
@@ -2089,6 +2096,89 @@ namespace MogwaiNano.Engine
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
+        private EvalResult PrimitiveTrap(string name)
+        {
+            // code TRAP
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGCode))
+            {
+                var code = StackPop() as MOGCode;
+
+                var result = code.Execute();
+
+                if (result != EvalResult.NoError)
+                    LastError = result.Error;
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveGuard(string name)
+        {
+            // code elseCode GUARD
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGCode))
+            {
+                var errorCode = StackPop() as MOGCode;
+                var code = StackPop() as MOGCode;
+
+                var result = code.Execute();
+
+                if (result != EvalResult.NoError)
+                {
+                    LastError = result.Error;
+
+                    return errorCode.Execute();
+                }
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveErrorLast(string name)
+        {
+            StackPush(new MOGString(this, LastError.Code));
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveErrorReset(string name)
+        {
+            LastError = Error.None;
+            return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveErrorThrow(string name)
+        {
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGString))
+            {
+                var errCode = StackPop() as MOGString;
+                var error = Error.GetError(errCode.Value);
+                
+                return EvalResult.Failure(this, error);
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
         private EvalResult PrimitiveDefunc(string name)
         {
             // code name DEFUNC
@@ -2996,6 +3086,27 @@ namespace MogwaiNano.Engine
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
+
+        private EvalResult PrimitiveToString(string name)
+        {
+            // object ->str
+
+            if (StackSize == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            var obj = StackPop();
+
+            if (obj is MOGString)
+            {
+                StackPush(obj);
+            }
+            else
+            {
+                StackPush(new MOGString(this, obj.ToString())); 
+            }
+
+            return EvalResult.NoError;
+        }   
 
         #region UNITS
 

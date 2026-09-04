@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using System.Collections;
 
 namespace MogwaiNano.Engine
@@ -229,6 +230,14 @@ namespace MogwaiNano.Engine
         public string Message { get; set; }
         
         public bool IsOK => Code == None.Code;
+
+        public static Error GetError(string code)
+        {
+            if (_errors.Contains(code))
+                return _errors[code] as Error;
+
+            return new Error(code, "user error");
+        }
 
         public Error(string code, string message)
         {
