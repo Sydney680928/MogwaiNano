@@ -36,6 +36,12 @@ namespace MogwaiNano.Objects
         {
             var parser = new Parser(engine);
             Items = parser.Parse(content);
+
+            if (Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
+            {
+                AutoEval = true;
+                Items.RemoveAt(0);
+            }   
         }
 
         public MOGObject GetItem(int index)
@@ -66,7 +72,46 @@ namespace MogwaiNano.Objects
             foreach (MOGObject item in Items)
                 obj.Items.Add(item.Clone());
 
+            obj.AutoEval = AutoEval;
+
             return obj;
+        }
+
+        private void Eval()
+        {
+            for (int i = 0; i < Items.Count; i++)
+            {
+                var item = Items[i] as MOGObject;
+                var stackSize = Engine.StackSize;
+
+                var r = item.EngineEval();
+
+                if (r != EvalResult.NoError)
+                    break;
+
+                if (Engine.StackSize > stackSize)
+                {
+                    var value = Engine.StackPop();
+                    Items[i] = value!;
+                }
+            }
+        }
+
+        public override EvalResult EngineEval()
+        {
+            if (AutoEval)
+            {
+                AutoEval = false;
+                Eval();
+            }
+
+            return base.EngineEval();
+        }
+
+        public override EvalResult UserEval()
+        {
+            Eval();
+            return base.UserEval();
         }
 
         public override string ToString()
