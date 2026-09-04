@@ -55,28 +55,31 @@ namespace MogwaiNanoStudio
             "run",
             "file.edit",
             "file.select",
+
             "nano.run",
             "nano.connect",
             "nano.disconnect",
             "nano.isConnected",
-            "nano.scan",
-            "nano.user.select",
+            "nano.scan",           
             "nano.state",
             "nano.isRunning",
             "nano.halt",
-            "nano.autorun.set",
-            "nano.autorun.get",
-            "nano.autorun.purge",
-            "nano.reboot",
-            "nano.user.view",
             "nano.session",
             "nano.lastResult",
             "nano.memory",
             "nano.name",
             "nano.name.set",
             "nano.info",
-            "nano.user.connect",
+            "nano.reboot",
             "nano.send",
+
+            "nano.autorun.set",
+            "nano.autorun.get",
+            "nano.autorun.purge",
+            
+            "nano.user.select",
+            "nano.user.view",
+            "nano.user.connect",          
 
             "nano.units.install",
             "nano.units",
@@ -84,6 +87,9 @@ namespace MogwaiNanoStudio
 
             "mogwai.memory",
             "mogwai.reboot",
+            "mogwai.frugalMode",
+            "mogwai.units",
+            "mogwai.units.run",
 
             "bcd->",
             "->bcd",
@@ -120,7 +126,18 @@ namespace MogwaiNanoStudio
             "ssd1306.drawFilledRectangle",
             "ssd1306.drawBitmap"
 
-            
+            "pwm.open",
+            "pwm.close",
+            "pwm.start",
+            "pwm.stop",
+
+            "adc.open",
+            "adc.close",
+            "adc.read",
+            "adc.resolutionInBits",
+            "adc.maxValue",
+
+            "device.setPinFunction"
 
             ];
 
