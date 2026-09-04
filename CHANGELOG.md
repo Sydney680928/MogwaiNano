@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+## [0.4.0] - 2026-09-04
+
+### Added
+
 - `sub`, `->format`, `->num` — ported from the desktop MOGWAI engine. `sub` extracts a part of a `MOGString`, `MOGList`, `MOGData` or `.binary` value by start position and extent (an extent of `0` means "to the end"), useful for parsing fixed-format messages received via `nano.send`. `->format` converts a number to a string using a .NET standard numeric format specifier (e.g. `50 "D3" ->format` → `"050"`) — nanoFramework only supports standard specifiers (`D`/`F`/`G`/`N`/`X`), not the custom format strings (`"000"`, `"000.000"`) available on desktop. `->num` converts a string to a number, raising an error if it isn't a valid one
 - `nano.session` — returns the connected device's session identifier directly, as a string, without needing a full `nano.scan`/`nano.info` call
 - `nano.lastResult` — returns the full result message from the last program run on the device, however it ended. On a program that fails without producing any output of its own, this is the way to find out why — it reports the underlying error rather than leaving a silent failure
@@ -185,7 +193,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.1.0
