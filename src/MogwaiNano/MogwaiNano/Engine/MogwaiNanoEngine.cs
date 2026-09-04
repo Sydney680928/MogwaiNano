@@ -212,6 +212,7 @@ namespace MogwaiNano.Engine
         private void RegisterPrimitives()
         {
             _primitives.Add("->type", new PrimitiveDelegate(PrimitiveGetType));
+            _primitives.Add("eval", new PrimitiveDelegate(PrimitiveEval));
 
             _primitives.Add("+", new PrimitiveDelegate(PrimitivePlus));
             _primitives.Add("-", new PrimitiveDelegate(PrimitiveMathSubstraction));
@@ -935,6 +936,15 @@ namespace MogwaiNano.Engine
             StackPush(n0.Type.Clone());
 
             return EvalResult.NoError;
+        }
+
+        private EvalResult PrimitiveEval(string name)
+        {
+            if (StackSize == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            var obj = StackPop();
+            return obj.UserEval();
         }
 
         private EvalResult PrimitiveStackClear(string name)

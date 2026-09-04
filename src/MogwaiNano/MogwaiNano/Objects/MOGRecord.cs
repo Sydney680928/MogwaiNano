@@ -29,15 +29,16 @@ namespace MogwaiNano.Objects
 
         }   
 
-        public MOGRecord(MogwaiNanoEngine engine, Hashtable items) : this(engine)
-        {
-            Items = items;
-        }
-
         public MOGRecord(MogwaiNanoEngine engine, string content) : this(engine)
         {
             var parser = new Parser(engine);
             var items = parser.Parse(content);
+
+            if (items.Count > 0 && items[0] is MOGWord word && word.Value == "!")
+            {
+                AutoEval = true;
+                items.RemoveAt(0);
+            }
 
             if (items.Count % 2 != 0)
                 throw new System.Exception("items must be in pairs");
@@ -88,7 +89,56 @@ namespace MogwaiNano.Objects
             foreach (var key in Keys)
                 obj.Keys.Add(key);
 
+            obj.AutoEval = AutoEval;
+
             return obj;
+        }
+
+        private EvalResult Eval()
+        {
+            foreach (var key in Keys)
+            {
+                var item = Items[key] as MOGObject;
+                var stackSize = Engine.StackSize;
+
+                var r = item.UserEval();
+
+                if (r != EvalResult.NoError)
+                    return r;              
+
+                if (Engine.StackSize > stackSize)
+                {
+                    var value = Engine.StackPop();
+                    Items[key] = value;
+                }
+            }
+
+            return EvalResult.NoError;
+        }
+
+        public override EvalResult UserEval()
+        {
+            var result = Eval();
+
+            if (result != EvalResult.NoError)
+                return result;
+
+            return base.EngineEval();
+        }
+
+        public override EvalResult EngineEval()
+        {
+            if (AutoEval)
+            {
+                AutoEval = false;
+
+                var result = Eval();
+
+                if (result != EvalResult.NoError)
+                    return result;
+            }
+
+            return base.EngineEval();
         }
 
         public override string ToString()
