@@ -124,7 +124,7 @@ namespace MogwaiNanoStudio
             "ssd1306.drawVerticalLine",
             "ssd1306.drawRectangle",    
             "ssd1306.drawFilledRectangle",
-            "ssd1306.drawBitmap"
+            "ssd1306.drawBitmap",
 
             "pwm.open",
             "pwm.close",
