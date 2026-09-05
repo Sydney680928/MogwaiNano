@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Structured error handling** — `TRAP`/`trap { ... }` protects a block of code: if it fails partway through, execution resumes right after the block with the stack automatically restored to its pre-`TRAP` state, rather than crashing the program. `GUARD`/`guard { ... } else { ... }` does the same but also runs a catch block on failure. `error.last` returns the last raised error's code (e.g. `"MW.40"`), `error.reset` clears it back to `"MW.0"` (not automatic — reset it once handled), and `error.throw` artificially raises a given error code. All four ported from the desktop MOGWAI engine with full parity
+- `->str` — converts an object to a string, ported from the desktop MOGWAI engine
+- **`eval`, with string interpolation and auto-eval on records/lists** — a new primitive, ported from the desktop MOGWAI engine: evaluates an object, with behavior depending on its type. A `MOGFunction`/`MOGCode` block is executed. A `MOGString` has its `{! ... }` placeholders resolved — running the RPN code inside the braces and substituting the result, not just a variable name, any expression: `"2x2={! 2 2 *}" eval` → `"2x2=4"`. A `MOGRecord`/`MOGList` has any dynamic elements it contains replaced by their current value. A `!` prefix on a record or list literal (`[! x: 10 y: A]`, `(! 1 2 3 A)`) auto-evaluates it immediately at construction, equivalent to appending `eval` — the same `!` marker already used for auto-evaluating code blocks (`{! ... }`), now extended uniformly to all three collection/block types
+
 ### Updated
 
 ### Fixed

@@ -75,8 +75,19 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 | `bcd->` | ⚙️ | `n bcd->` | Converts a BCD-encoded number back to decimal (e.g. `0x35 bcd->` → `35`) |
 | `->format` | 🔗 | `n "spec" ->format` → `.string` | Converts a number to a string using a .NET **standard** numeric format specifier — nanoFramework only supports `D`/`F`/`G`/`N`/`X` (with an optional precision digit), not custom format strings like `"000"`. E.g. `50 "D3" ->format` → `"050"`. Since `D` and `X` only apply to integers in .NET while `MOGNumber` is `float`-backed, the number is automatically cast to an integer first when the specifier is `D` or `X` (truncating any decimal part); `F`/`G`/`N` work directly on the float value with no cast |
 | `->num` | 🔗 | `"str" ->num` → `.number` | Converts a string to a number; raises an error if it isn't a valid one |
+| `->str` | 🔗 | `v ->str` → `.string` | Converts an object to a string |
 | `sub` | 🔗 | `v start extent sub` | Extracts a part of a `MOGString`, `MOGList`, `MOGData` or `.binary` value by start position and extent. An extent of `0` means "to the end". Also accepts a `MOGRef` (`&variable`) in place of `v`, dereferenced transparently |
 | `makeData` | ⚙️ | `size value makeData` → `.data` | Creates a `MOGData` of a given size, filled with a given byte value, without pushing each byte individually — avoids a memory spike compared to building the same buffer with `repeat`/`->data` |
+
+### Evaluation and string interpolation
+
+| Primitive | Origin | Signature | Description |
+|---|---|---|---|
+| `eval` | 🔗 | `v eval` | Evaluates an object, with behavior depending on its type: a `MOGFunction`/`MOGCode` block is executed; a `MOGString` has its `{! ... }` placeholders resolved (see below); a `MOGRecord` or `MOGList` has any dynamic elements it contains replaced by their current value |
+
+**String interpolation:** a `{! ... }` placeholder inside a string is replaced, on `eval`, by the result of evaluating the RPN code inside it — not just a variable name, any expression. `"Le nombre est {! A}" eval` (with `50 -> 'A'` beforehand) produces `"Le nombre est 50"`; `"2x2={! 2 2 *}" eval` produces `"2x2=4"`.
+
+**Auto-eval on records and lists:** a `MOGRecord`/`MOGList` literal prefixed with `!` evaluates its dynamic elements immediately at construction, without a separate `eval` call — `[! x: 10 y: A]` is equivalent to `[x: 10 y: A] eval`, and the same `!` prefix works identically on lists: `(! 1 2 3 A)` is equivalent to `(1 2 3 A) eval`. This is the same `!` marker already used for auto-evaluating code blocks (`{! ... }`), now extended uniformly to all three collection/block types.
 
 ### Variable extraction
 
@@ -122,12 +133,26 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 | `FORSTEP` | `for (start end step) 'var' do { ... }` | `start end step 'var' block FORSTEP` | Like `FOR`, with an explicit step (always taken as an absolute value — direction comes from `start`→`end`). Same loop variable reuse semantics as `FOR` |
 | `FOREVER` | `forever do { ... }` | `block FOREVER` | Loops indefinitely until `break` |
 | `FOREACH` | `foreach 'var' do { ... }` | `collection 'var' block FOREACH` | Iterates a `MOGList` (element by element), a `MOGData` (byte by byte, exposed as `.number`), or a `MOGString` (character by character, exposed as a single-character `.string`) |
+| `TRAP` | `trap { ... }` | `block TRAP` | Runs `block`; if an error occurs partway through, execution of the block stops there and continues right after `TRAP` — the stack is automatically restored to its state from before `TRAP` ran, so a failed protected block never leaves stray values behind |
+| `GUARD` | `guard { ... } else { ... }` | `tryBlock catchBlock GUARD` | Like `TRAP`, but runs `catchBlock` if `tryBlock` fails, with the same stack restoration guarantee |
 
 All loop forms interrupt cleanly if the executed block returns an error, and support `break` for early exit.
 
 ---
 
-## 3. Events and timers
+## 3. Error handling
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `error.last` | `error.last` → `.string` | Returns the code of the last error raised (e.g. `"MW.40"`), most useful inside a `GUARD`'s catch block or right after a `TRAP` |
+| `error.reset` | `error.reset` | Resets the last-error code back to `"MW.0"` (no error). This doesn't happen automatically — reset it once you're done handling an error |
+| `error.throw` | `"MW.xx" error.throw` | Artificially raises the given error code, as if the engine itself had encountered it |
+
+`TRAP`/`GUARD` (above) are the primitives you'll actually reach for to keep a program running past a failure; `error.*` is what you use to find out what went wrong and react accordingly.
+
+---
+
+## 4. Events and timers
 
 | Primitive (canonical) | Sugared form | Signature | Description |
 |---|---|---|---|
@@ -150,7 +175,7 @@ All of the above are 🔗 **Shared** with the desktop engine.
 
 ---
 
-## 4. Skills and flags
+## 5. Skills and flags
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -167,7 +192,7 @@ All of the above are 🔗 **Shared** with the desktop engine.
 
 ---
 
-## 5. Console and debug output
+## 6. Console and debug output
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -179,7 +204,7 @@ All three accept a `MOGRef` (`&variable`) and dereference it automatically befor
 
 ---
 
-## 6. System (`mogwai.*`)
+## 7. System (`mogwai.*`)
 
 All ⚙️ **NANO-only** (though most have a conceptual desktop equivalent).
 
@@ -209,7 +234,7 @@ Only the matching hook runs for a given program end — never more than one.
 
 ---
 
-## 7. GPIO
+## 8. GPIO
 
 All ⚙️ **NANO-only.** Every primitive takes a **pin number** (`.number`), not a name.
 
@@ -232,7 +257,7 @@ All ⚙️ **NANO-only.** Every primitive takes a **pin number** (`.number`), no
 
 ---
 
-## 8. I2C
+## 9. I2C
 
 All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather than repeating the bus/address pair on every call.
 
@@ -248,7 +273,7 @@ All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather th
 
 ---
 
-## 9. PWM
+## 10. PWM
 
 All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, following the same pattern as I2C. Requires the pin to already be configured for PWM via `device.setPinFunction` (see [ESP32 DeviceFunction values reference](esp32-device-function-values.md)) beforehand.
 
@@ -265,7 +290,7 @@ All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, followi
 
 ---
 
-## 10. SSD1306 OLED display
+## 11. SSD1306 OLED display
 
 All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `nanoFramework.Iot.Device.Ssd13xx` binding, built after dense per-pixel drawing in pure RPN proved impractically slow. Fixed to 128x64 resolution over I2C Fast Mode; only one display instance is supported at a time (no naming).
 
@@ -288,7 +313,7 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ---
 
-## 11. Device-level platform access
+## 12. Device-level platform access
 
 ⚙️ **NANO-only.**
 
