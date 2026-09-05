@@ -32,6 +32,7 @@ namespace MogwaiNano.Engine
             _tooFewArgumentsError,
             _badArgumentTypeError,
             _badArgumentValueError,
+            _stackSizeError,
 
             _divisionByZeroError,
             _mathematicalError,
@@ -94,6 +95,7 @@ namespace MogwaiNano.Engine
             _tooFewArgumentsError = RegisterError("MW.20", "too few arguments error");
             _badArgumentTypeError = RegisterError("MW.21", "bad argument type error");
             _badArgumentValueError = RegisterError("MW.22", "bad argument value error");
+            _stackSizeError = RegisterError("MW.23", "stack size error");
             
             _divisionByZeroError = RegisterError("MW.30", "division by zero error");
             _mathematicalError = RegisterError("MW.31", "mathematical error");
@@ -162,7 +164,9 @@ namespace MogwaiNano.Engine
         public static Error BadArgumentTypeError { get { EnsureInitialized(); return _badArgumentTypeError; } }
         
         public static Error BadArgumentValueError { get { EnsureInitialized(); return _badArgumentValueError; } }
-        
+
+        public static Error StackSizeError { get { EnsureInitialized(); return _stackSizeError; } }
+
         public static Error DivisionByZeroError { get { EnsureInitialized(); return _divisionByZeroError; } }
        
         public static Error MathematicalError { get { EnsureInitialized(); return _mathematicalError; } }
