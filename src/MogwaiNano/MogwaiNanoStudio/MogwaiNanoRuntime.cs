@@ -582,11 +582,12 @@ namespace MogwaiNanoStudio
                             var target = record.GetItem("target") as MOGString;
                             var ip = record.GetItem("ip") as MOGString;
                             var name = record.GetItem("name") as MOGString;
+                            var version = record.GetItem("version") as MOGString; 
 
-                            if (target != null && ip != null && name != null)
+                            if (target != null && ip != null && name != null && version != null)
                             {
                                 var n = name.Value.Length > 30 ? name.Value.Substring(0, 30) : name.Value;
-                                Console.WriteLine($"{c}: {n.PadRight(30)} - {ip.Value.PadRight(15)} - {target.Value}");
+                                Console.WriteLine($"{c}: {n.PadRight(30)} - v{version.Value.PadRight(10)} - {ip.Value.PadRight(15)} - {target.Value}");
                                 c++;
                             }
                         }

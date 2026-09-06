@@ -13,7 +13,7 @@ This page only covers Studio's own `nano.*` primitives. For everything that actu
 | `nano.connect` | `"ip" nano.connect` → `.boolean` | Connects to a device at a known IP address. Pushes `true`/`false` depending on success — a deliberate exception to the pattern used elsewhere in this reference: connecting is expected to sometimes fail, so a boolean fits a straightforward feasibility check |
 | `nano.disconnect` | `nano.disconnect` | Disconnects from the currently connected device |
 | `nano.isConnected` | `nano.isConnected` → `.boolean` | Tests whether a device is currently connected |
-| `nano.user.connect` | `nano.user.connect` → `.boolean` | Guided connection shortcut combining discovery, interactive selection, and connection in one call: scans for devices, lists the ones that responded for the user to pick from, and connects to the selected one. Pushes `true` on a successful connection, `false` if nothing responded, no device was selected, or the connection failed — same boolean convention as `nano.connect` |
+| `nano.user.connect` | `nano.user.connect` → `.boolean` | Guided connection shortcut combining discovery, interactive selection, and connection in one call: scans for devices, lists the ones that responded (with their name, firmware version, IP, and platform) for the user to pick from, and connects to the selected one. Pushes `true` on a successful connection, `false` if nothing responded, no device was selected, or the connection failed — same boolean convention as `nano.connect` |
 
 ## Units (reusable code libraries)
 
@@ -30,7 +30,7 @@ A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device'
 | Primitive | Signature | Description |
 |---|---|---|
 | `nano.scan` | `nano.scan` → `.list` | UDP network discovery (fixed 1s duration, with retransmission every 250ms to compensate for broadcast packet loss). Returns a list of records (`name`, `version`, `session`, `ip`, `platform`, `target`, `oem`, firmware version), deduplicated by IP. The `session` field is a random number generated once at boot, letting you detect a silent device reboot between two scans even without any visible error |
-| `nano.user.select` | `nano.user.select` → `.record` \| `.null` | Runs its own scan and displays the responding devices (name, platform, IP) for interactive console selection. Pushes the selected device's scan record on the stack, or `null` if aborted or nothing responded |
+| `nano.user.select` | `nano.user.select` → `.record` \| `.null` | Runs its own scan and displays the responding devices (name, firmware version, IP, platform) for interactive console selection. Pushes the selected device's scan record on the stack, or `null` if aborted or nothing responded |
 
 ## Running code
 
