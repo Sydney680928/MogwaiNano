@@ -243,6 +243,7 @@ namespace MogwaiNano.Engine
             _primitives.Add("set", new PrimitiveDelegate(PrimitiveSet));
             _primitives.Add("size", new PrimitiveDelegate(PrimitiveSize));
             _primitives.Add("purge", new PrimitiveDelegate(PrimitivePurge));
+            _primitives.Add("exists", new PrimitiveDelegate(PrimitiveExists));
 
             _primitives.Add("DI", new PrimitiveDelegate(PrimitiveDI));
             _primitives.Add("EI", new PrimitiveDelegate(PrimitiveEI));
@@ -1522,6 +1523,26 @@ namespace MogwaiNano.Engine
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
 
+        }
+
+        private EvalResult PrimitiveExists(string name)
+        {
+            var s = StackSign(1);
+            
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] == typeof(MOGName))
+            {
+                var varName = StackPop() as MOGName;
+                var exists = VarExists(varName.Value);
+               
+                StackPush(new MOGBoolean(this, exists));
+                
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
         private EvalResult PrimitiveDI(string name)
