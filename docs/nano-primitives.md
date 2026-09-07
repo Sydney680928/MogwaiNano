@@ -134,6 +134,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 | `FOR` | `for (start end) 'var' do { ... }` | `start end 'var' block FOR` | Loops from `start` to `end` inclusive (direction auto-detected). The loop variable object is reused and updated in place on every iteration for performance — a reference to it (`&var`) always reflects its *current* value, even after the loop has moved past that point. To keep a snapshot from a specific iteration, copy it explicitly (`var -> 'snapshot'`) |
 | `FORSTEP` | `for (start end step) 'var' do { ... }` | `start end step 'var' block FORSTEP` | Like `FOR`, with an explicit step (always taken as an absolute value — direction comes from `start`→`end`). Same loop variable reuse semantics as `FOR` |
 | `FOREVER` | `forever do { ... }` | `block FOREVER` | Loops indefinitely until `break` |
+| `DURING` | `during <ms> do { ... }` | `duration block DURING` | Repeats `block` for the given `duration` (milliseconds), then stops — a time-bounded `FOREVER` rather than a count- or condition-bounded loop. Also supports `break` for early exit |
 | `FOREACH` | `foreach 'var' do { ... }` | `collection 'var' block FOREACH` | Iterates a `MOGList` (element by element), a `MOGData` (byte by byte, exposed as `.number`), or a `MOGString` (character by character, exposed as a single-character `.string`) |
 | `TRAP` | `trap { ... }` | `block TRAP` | Runs `block`; if an error occurs partway through, execution of the block stops there and continues right after `TRAP` — the stack is automatically restored to its state from before `TRAP` ran, so a failed protected block never leaves stray values behind |
 | `GUARD` | `guard { ... } else { ... }` | `tryBlock catchBlock GUARD` | Like `TRAP`, but runs `catchBlock` if `tryBlock` fails, with the same stack restoration guarantee |
@@ -177,7 +178,24 @@ All of the above are 🔗 **Shared** with the desktop engine.
 
 ---
 
-## 5. Skills and flags
+## 5. Stopwatch
+
+⚙️ **NANO-only.** Named timers for measuring elapsed time, following the same by-name management pattern as I2C/PWM/ADC.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `stopwatch.create` | `'name' stopwatch.create` | Creates a named stopwatch, initially stopped. Refuses to create one under an already-used name (`MW.41`) |
+| `stopwatch.purge` | `'name' stopwatch.purge` | Removes a stopwatch entirely |
+| `stopwatch.start` | `'name' stopwatch.start` | Starts (or resumes) timing |
+| `stopwatch.stop` | `'name' stopwatch.stop` | Pauses timing, keeping the elapsed time so far |
+| `stopwatch.reset` | `'name' stopwatch.reset` | Stops and zeroes the elapsed time |
+| `stopwatch.restart` | `'name' stopwatch.restart` | Equivalent to `reset` followed immediately by `start` |
+| `stopwatch.isRunning` | `'name' stopwatch.isRunning` → `.boolean` | Tests whether the stopwatch is currently running |
+| `stopwatch.elapsed` | `'name' stopwatch.elapsed` → `.number` | Elapsed time in milliseconds |
+
+---
+
+## 6. Skills and flags
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -194,7 +212,7 @@ All of the above are 🔗 **Shared** with the desktop engine.
 
 ---
 
-## 6. Console and debug output
+## 7. Console and debug output
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -206,7 +224,7 @@ All three accept a `MOGRef` (`&variable`) and dereference it automatically befor
 
 ---
 
-## 7. System (`mogwai.*`)
+## 8. System (`mogwai.*`)
 
 All ⚙️ **NANO-only** (though most have a conceptual desktop equivalent).
 
@@ -236,7 +254,7 @@ Only the matching hook runs for a given program end — never more than one.
 
 ---
 
-## 8. GPIO
+## 9. GPIO
 
 All ⚙️ **NANO-only.** Every primitive takes a **pin number** (`.number`), not a name.
 
@@ -259,7 +277,7 @@ All ⚙️ **NANO-only.** Every primitive takes a **pin number** (`.number`), no
 
 ---
 
-## 9. I2C
+## 10. I2C
 
 All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather than repeating the bus/address pair on every call.
 
@@ -275,7 +293,7 @@ All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather th
 
 ---
 
-## 10. PWM
+## 11. PWM
 
 All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, following the same pattern as I2C. Requires the pin to already be configured for PWM via `device.setPinFunction` (see [ESP32 DeviceFunction values reference](esp32-device-function-values.md)) beforehand.
 
@@ -292,7 +310,7 @@ All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, followi
 
 ---
 
-## 11. SSD1306 OLED display
+## 12. SSD1306 OLED display
 
 All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `nanoFramework.Iot.Device.Ssd13xx` binding, built after dense per-pixel drawing in pure RPN proved impractically slow. Fixed to 128x64 resolution over I2C Fast Mode; only one display instance is supported at a time (no naming).
 
@@ -315,7 +333,7 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ---
 
-## 12. Device-level platform access
+## 13. Device-level platform access
 
 ⚙️ **NANO-only.**
 

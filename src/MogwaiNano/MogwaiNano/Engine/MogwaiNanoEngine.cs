@@ -70,6 +70,7 @@ namespace MogwaiNano.Engine
         private Hashtable _pwmChannels = new(2);
         private Hashtable _adcChannels = new(2);
         private AdcController _adcController;
+        private Hashtable _stopwatches = new(2);
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -355,6 +356,15 @@ namespace MogwaiNano.Engine
 
             _primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
 
+            _primitives.Add("stopwatch.create", new PrimitiveDelegate(PrimitiveStopwatchCreate));   
+            _primitives.Add("stopwatch.start", new PrimitiveDelegate(PrimitiveStopwatchStart));
+            _primitives.Add("stopwatch.stop", new PrimitiveDelegate(PrimitiveStopwatchStop));
+            _primitives.Add("stopwatch.reset", new PrimitiveDelegate(PrimitiveStopwatchReset));
+            _primitives.Add("stopwatch.restart", new PrimitiveDelegate(PrimitiveStopwatchRestart));
+            _primitives.Add("stopwatch.isRunning", new PrimitiveDelegate(PrimitiveStopwatchIsRunning));
+            _primitives.Add("stopwatch.elapsed", new PrimitiveDelegate(PrimitiveStopwatchElapsed));
+            _primitives.Add("stopwatch.purge", new PrimitiveDelegate(PrimitiveStopwatchPurge));
+
             _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
             _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
             _primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));
@@ -367,6 +377,7 @@ namespace MogwaiNano.Engine
             _primitives.Add("FOREACH", new PrimitiveDelegate(PrimitiveForeach));
             _primitives.Add("TRAP", new PrimitiveDelegate(PrimitiveTrap));
             _primitives.Add("GUARD", new PrimitiveDelegate(PrimitiveGuard));
+            _primitives.Add("DURING", new PrimitiveDelegate(PrimitiveDuring));    
         }
 
         private void RunLoop()
@@ -525,11 +536,13 @@ namespace MogwaiNano.Engine
 
         public void Reset(bool keepAlive = false)
         {
-            ClearTimers();
+            CleanupStopwatchs();
 
-            ClearEvents();
+            CleanupTimers();
 
-            ClearWaitingFireObjects();
+            CleanupEvents();
+
+            CleanupWaitingFireObjects();
 
             CleanupOpenPins();
 
@@ -589,41 +602,6 @@ namespace MogwaiNano.Engine
                 }
             }
         }
-
-        #region STACK
-
-        public void AddNewStack()
-        {
-            _currentStack = new MOGStack();
-            _stacks.Add(_currentStack);
-        }
-
-        public void RemoveLastStack()
-        {
-            if (_stacks.Count > 1)
-            {
-                _stacks.RemoveAt(_stacks.Count - 1);
-                _currentStack = _stacks[_stacks.Count - 1] as MOGStack;
-            }
-        }
-
-        public int StackSize => _currentStack.Count;
-
-        public void StackPush(MOGObject item) => _currentStack.Push(item);
-
-        public MOGObject StackPop() => _currentStack.Pop();
-
-        public Type[] StackSign(int count) => _currentStack.Sign(count);
-
-        public void StackClear() => _currentStack.Clear();
-
-        public bool StackSwap() => _currentStack.Swap();
-
-        public void StackDup() => _currentStack.Dup();
-
-        public void StackDrop() => _currentStack.Drop();
-
-        #endregion
 
         #region PRIMITIVES
 
@@ -2323,6 +2301,48 @@ namespace MogwaiNano.Engine
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
         }
 
+        private EvalResult PrimitiveDuring(string name)
+        {
+            // number {code} DURING
+
+            var s = StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGNumber))
+            {
+                var code = StackPop() as MOGCode;
+                var duration = StackPop() as MOGNumber;
+
+                if (duration.Value < 0)
+                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+
+                var result = EvalResult.NoError;
+                var stopWatch = Stopwatch.StartNew();
+
+                while (stopWatch.Elapsed.TotalMilliseconds < duration.Value)
+                {
+                    if (BreakRequested) // || ExitRequested || ReturnRequested)
+                    {
+                        BreakRequested = false;
+                        break;
+                    }
+
+                    result = code.Execute();
+
+                    if (result != EvalResult.NoError)
+                        break;
+                }
+
+                stopWatch.Stop();
+
+                return result;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
         private EvalResult PrimitiveErrorLast(string name)
         {
             StackPush(new MOGString(this, LastError.Code));
@@ -3476,6 +3496,211 @@ namespace MogwaiNano.Engine
 
         #endregion
 
+        #region STOPWATCHS
+
+        private EvalResult PrimitiveStopwatchCreate(string name)
+        {
+            // 'name' stopwatch.create  
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+
+                if (_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.NameAlreadyExistsError, name, stopwatchName.Value);
+
+                _stopwatches.Add(stopwatchName.Value, new Stopwatch());
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStopwatchStart(string name)
+        {
+            // 'name' stopwatch.start
+
+            var s = StackSign(1);
+            
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+                
+                if (!_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+
+                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                sw.Start();
+                
+                return EvalResult.NoError;
+            }
+            
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStopwatchStop(string name)
+        {
+            // 'name' stopwatch.stop
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+
+                if (!_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+
+                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                sw.Stop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStopwatchReset(string name)
+        {
+            // 'name' stopwatch.reset
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+
+                if (!_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+
+                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                sw.Reset();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStopwatchRestart(string name)
+        {
+            // 'name' stopwatch.restart
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+
+                if (!_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+
+                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                sw.Restart();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStopwatchIsRunning(string name)
+        {
+            // 'name' stopwatch.isRunning
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+
+                if (!_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+
+                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                StackPush(new MOGBoolean(this, sw.IsRunning));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStopwatchPurge(string name)
+        {
+            // 'name' stopwatch.purge
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+
+                if (!_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+
+                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                sw.Stop();
+
+                _stopwatches.Remove(stopwatchName.Value);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveStopwatchElapsed(string name)
+        {
+            // 'name' stopwatch.elapsed
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var stopwatchName = StackPop() as MOGName;
+
+                if (!_stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+
+                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                StackPush(new MOGNumber(this, sw.ElapsedMilliseconds));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        #endregion
+
         #region GPIO
 
         private EvalResult PrimitiveGpioModeInput(string name) => SetPinMode(name, PinMode.Input);
@@ -4587,6 +4812,41 @@ namespace MogwaiNano.Engine
 
         #endregion
 
+        #region STACK
+
+        public void AddNewStack()
+        {
+            _currentStack = new MOGStack();
+            _stacks.Add(_currentStack);
+        }
+
+        public void RemoveLastStack()
+        {
+            if (_stacks.Count > 1)
+            {
+                _stacks.RemoveAt(_stacks.Count - 1);
+                _currentStack = _stacks[_stacks.Count - 1] as MOGStack;
+            }
+        }
+
+        public int StackSize => _currentStack.Count;
+
+        public void StackPush(MOGObject item) => _currentStack.Push(item);
+
+        public MOGObject StackPop() => _currentStack.Pop();
+
+        public Type[] StackSign(int count) => _currentStack.Sign(count);
+
+        public void StackClear() => _currentStack.Clear();
+
+        public bool StackSwap() => _currentStack.Swap();
+
+        public void StackDup() => _currentStack.Dup();
+
+        public void StackDrop() => _currentStack.Drop();
+
+        #endregion
+
         #region VARS
 
         public EvalResult VarWrite(string name, MOGObject value)
@@ -4744,21 +5004,10 @@ namespace MogwaiNano.Engine
                 _fireObjectsQueue.Enqueue(fireObject);
         }
 
-        public void ClearWaitingFireObjects()
+        public void CleanupWaitingFireObjects()
         {
             lock (_fireObjectsQueueLock)
                 _fireObjectsQueue.Clear();
-        }
-
-        public void ClearTimers()
-        {
-            foreach (var key in _timers.Keys)
-            {
-                var timer = _timers[key] as MOGTimer;
-                timer.Stop();
-            }
-
-            _timers.Clear();
         }
 
         public bool HasWaitingFireObjects => !_disableInterrupts && _fireObjectsQueue.Count > 0;
@@ -4815,9 +5064,20 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
+        public void CleanupTimers()
+        {
+            foreach (var key in _timers.Keys)
+            {
+                var timer = _timers[key] as MOGTimer;
+                timer.Stop();
+            }
+
+            _timers.Clear();
+        }
+
         #endregion
 
-        #region EVENT FUNCTIONS
+        #region EVENTS
 
         public bool EventExists(string name) => _events.Contains(name);
 
@@ -4886,9 +5146,24 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public void ClearEvents()
+        public void CleanupEvents()
         {
             _events.Clear();
+        }
+
+        #endregion
+
+        #region STOPWATCHS
+
+        private void CleanupStopwatchs()
+        {
+            foreach (var key in _stopwatches.Keys)
+            {
+                var stopwatch = _stopwatches[key] as Stopwatch;
+                stopwatch.Stop();
+            }
+
+            _stopwatches.Clear();
         }
 
         #endregion
