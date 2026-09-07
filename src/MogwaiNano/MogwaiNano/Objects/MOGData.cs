@@ -86,6 +86,32 @@ namespace MogwaiNano.Objects
             return false;
         }
 
+        public EvalResult RemoveItem(int index)
+        {
+            if (index < 0 || index >= Items.Length)
+                return EvalResult.Failure(Engine, Error.BadArgumentValueError);
+
+            var newItems = new byte[Items.Length - 1];
+
+            if (index == 0)
+            {
+                Array.Copy(Items, 1, newItems, 0, Items.Length - 1);
+            }
+            else if (index == Items.Length - 1)
+            {
+                Array.Copy(Items, 0, newItems, 0, Items.Length - 1);
+            }
+            else
+            {
+                Array.Copy(Items, 0, newItems, 0, index);
+                Array.Copy(Items, index + 1, newItems, index, Items.Length - index - 1);
+            }
+
+            Items = newItems;
+
+            return EvalResult.NoError;
+        }
+
         public override MOGObject Clone()
         {
             var newItems = new byte[Items.Length];

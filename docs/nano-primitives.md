@@ -102,6 +102,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
 | `STO` (canonical; write `->`) | 🔗 | `value -> 'name'` | Stores a value into a variable |
+| `purge` | 🔗 | see below | Removes an element — behavior depends on what's on the stack: `'name' purge` deletes a variable (e.g. `'$A' purge`); `record key: purge` removes a key from a `MOGRecord` (`[x: 10 y: 20] x: purge` → `[y: 20]`); `list index purge` removes an item from a `MOGList` by index (`(1 2 3 4) 1 purge` → `(1 3 4)`); `data index purge` removes a byte from a `MOGData` by index (`D:FF5634 1 purge` → `D:FF34`) |
 
 ### Function definition
 

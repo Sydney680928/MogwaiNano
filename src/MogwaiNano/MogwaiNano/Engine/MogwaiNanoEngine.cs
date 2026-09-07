@@ -242,6 +242,7 @@ namespace MogwaiNano.Engine
             _primitives.Add("get", new PrimitiveDelegate(PrimitiveGet));
             _primitives.Add("set", new PrimitiveDelegate(PrimitiveSet));
             _primitives.Add("size", new PrimitiveDelegate(PrimitiveSize));
+            _primitives.Add("purge", new PrimitiveDelegate(PrimitivePurge));
 
             _primitives.Add("DI", new PrimitiveDelegate(PrimitiveDI));
             _primitives.Add("EI", new PrimitiveDelegate(PrimitiveEI));
@@ -1379,6 +1380,148 @@ namespace MogwaiNano.Engine
             }
 
             return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitivePurge(string name)
+        {
+            // 'A' purge
+
+            var s = StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var varName = StackPop() as MOGName;
+
+                if (VarPurge(varName.Value))
+                    return EvalResult.NoError;
+
+                return EvalResult.Failure(this, Error.UnknownNameError, name, varName.Value);
+            }
+            else if (s[0] == typeof(MOGKey))
+            {
+                s = StackSign(2);
+
+                if (s.Length == 0)
+                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+                if (s[0] == typeof(MOGKey) && s[1] == typeof(MOGRecord))
+                {
+                    var key = StackPop() as MOGKey;
+                    var record = StackPop() as MOGRecord;
+
+                    if (record.RemoveItem(key.Value))
+                    {
+                        StackPush(record);
+                        return EvalResult.NoError;
+                    }
+
+                    return EvalResult.Failure(this, Error.UnknownKeyError, name, key.Value);
+                }
+                else if (s[1] == typeof(MOGRef))
+                {
+                    var n0 = StackPop();
+
+                    var reference = StackPop() as MOGRef;
+                    var value = VarRead(reference.Value, false);
+
+                    if (value == null)
+                        return EvalResult.Failure(this, Error.UnknownNameError, name, reference.ToString());
+
+                    // Le contenu de la variable doit être de type record
+
+                    if (value is MOGRecord)
+                    {
+                        StackPush(value);
+                        StackPush(n0);
+
+                        var r = PrimitivePurge(name);
+
+                        if (r.IsError)
+                            return r;
+
+                        // On enlève la valeur modifiée de la stack qui ne sert à rien
+
+                        StackDrop();
+
+                        return EvalResult.NoError;
+                    }
+                    else
+                    {
+                        return EvalResult.Failure(this, Error.BadArgumentTypeError, name, reference.ToString(), $"var type .{value.Type.Value} not allowed");
+                    }
+                }
+            }
+            else if (s[0] == typeof(MOGNumber))
+            {
+                s = StackSign(2);
+
+                if (s.Length == 0)
+                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+
+                if (s[1] == typeof(MOGList))
+                {
+                    var index = StackPop() as MOGNumber;
+                    var list = StackPop() as MOGList;
+
+                    var result = list.RemoveItem((int)index.Value);
+
+                    if (result == EvalResult.NoError)
+                        StackPush(list);
+
+                    return result;
+                }
+                else if (s[1] == typeof(MOGData))
+                {
+                    var index = StackPop() as MOGNumber;
+                    var data = StackPop() as MOGData;
+
+                    var result = data.RemoveItem((int)index.Value);
+
+                    if (result == EvalResult.NoError)
+                        StackPush(data);
+
+                    return result;
+                }
+                else if (s[1] == typeof(MOGRef))
+                {
+                    var n0 = StackPop();
+
+                    var reference = StackPop() as MOGRef;
+                    var value = VarRead(reference.Value, false);
+
+                    if (value == null)
+                        return EvalResult.Failure(this, Error.UnknownNameError, name, reference.ToString());
+
+                    // Le contenu de la variable doit être de type list ou data
+
+                    if (value is MOGList || value is MOGData)
+                    {
+                        StackPush(value);
+                        StackPush(n0);
+
+                        var r = PrimitivePurge(name);
+
+                        if (r.IsError)
+                            return r;
+
+                        // On enlève la valeur modifiée de la stack qui ne sert à rien
+
+                        StackDrop();
+
+                        return EvalResult.NoError;
+                    }
+                    else
+                    {
+                        return EvalResult.Failure(this, Error.BadArgumentTypeError, name, reference.ToString(), $"var type .{value.Type.Value} not allowed");
+                    }
+                }
+            }
+
+            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+
         }
 
         private EvalResult PrimitiveDI(string name)

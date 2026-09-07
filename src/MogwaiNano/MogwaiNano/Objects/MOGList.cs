@@ -63,7 +63,16 @@ namespace MogwaiNano.Objects
             }
 
             return false;
-        }   
+        }
+
+        public EvalResult RemoveItem(int index)
+        {
+            if (index < 0 || index >= Items.Count)
+                return EvalResult.Failure(Engine, Error.BadArgumentValueError);
+
+            Items.RemoveAt(index);
+            return EvalResult.NoError;
+        }
 
         public override MOGObject Clone()
         {

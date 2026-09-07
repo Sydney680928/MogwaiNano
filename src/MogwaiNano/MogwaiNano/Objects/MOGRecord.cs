@@ -20,7 +20,7 @@ namespace MogwaiNano.Objects
 {
     public class MOGRecord : MOGObject
     {
-        public ArrayList Keys = new ArrayList();
+        public ArrayList Keys { get; private set; } = new ArrayList();
         
         public Hashtable Items { get; } = new();
 
@@ -74,6 +74,19 @@ namespace MogwaiNano.Objects
                 Items.Add(key, value);
                 Keys.Add(key);
             }   
+        }
+
+        public bool RemoveItem(string key)
+        {
+            if (Keys.Contains(key))
+            {
+                Keys.Remove(key);
+                Items.Remove(key);
+
+                return true;
+            }
+
+            return false;
         }
 
         public override MOGObject Clone()

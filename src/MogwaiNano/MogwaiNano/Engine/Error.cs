@@ -44,6 +44,7 @@ namespace MogwaiNano.Engine
             _nameAlreadyUsedByFunctionError,
             _nameAlreadyUsedByVarError,
             _invalidNameError,
+            _unknownKeyError,
             _unableToWriteValueError,
 
             _unknownWordError,
@@ -106,6 +107,7 @@ namespace MogwaiNano.Engine
             _functionAlreadyExistsError = RegisterError("MW.42", "function already exists error");
             _nameAlreadyUsedByFunctionError = RegisterError("MW.43", "name already used by function error");
             _nameAlreadyUsedByVarError = RegisterError("MW.44", "name already used by var error");
+            _unknownKeyError = RegisterError("MW.45", "unknown key error");
             _invalidNameError = RegisterError("MW.46", "invalid name error");
             _unableToWriteValueError = RegisterError("MW.47", "unable to write value in var error");
             
@@ -174,6 +176,8 @@ namespace MogwaiNano.Engine
         public static Error ConvertError { get { EnsureInitialized(); return _convertError; } }
         
         public static Error UnknownNameError { get { EnsureInitialized(); return _unknownNameError; } }
+
+        public static Error UnknownKeyError { get { EnsureInitialized(); return _unknownKeyError; } }
         
         public static Error NameAlreadyExistsError { get { EnsureInitialized(); return _nameAlreadyExistsError; } }
         
