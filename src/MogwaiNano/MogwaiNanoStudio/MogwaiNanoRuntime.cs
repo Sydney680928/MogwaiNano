@@ -46,8 +46,6 @@ namespace MogwaiNanoStudio
 
         public bool IsRunning { get; private set; } = false;
 
-        public bool DisplayMessages { get; set; } = false;
-
         public bool ViewMode { get; private set; } = false; 
 
         public bool ExitViewModeRequested { get; set; } = false;    
@@ -115,6 +113,21 @@ namespace MogwaiNanoStudio
             }
         }
 
+        private void MogwaiNanoRuntime_NanoDebugWrite(string message)
+        {
+            Console.WriteLine($"[DBG] {message}");
+        }
+
+        private void MogwaiNanoRuntime_NanoPrint(string message)
+        {
+            Console.Write(message);
+        }
+
+        private void MogwaiNanoRuntime_NanoPrintLn(string message)
+        {
+            Console.WriteLine(message);
+        }
+
         public bool Halt()
         {
             try
@@ -142,8 +155,6 @@ namespace MogwaiNanoStudio
             if (responseState.Parameters[0] != "IDLE")
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceBusyError);
 
-            DisplayMessages = false;
-
             IsRunning = false;
 
             try
@@ -156,7 +167,7 @@ namespace MogwaiNanoStudio
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
             }
 
-            var startResponse = await WaitResponse("PROGRAM.DID.START");
+            var startResponse = await WaitResponse("PROGRAM.DID.START", 30000);
 
             if (startResponse == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -168,7 +179,11 @@ namespace MogwaiNanoStudio
         {
             if (!AppGlobal.NanoClient.IsConnected)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
-                
+
+            NanoPrint += MogwaiNanoRuntime_NanoPrint;
+            NanoPrintLn += MogwaiNanoRuntime_NanoPrintLn;
+            NanoDebugWrite += MogwaiNanoRuntime_NanoDebugWrite;
+
             Console.WriteLine();
             Console.WriteLine("──── Start view mode (press CTRL-C to exit) ─────────────");
             Console.WriteLine();
@@ -177,13 +192,13 @@ namespace MogwaiNanoStudio
 
             if (IsRunning)
             {                
-                DisplayMessages = true;
                 ViewMode = true;
-
                 await WaitNanoProgramDidEnd();
             }
 
-            DisplayMessages = false;
+            NanoPrint -= MogwaiNanoRuntime_NanoPrint;
+            NanoPrintLn -= MogwaiNanoRuntime_NanoPrintLn;
+            NanoDebugWrite -= MogwaiNanoRuntime_NanoDebugWrite;
 
             if (!ExitViewModeRequested)
             {
@@ -207,7 +222,6 @@ namespace MogwaiNanoStudio
             Console.WriteLine("──── Exit view mode ──────────────────────────────────");
             Console.WriteLine();
 
-            DisplayMessages = false;
             ViewMode = false;
             ExitViewModeRequested = false;
 
@@ -666,18 +680,12 @@ namespace MogwaiNanoStudio
                 await Task.Delay(100);
 
                 if (ExitViewModeRequested || _engine.HaltRequested)
-                {
-                    DisplayMessages = false;
                     return;
-                }
 
                 var r = await _engine.Yield();
 
                 if (r.IsError)
-                {
-                    DisplayMessages = false;
                     return;
-                }
             }
         }
 

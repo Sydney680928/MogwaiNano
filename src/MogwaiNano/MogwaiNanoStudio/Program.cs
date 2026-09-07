@@ -22,6 +22,8 @@ CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
 
 AppGlobal.MogwaiEngine.AllowPrivatePrimitives = true;
 
+/*
+
 AppGlobal.NanoRuntime.NanoDebugWrite += (message) =>
 {
     if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.DisplayMessages)
@@ -39,6 +41,8 @@ AppGlobal.NanoRuntime.NanoPrintLn += (message) =>
     if (AppGlobal.NanoRuntime.IsRunning && AppGlobal.NanoRuntime.DisplayMessages)
         Console.WriteLine(message);
 };
+
+*/
 
 AppGlobal.EngineDelegate.NanoConnect += (name, address) =>
 {
