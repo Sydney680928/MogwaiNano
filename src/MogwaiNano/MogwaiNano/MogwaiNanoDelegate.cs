@@ -28,15 +28,20 @@ namespace MogwaiNano
 
         public void ProgramEnd(MogwaiNanoEngine engine, EvalResult result)
         {
-            var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.END", result.ToString());
-            AppGlobal.TcpServer.EnqueueMessage(msg);
+            if (!engine.IsTask)
+            {
+                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.END", result.ToString());
+                AppGlobal.TcpServer.EnqueueMessage(msg);
+            }
         }
 
         public void ProgramStart(MogwaiNanoEngine engine, string code)
         {
-            var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.START");
-            AppGlobal.TcpServer.EnqueueMessage(msg);
-
+            if (!engine.IsTask)
+            {
+                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.START");
+                AppGlobal.TcpServer.EnqueueMessage(msg);
+            }
         }
 
         public EvalResult DebugMessage(MogwaiNanoEngine engine, string message)

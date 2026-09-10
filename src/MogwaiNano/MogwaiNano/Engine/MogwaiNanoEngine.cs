@@ -109,6 +109,8 @@ namespace MogwaiNano.Engine
 
         public Ssd1306 Ssd1306 { get; set; }
 
+        public Hashtable Tasks { get; } = new(2);
+
         public Error LastError
         {
             get
@@ -160,6 +162,8 @@ namespace MogwaiNano.Engine
 
         public MOGObject TaskResult { get; set; }
 
+        public bool IsTask => MotherEngine != null;
+
         static MogwaiNanoEngine()
         {
             // load primitives
@@ -170,6 +174,7 @@ namespace MogwaiNano.Engine
         public MogwaiNanoEngine(string name = "MogwaiNanoEngine")
         {
             Name = name;
+            TaskResult = new MOGNull(this);
 
             // Create general parser 
 
@@ -329,6 +334,21 @@ namespace MogwaiNano.Engine
             Primitives.Add("flag.isSet", new PrimitiveDelegate(PrimitiveFlagIsSet));
             Primitives.Add("flag.isClear", new PrimitiveDelegate(PrimitiveFlagIsClear));
 
+            Primitives.Add("TASK.DEF", new PrimitiveDelegate(PrimitiveTaskDef));
+            Primitives.Add("task.list", new PrimitiveDelegate(PrimitiveTaskList));
+            Primitives.Add("TASK.START", new PrimitiveDelegate(PrimitiveTaskStartWithParameter));
+            Primitives.Add("task.isRunning", new PrimitiveDelegate(PrimitiveTaskIsRunning));
+            Primitives.Add("task.start", new PrimitiveDelegate(PrimitiveTaskStartWithoutParameter));
+            Primitives.Add("task.stop", new PrimitiveDelegate(PrimitiveTaskStop));
+            Primitives.Add("task.purge", new PrimitiveDelegate(PrimitiveTaskPurge));
+            Primitives.Add("task.publish", new PrimitiveDelegate(PrimitiveTaskPublish));
+            Primitives.Add("task.send", new PrimitiveDelegate(PrimitiveTaskSend));
+            Primitives.Add("task.setResult", new PrimitiveDelegate(PrimitiveTaskSetResult));
+            Primitives.Add("task.result", new PrimitiveDelegate(PrimitiveTaskGetResult));
+            Primitives.Add("task.name", new PrimitiveDelegate(PrimitiveTaskGetName));
+            Primitives.Add("task.wait", new PrimitiveDelegate(PrimitiveTaskWait));
+            Primitives.Add("task.join", new PrimitiveDelegate(PrimitiveTaskJoin));
+
             Primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
 
             Primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));    
@@ -344,6 +364,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("mogwai.frugalMode", new PrimitiveDelegate(PrimitiveMogwaiFrugalMode));
             Primitives.Add("mogwai.units", new PrimitiveDelegate(PrimitiveGetUnits));
             Primitives.Add("mogwai.units.run", new PrimitiveDelegate(PrimitiveRunUnit));
+            Primitives.Add("mogwai.isTask", new PrimitiveDelegate(PrimitiveIsTask));    
 
             Primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
             Primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
@@ -474,6 +495,9 @@ namespace MogwaiNano.Engine
 
                 var stopwatch = Stopwatch.StartNew();
 
+                if (MotherEngine != null && TaskName != null)
+                    MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_START, new MOGName(MotherEngine, TaskName));
+
                 if (Delegate != null)
                     Delegate.ProgramStart(this, code);
 
@@ -489,6 +513,16 @@ namespace MogwaiNano.Engine
                     stopwatch.Stop();
 
                     LastResult = EvalResult.ParseFailure(this, ex.Message);
+
+                    if (IsTask)
+                    {
+                        var failureInformations = new MOGRecord(MotherEngine);
+                        failureInformations.Items["task"] = new MOGName(MotherEngine, TaskName);
+                        failureInformations.Items["error"] = new MOGString(MotherEngine, LastResult.Error.Code);
+                        failureInformations.Items["message"] = new MOGString(MotherEngine, LastResult.Error.Message);
+
+                        MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_FAIL, failureInformations);
+                    }
 
                     if (Delegate != null)
                         Delegate.ProgramEnd(this, LastResult);
@@ -536,19 +570,42 @@ namespace MogwaiNano.Engine
                 stopwatch.Stop();
                 result.Duration = stopwatch.Elapsed;
 
-                Reset();
-
                 // _debugMode = false;
 
                 LastResult = result;
 
                 if (Delegate != null)
                     Delegate.ProgramEnd(this, result);
-              
-                return result;
+
+                if (LastResult != EvalResult.NoError)
+                {
+                    if (MotherEngine != null && TaskName != null)
+                    {
+                        var failureInformations = new MOGRecord(MotherEngine);
+                        failureInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                        failureInformations.SetItem("error", new MOGString(MotherEngine, LastResult.Error.Code));
+                        failureInformations.SetItem("message", new MOGString(MotherEngine, LastResult.Error.Message));
+
+                        MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_FAIL, failureInformations);
+                    }
+                }
+                else
+                {
+                    if (MotherEngine != null && TaskName != null)
+                    {
+                        var endInformations = new MOGRecord(MotherEngine);
+                        endInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                        endInformations.SetItem("result",TaskResult);
+
+                        MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_END, endInformations);
+                    }
+                }
+
+                return LastResult;
             }
             finally
             {
+                Reset();
                 GC.Run(true);
                 IsRunning = false;
             }
@@ -569,6 +626,8 @@ namespace MogwaiNano.Engine
 
         public void Reset(bool keepAlive = false)
         {
+            CleanupTasks();
+
             CleanupStopwatchs();
 
             CleanupTimers();
@@ -3328,7 +3387,342 @@ namespace MogwaiNano.Engine
             }
 
             return EvalResult.NoError;
-        }   
+        }
+
+        #region TASKS
+
+        private static EvalResult PrimitiveIsTask(MogwaiNanoEngine engine, string name)
+        {
+            engine.StackPush(new MOGBoolean(engine, engine.IsTask));    
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveTaskDef(MogwaiNanoEngine engine, string name)
+        {
+            // name function TASK.DEF
+
+            var s = engine.StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGFunction) && s[1] == typeof(MOGName))
+            {
+                var function = engine.StackPop() as MOGFunction;
+                var taskName = engine.StackPop() as MOGName;
+
+                return engine.CreateTask(taskName.Value, function.ToStringCode());
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskList(MogwaiNanoEngine engine, string name)
+        {
+            var list = new MOGList(engine);
+
+            foreach (string task in engine.Tasks.Keys)
+            {
+                list.AddItem(new MOGName(engine, task));
+            }
+
+            engine.StackPush(list);
+
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveTaskStartWithParameter(MogwaiNanoEngine engine, string name)
+        {
+            // name object TASK.START
+            // objet is a parameter for the task's job
+
+            var s = engine.StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[1] == typeof(MOGName))
+            {
+                var parameter = engine.StackPop();
+                var taskName = engine.StackPop() as MOGName;
+
+                var task = engine.GetTask(taskName.Value);
+
+                if (task == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, taskName.ToString());
+                
+                string paramString = null;
+
+                if (parameter is not MOGNull)
+                    paramString = parameter.ToString();
+
+                return task.Start(paramString);
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskStartWithoutParameter(MogwaiNanoEngine engine, string name)
+        {
+            // name TASK.START
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var taskName = engine.StackPop() as MOGName;
+                var task = engine.GetTask(taskName.Value);
+
+                if (task == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, taskName.ToString());
+
+                return task.Start();
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskIsRunning(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var taskName = engine.StackPop() as MOGName;
+                var task = engine.GetTask(taskName.Value);
+
+                if (task == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name);
+
+                engine.StackPush(new MOGBoolean(engine, task.Status == MOGTask.TaskStatus.Running));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskStop(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var taskName = engine.StackPop() as MOGName;
+                var task = engine.GetTask(taskName.Value);
+
+                if (task == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name);
+
+                task.Stop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskPurge(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var taskName = engine.StackPop() as MOGName;
+                return engine.TaskPurge(taskName.Value);   
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskPublish(MogwaiNanoEngine engine, string name)
+        {
+            // message task.publish
+
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            var message = engine.StackPop();
+            return engine.TaskPublish(message.ToString());
+        }
+
+        private static EvalResult PrimitiveTaskSend(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[1] == typeof(MOGName))
+            {
+                var message = engine.StackPop();
+                var taskName = engine.StackPop() as MOGName;
+
+                var task = engine.GetTask(taskName.Value);
+
+                if (task == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, taskName.ToString());
+
+                return task.SendMessage(message.ToString());
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskSetResult(MogwaiNanoEngine engine, string name)
+        {
+            // object task.setResult
+
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            var obj = engine.StackPop();
+
+            if (engine.IsTask)
+            {
+                ArrayList items = null;
+
+                try
+                {
+                    items = engine.MotherEngine.Parse(obj.ToString());
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(engine, Error.ParseError, ex.Message);
+                }
+
+                engine.TaskResult = items[0] as MOGObject;
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveTaskGetResult(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var taskName = engine.StackPop() as MOGName;
+               
+                if (engine.Tasks.Contains(taskName.Value))
+                {
+                    var task = engine.Tasks[taskName.Value] as MOGTask;
+                    engine.StackPush(task.Result);
+                    return EvalResult.NoError;
+                }
+
+                return EvalResult.Failure(engine, Error.UnknownNameError, name, taskName.Value);
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskGetName(MogwaiNanoEngine engine, string name)
+        {
+            if (engine.IsTask)
+            {
+                engine.StackPush(new MOGName(engine, engine.TaskName));
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.InvalidOutsideOfATaskError, name);
+        }
+
+        private static EvalResult PrimitiveTaskWait(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGName))
+            {
+                var taskName = engine.StackPop() as MOGName;
+                var task = engine.GetTask(taskName.Value);
+
+                if (task == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name);
+
+                return task.Wait();
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveTaskJoin(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGList))
+            {
+                var list = engine.StackPop() as MOGList;
+
+                if (list.Items.Count > 0)
+                {
+                    ArrayList names = new();
+
+                    foreach (var item in list.Items)
+                    {
+                        if (item is MOGName taskName)
+                        {
+                            names.Add(taskName.Value);
+                        }
+                        else
+                        {
+                            return EvalResult.Failure(engine, Error.BadArgumentValueError, name, item.ToString());
+                        }
+                    }
+
+                    while (names.Count > 0)
+                    {
+                        Thread.Sleep(10);
+
+                        for (int i = names.Count - 1; i >= 0; i--)
+                        {
+                            var taskName = names[i] as string;
+
+                            if (!engine.Tasks.Contains(taskName))
+                                return EvalResult.Failure(engine, Error.UnknownNameError, name, taskName);
+
+                            var task = engine.Tasks[taskName] as MOGTask;
+
+                            if (task.Status == MOGTask.TaskStatus.Waiting)
+                                names.RemoveAt(i);
+                        }
+
+                        var r = engine.ExecuteWaitingFireObjects();
+
+                        if (r != EvalResult.NoError)
+                            return r;
+                    }
+
+                    return EvalResult.NoError;
+                }
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        #endregion
 
         #region UNITS
 
@@ -5290,6 +5684,8 @@ namespace MogwaiNano.Engine
             FireEvent("GPIO_PIN_CHANGED", record);
         }
 
+        #endregion
+
         #region I2C
 
         public void CleanupI2cDevices()
@@ -5328,6 +5724,85 @@ namespace MogwaiNano.Engine
         }
 
         #endregion
+
+        #region TASKS
+
+        internal EvalResult CreateTask(string name, string code)
+        {
+            if (Tasks.Contains(name))
+                return EvalResult.Failure(this, Error.NameAlreadyExistsError);
+
+            try
+            {
+                Tasks[name] = new MOGTask(this, name, code);
+                return EvalResult.NoError;
+            }
+            catch
+            {
+
+            }
+
+            return EvalResult.Failure(this, Error.TaskCreationError);
+        }
+
+        internal MOGTask GetTask(string name)
+        {
+            if (Tasks.Contains(name))
+                return Tasks[name] as MOGTask;
+            
+            return null;
+        }
+
+        internal EvalResult TaskPurge(string name)
+        {
+            if (Tasks.Contains(name))
+            {
+                var task = Tasks[name] as MOGTask;
+                task.Stop();
+                
+                Tasks.Remove(name);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(this, Error.UnknownNameError, $"unabled to purge unknown task '{name}'");
+        }
+
+        internal EvalResult TaskPublish(string message)
+        {
+            if (IsTask)
+            {
+                ArrayList items = null;
+
+                try
+                {
+                    items = MotherEngine.Parse(message);
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(this, Error.ParseError, ex.Message);
+                }
+
+                var messageInformations = new MOGRecord(MotherEngine!);
+                messageInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                messageInformations.SetItem("message",items[0] as MOGObject);
+
+                return MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_PUBLISH, messageInformations);
+            }
+
+            return EvalResult.NoError;
+        }
+
+        internal void CleanupTasks()
+        {
+            foreach (var key in Tasks.Keys)
+            {
+                var task = Tasks[key] as MOGTask;
+                task.Stop();
+            }
+
+            Tasks.Clear();
+        }
 
         #endregion
 

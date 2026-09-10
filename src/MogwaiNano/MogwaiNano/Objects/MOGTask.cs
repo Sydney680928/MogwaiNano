@@ -105,6 +105,8 @@ namespace MogwaiNano.Objects
                 _thread = null;
             });
 
+            _thread.Start();
+
             return EvalResult.NoError;
         }
 

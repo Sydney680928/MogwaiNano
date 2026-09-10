@@ -26,7 +26,7 @@ namespace MogwaiNano.Engine
         private ArrayList _items;
         private int _index;
         private MogwaiNanoEngine _engine;
-        StringBuilder _item = new();
+        private StringBuilder _item;
 
         public Parser(MogwaiNanoEngine engine)
         {
@@ -38,7 +38,7 @@ namespace MogwaiNano.Engine
             _items = new(); 
             _index = 0;
             _code = code;
-            _items.Clear();
+            _item = new();
 
             while (_index < _code.Length)
             {
