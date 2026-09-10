@@ -59,7 +59,8 @@ namespace MogwaiNano.Engine
         private EvalResult _lastResult;
         private Error _lastError;
         private int _iterationCount = 0;
-        private object _lastResultLock = new();    
+        private object _lastResultLock = new();
+        private Parser _parser;
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -77,6 +78,12 @@ namespace MogwaiNano.Engine
         public readonly MOGType TypeNull;
         public readonly MOGType TypeReference;
         public readonly MOGType TypeAny;
+
+        public string Name { get; init; }
+
+        public string TaskName { get; set; }    
+
+        public MogwaiNanoEngine MotherEngine { get; set; }
 
         public bool DisableInterrupts { get; set; }
 
@@ -123,7 +130,7 @@ namespace MogwaiNano.Engine
 
         public bool BreakRequested { get; private set; }
 
-        public bool HaltRequested { get; private set; }
+        public bool HaltRequested { get; set; }
 
         public static Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
@@ -151,6 +158,8 @@ namespace MogwaiNano.Engine
 
         public bool FrugalMode { get; set; } = false;
 
+        public MOGObject TaskResult { get; set; }
+
         static MogwaiNanoEngine()
         {
             // load primitives
@@ -158,8 +167,14 @@ namespace MogwaiNano.Engine
             RegisterPrimitives();
         }
 
-        public MogwaiNanoEngine()
+        public MogwaiNanoEngine(string name = "MogwaiNanoEngine")
         {
+            Name = name;
+
+            // Create general parser 
+
+            _parser = new Parser(this); 
+
             // load types
 
             TypeNumber = new MOGType(this, "number");
@@ -205,6 +220,8 @@ namespace MogwaiNano.Engine
             _runThread = new Thread(RunLoop);
             _runThread.Start();
         }
+
+        public ArrayList Parse(string code) => _parser.Parse(code);
 
         public bool IsPrimitive(string name) => Primitives.Contains(name);
 

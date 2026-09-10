@@ -49,6 +49,10 @@ namespace MogwaiNano.Engine
 
             _unknownWordError,
 
+            _taskCreationError,
+            _unabledToStartTaskError,
+            _invalidOutsideOfATaskError,
+
             _fatalError,
 
             _gpioUnknownPinError,
@@ -112,7 +116,11 @@ namespace MogwaiNano.Engine
             _unableToWriteValueError = RegisterError("MW.47", "unable to write value in var error");
             
             _unknownWordError = RegisterError("MW.50", "unknown word error");
-            
+
+            _taskCreationError = RegisterError("MW.60", "task creation error");
+            _unabledToStartTaskError = RegisterError("MW.61", "unable to start task error");
+            _invalidOutsideOfATaskError = RegisterError("MW.62", "invalid outside of a task error");
+
             _fatalError = RegisterError("MW.!!!", "fatal error");
 
             _gpioUnknownPinError = RegisterError("MW.500", "gpio unknown pin error");
@@ -192,6 +200,12 @@ namespace MogwaiNano.Engine
         public static Error UnableToWriteValueError { get { EnsureInitialized(); return _unableToWriteValueError; } }
         
         public static Error UnknownWordError { get { EnsureInitialized(); return _unknownWordError; } }
+
+        public static Error TaskCreationError { get { EnsureInitialized(); return _taskCreationError; } }
+
+        public static Error UnabledToStartTaskError { get { EnsureInitialized(); return _unabledToStartTaskError; } }
+
+        public static Error InvalidOutsideOfATaskError { get { EnsureInitialized(); return _invalidOutsideOfATaskError; } }
 
         public static Error FatalError { get { EnsureInitialized(); return _fatalError; } }
 

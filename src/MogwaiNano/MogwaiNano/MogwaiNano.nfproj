@@ -50,6 +50,7 @@
     <Compile Include="Objects\MOGList.cs" />
     <Compile Include="Objects\MOGKey.cs" />
     <Compile Include="Objects\MOGPrimitive.cs" />
+    <Compile Include="Objects\MOGTask.cs" />
     <Compile Include="Objects\MOGTimer.cs" />
     <Compile Include="Objects\MOGType.cs" />
     <Compile Include="Objects\MOGBoolean.cs" />
