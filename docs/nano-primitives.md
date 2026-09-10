@@ -178,7 +178,107 @@ All of the above are 🔗 **Shared** with the desktop engine.
 
 ---
 
-## 5. Stopwatch
+## 5. Tasks
+
+🔗 **Shared** with the desktop engine, ported with full parity. A *task* runs a block of code on its own real native thread (`System.Threading.Thread` — nanoFramework has no Task Parallel Library, so unlike desktop MOGWAI's `Task.Run`-based implementation, NANO tasks are backed directly by threads), with its own fully isolated `MogwaiNanoEngine` instance (own stack, own variable scope, own everything) — never shared state with the parent or with other tasks. All communication between a task and its parent happens exclusively through the existing event mechanism (above) — there's no other way to share data between them, by design.
+
+Only two states exist, matching the desktop engine exactly: a task is either `Running`, or `Waiting` — and `Waiting` covers both "never started yet" and "finished running", with no distinction between the two. `task.join`/`task.wait` don't error if you wait on a task you forgot to start; they simply return immediately, since an unstarted task already looks "done" from their point of view.
+
+| Primitive (canonical) | Sugared form | Signature | Description |
+|---|---|---|---|
+| `TASK.DEF` | `task 'name' do { ... }` | `block 'name' TASK.DEF` | Declares a named task. Creates its dedicated engine instance immediately (reused across restarts), but doesn't run anything yet |
+| `task.list` | — | `task.list` → `.list` | Returns the names of all declared tasks |
+| `task.start` | `'name' task.start` | `'name' task.start` | Starts a task with no launch parameter. Fails if the task is already running |
+| `TASK.START` | `task 'name' start with param` | `param 'name' TASK.START` | Starts a task, passing a launch parameter — parsed and pushed onto the task's own stack before its code runs |
+| `task.isRunning` | — | `'name' task.isRunning` → `.boolean` | Tests whether a task is currently running |
+| `task.stop` | — | `'name' task.stop` | Requests a running task to halt (sets its `HaltRequested` flag — cooperative, same mechanism as `mogwai.halt`, not an immediate kill) |
+| `task.purge` | — | `'name' task.purge` | Removes a declared task |
+| `task.publish` | — | `message task.publish` | Called from *inside* a running task: sends `message` to the parent, firing `TASK_DID_PUBLISH` there |
+| `task.send` | — | `message 'name' task.send` | Called from the parent: sends `message` to a named task, firing `TASK_DID_RECEIVE` inside it |
+| `task.setResult` | — | `object task.setResult` | Called from inside a task: records its final result (safely copied across the thread/instance boundary by serializing to string and re-parsing with the parent's own engine, rather than sharing a live object reference) |
+| `task.result` | — | `'name' task.result` | Returns a task's recorded result (set via `task.setResult`) |
+| `task.name` | — | `task.name` → `.name` | Returns the current task's own name, called from inside it |
+| `task.wait` | — | `'name' task.wait` | Blocks until a single named task finishes, pumping the parent's own pending events while waiting (so `onEvent` handlers still fire live during the wait, not just after) |
+| `task.join` | — | `(names) task.join` | Blocks until *all* the named tasks finish, same event-pumping behavior as `task.wait` |
+
+**Events fired around a task's lifecycle**, delivered to the parent via the same `onEvent`/`eventData` mechanism as everything else:
+
+| Event | `eventData` | Fired when |
+|---|---|---|
+| `TASK_DID_START` | the task's name (`.name`) | A task starts running |
+| `TASK_DID_END` | a record with `task:` and `result:` | A task finishes successfully |
+| `TASK_DID_FAIL` | a record with `task:`, `error:`, `message:` | A task finishes with an error, or fails to even parse |
+| `TASK_DID_PUBLISH` | a record with `task:` and the published message | A running task calls `task.publish` |
+| `TASK_DID_RECEIVE` | the message sent | Fired *inside* the task itself when the parent calls `task.send` |
+
+**Memory cost, measured:** roughly 7KB for the task's own `MogwaiNanoEngine` instance plus roughly 3KB for its native thread — about 10KB per task. This is why tasks are only practical on an ESP32-S3 with PSRAM (see [Memory considerations](../README.md#memory-considerations)) — on a plain ESP32's ~40KB budget, even a couple of tasks would eat most of the available headroom.
+
+**Example — two LEDs blinking at independent rates, with every lifecycle event logged:**
+
+```
+onEvent 'TASK_DID_START' do 
+{ 
+    "EVENT TASK DID START" ?
+    eventData ?
+}
+
+onEvent 'TASK_DID_END' do 
+{ 
+    "EVENT TASK DID END" ?
+    eventData ?
+}
+
+onEvent 'TASK_DID_PUBLISH' do 
+{ 
+    "EVENT TASK DID PUBLISH" ?
+    eventData ?
+}
+
+onEvent 'TASK_DID_FAIL' do
+{
+    "EVENT TASK DID FAIL" ?
+    eventData ?
+}
+
+task 'TSK1' do
+{
+    4 gpio.setMode.output
+    4 gpio.write.low
+
+    10 repeat
+    {
+        4 gpio.toggle
+        1000 wait
+    }
+
+    4 gpio.write.low
+}
+
+task 'TSK2' do
+{
+    5 gpio.setMode.output
+    5 gpio.write.low
+
+    50 repeat
+    {
+        5 gpio.toggle
+        200 wait
+    }
+
+    5 gpio.write.low
+}
+
+'TSK1' task.start
+'TSK2' task.start
+
+('TSK1' 'TSK2') task.join
+
+"PROGRAM ENDED" ?
+```
+
+`TSK1` toggles GPIO 4 every second (10 times), `TSK2` toggles GPIO 5 every 200ms (50 times) — both run genuinely in parallel, each on its own thread. `task.join` blocks until both finish, while every `onEvent` handler above still fires live as each task starts, ends, or publishes — not just after `join` returns.
+
+## 6. Stopwatch
 
 ⚙️ **NANO-only.** Named timers for measuring elapsed time, following the same by-name management pattern as I2C/PWM/ADC.
 
@@ -195,7 +295,7 @@ All of the above are 🔗 **Shared** with the desktop engine.
 
 ---
 
-## 6. Skills and flags
+## 7. Skills and flags
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -212,7 +312,7 @@ All of the above are 🔗 **Shared** with the desktop engine.
 
 ---
 
-## 7. Console and debug output
+## 8. Console and debug output
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -224,7 +324,7 @@ All three accept a `MOGRef` (`&variable`) and dereference it automatically befor
 
 ---
 
-## 8. System (`mogwai.*`)
+## 9. System (`mogwai.*`)
 
 All ⚙️ **NANO-only** (though most have a conceptual desktop equivalent).
 
@@ -239,6 +339,7 @@ All ⚙️ **NANO-only** (though most have a conceptual desktop equivalent).
 | `mogwai.sendMessage` | `"message" mogwai.sendMessage` | Sends an arbitrary string to Studio (device → Studio direction) — the counterpart to the Studio-side `nano.send` (Studio → device) |
 | `mogwai.units` | `mogwai.units` → `.list` | Returns the names of all units currently stored on the device, from within a running program |
 | `mogwai.units.run` | `'unit' mogwai.units.run` | Executes a stored unit's code — typically used to load the functions it declares (e.g. a RTC helper library) into the current program's context, once, near the start of a script |
+| `mogwai.isTask` | `mogwai.isTask` → `.boolean` | Tests whether the currently running program is a task's own engine (started via `task.start`/`TASK.START`) rather than the top-level program |
 
 ### Lifecycle hooks
 
@@ -254,7 +355,7 @@ Only the matching hook runs for a given program end — never more than one.
 
 ---
 
-## 9. GPIO
+## 10. GPIO
 
 All ⚙️ **NANO-only.** Every primitive takes a **pin number** (`.number`), not a name.
 
@@ -277,7 +378,7 @@ All ⚙️ **NANO-only.** Every primitive takes a **pin number** (`.number`), no
 
 ---
 
-## 10. I2C
+## 11. I2C
 
 All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather than repeating the bus/address pair on every call.
 
@@ -293,7 +394,7 @@ All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather th
 
 ---
 
-## 11. PWM
+## 12. PWM
 
 All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, following the same pattern as I2C. Requires the pin to already be configured for PWM via `device.setPinFunction` (see [ESP32 DeviceFunction values reference](esp32-device-function-values.md)) beforehand.
 
@@ -310,7 +411,7 @@ All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, followi
 
 ---
 
-## 12. SSD1306 OLED display
+## 13. SSD1306 OLED display
 
 All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `nanoFramework.Iot.Device.Ssd13xx` binding, built after dense per-pixel drawing in pure RPN proved impractically slow. Fixed to 128x64 resolution over I2C Fast Mode; only one display instance is supported at a time (no naming).
 
@@ -333,7 +434,7 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ---
 
-## 13. Device-level platform access
+## 14. Device-level platform access
 
 ⚙️ **NANO-only.**
 

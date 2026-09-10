@@ -9,7 +9,7 @@
 
 **Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
-> **A note on memory:** MOGWAI NANO is not recommended on a plain ESP32 (no PSRAM) beyond the simplest, single-purpose scripts. An ESP32-S3 board with PSRAM is strongly recommended for anything more composite — a display, several I2C devices, sustained network activity, all running together over a long session. See [Memory considerations](#memory-considerations) below for why.
+> **Target hardware: boards with real memory headroom.** MOGWAI NANO is built and tested primarily for microcontrollers with several megabytes of RAM available — an ESP32-S3 with PSRAM being our validated reference platform (a classic ESP32/WROVER with PSRAM, flashed with nanoFramework's `ESP32_PSRAM_REV3` target, should work comparably too, though we haven't tested that combination ourselves yet). A plain ESP32 (~40KB free RAM, no PSRAM) works for the simplest single-purpose scripts, but quickly runs into real, confirmed limits the moment a project combines more than one or two things — and some newer features (like [tasks](docs/nano-primitives.md#5-tasks)) simply aren't practical on it at all. If you're picking hardware for this project, start with a PSRAM-equipped board rather than the cheapest ESP32 you can find. See [Memory considerations](#memory-considerations) below for the full picture.
 
 > If MOGWAI NANO looks useful to you, a ⭐ helps others discover it — thank you!
 
@@ -54,10 +54,12 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 
 ## Key features
 
-- **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags
-- **Hardware support** — GPIO (digital I/O, interrupts) and I2C today; a dedicated SSD1306 OLED display driver built on top of I2C; SPI, PWM and ADC coming in upcoming releases
+- **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags, structured error handling (`trap`/`guard`)
+- **Hardware support** — GPIO, I2C, PWM, ADC, and a dedicated SSD1306 OLED display driver; SPI planned for an upcoming release
+- **Tasks** — real parallel execution, each on its own native thread with a fully isolated runtime instance, communicating with the parent only through events. Practical only on a PSRAM-equipped board (~10KB per task) — see [Memory considerations](#memory-considerations)
 - **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~40KB-RAM devices
-- **Timers** — one-shot and recurring, running independently of your main program
+- **Reusable code libraries** — *units*, stored on flash and loaded on demand, for sharing functions (an RTC helper library, for example) across scripts without copy-pasting
+- **Timers & stopwatches** — one-shot and recurring timers running independently of your main program, plus named stopwatches for measuring elapsed time
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
 - **Network protocol** — UDP discovery + reliable TCP communication, with automatic disconnection detection and clean recovery
 - **Persistent autorun** — store code to run automatically on every boot, for standalone production deployments
@@ -72,7 +74,11 @@ A plain ESP32 gives MOGWAI NANO roughly 40KB of free RAM to work with once the f
 
 None of this is a bug to "just fix" — it's a direct, measured consequence of running an interpreted RPN language on top of a managed CLR, on top of a real-time OS, on a few tens of kilobytes of RAM. **An ESP32-S3 board with PSRAM changes this picture completely.** With several megabytes available instead of tens of kilobytes, the same fragmentation risk is structurally still there, but never gets anywhere close to being a practical problem — a composite project (display + sensors + long network sessions) that showed real instability on a plain ESP32 ran rock-solid for hours straight on an ESP32-S3 with PSRAM in side-by-side testing, with no configuration changes to the script itself.
 
-**Recommendation:** an ESP32-S3 board with PSRAM is the platform we'd point you toward for any real project — the peace of mind of not fighting memory fragmentation is worth it as soon as your script does more than one simple thing. As a rough, untested rule of thumb, at least 1MB of PSRAM should give the runtime enough breathing room — our own testing was done on a board with several megabytes available, so consider this an estimate rather than a validated minimum. We expect to refine this figure over time as the runtime evolves and its own memory footprint changes. A plain ESP32 remains fine for small, single-purpose scripts (a single sensor, basic GPIO) where the tighter memory budget is unlikely to ever be an issue. See also `mogwai.frugalMode` above, which helps on constrained boards but doesn't eliminate this class of issue on its own.
+**Tasks (parallel execution) push this further still.** Each task costs roughly 10KB (its own engine instance plus its own native thread) — confirmed working smoothly on an ESP32-S3 with PSRAM, but confirmed genuinely too tight on a plain ESP32 (REV3, no PSRAM). To be precise about *why*: this isn't about the classic ESP32's Xtensa LX6 core being inherently incapable — it's specifically about PSRAM availability. This isn't a "might be an issue" caveat — it's a directly observed result. If your project needs tasks, a PSRAM-equipped board isn't optional.
+
+**PSRAM isn't exclusive to the S3 — nanoFramework supports it on classic ESP32 too, via dedicated firmware targets.** `ESP32_PSRAM_REV3` targets exactly the REV3 chip revision this project already uses, just paired with a PSRAM-equipped module (e.g. an ESP32-WROVER, which includes PSRAM directly on the module — as opposed to WROOM, which doesn't); `ESP32_PSRAM_REV0` covers other chip revisions with PSRAM the same way. **We haven't tested MOGWAI NANO on this specific target yet** — all our own measurements above were done on an S3 board — but the underlying mechanism (PSRAM exposed to the managed heap) is the same, so it should work comparably. If you go this route, we'd genuinely like to hear how it goes.
+
+**Recommendation:** a PSRAM-equipped board — whether an ESP32-S3 (our validated path) or a classic ESP32/WROVER flashed with a PSRAM-enabled target like `ESP32_PSRAM_REV3` (untested by us, but should work) — is what we'd point you toward for any real project. The peace of mind of not fighting memory fragmentation is worth it as soon as your script does more than one simple thing. As a rough, untested rule of thumb, at least 1MB of PSRAM should give the runtime enough breathing room — our own testing was done on a board with several megabytes available, so consider this an estimate rather than a validated minimum. We expect to refine this figure over time as the runtime evolves and its own memory footprint changes. A plain ESP32 without PSRAM remains fine for small, single-purpose scripts (a single sensor, basic GPIO) where the tighter memory budget is unlikely to ever be an issue — but treat that as the exception you're deliberately choosing, not the default starting point. See also `mogwai.frugalMode` above, which helps on constrained boards but doesn't eliminate this class of issue on its own.
 
 ## Supported platforms
 
@@ -80,6 +86,7 @@ None of this is a bug to "just fix" — it's a direct, measured consequence of r
 |---|---|
 | ESP32 | ✅ Tested — usable for small, single-purpose scripts only (see [Memory considerations](#memory-considerations)); not recommended for anything more composite |
 | ESP32-S3 (with PSRAM) | ✅ Tested — recommended for composite projects (display, multiple sensors, long-running sessions) |
+| Classic ESP32/WROVER (with PSRAM, `ESP32_PSRAM_REV3` target) | 🔜 Should work comparably to ESP32-S3+PSRAM — not yet tested by us |
 | Raspberry Pi Pico W | ⚠️ Runtime tested and working, but WiFi configuration currently blocked (see Quick Start note) |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
@@ -171,10 +178,12 @@ src/MogwaiNano/
 
 - [x] I2C support
 - [x] SSD1306 OLED display support (128x64, I2C Fast Mode)
+- [x] PWM and ADC helper primitives — building on the same pattern already validated with I2C
+- [ ] SPI — same pattern again, not yet implemented
 - [ ] `.binary`/`B:` support on NANO — for register-level bit manipulation
-- [ ] SPI, PWM, ADC helper primitives — building on the same pattern already validated with I2C (a DS3231 RTC module)
 - [ ] STM32 and TI validation
 - [x] ESP32-S3 / PSRAM validation — confirmed transparently usable by the managed heap, and confirmed to resolve the memory-fragmentation instability seen on plain ESP32 under sustained, multi-subsystem load (see [Memory considerations](#memory-considerations))
+- [x] Tasks — real parallel execution, each on its own native thread with a fully isolated runtime instance (confirmed practical on ESP32-S3/PSRAM, confirmed too tight on a plain ESP32)
 - [ ] BLE support
 - [x] `.mog` library system ("units") — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library)
 - [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the units system above on more capable boards
