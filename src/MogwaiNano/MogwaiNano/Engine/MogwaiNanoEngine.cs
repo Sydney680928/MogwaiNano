@@ -517,9 +517,9 @@ namespace MogwaiNano.Engine
                     if (IsTask)
                     {
                         var failureInformations = new MOGRecord(MotherEngine);
-                        failureInformations.Items["task"] = new MOGName(MotherEngine, TaskName);
-                        failureInformations.Items["error"] = new MOGString(MotherEngine, LastResult.Error.Code);
-                        failureInformations.Items["message"] = new MOGString(MotherEngine, LastResult.Error.Message);
+                        failureInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                        failureInformations.SetItem("error", new MOGString(MotherEngine, LastResult.Error.Code));
+                        failureInformations.SetItem("message", new MOGString(MotherEngine, LastResult.Error.Message));
 
                         MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_FAIL, failureInformations);
                     }
