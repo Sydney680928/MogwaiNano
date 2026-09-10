@@ -89,7 +89,7 @@ namespace MogwaiNano.Engine
             var response = new ServerMessage(
                 AppGlobal.NanoParameters.Name,
                 "I AM HERE",
-                AppGlobal.MogwaiNanoEngine.Version.ToString(),
+                MogwaiNanoEngine.Version.ToString(),
                 AppGlobal.Session.ToString(),
                 SystemInfo.Platform,
                 SystemInfo.TargetName,

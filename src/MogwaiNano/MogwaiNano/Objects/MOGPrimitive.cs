@@ -31,7 +31,7 @@ namespace MogwaiNano.Objects
             return obj;
         }
 
-        public override EvalResult EngineEval() => Engine.ExecutePrimitive(Name);
+        public override EvalResult EngineEval() => MogwaiNanoEngine.ExecutePrimitive(Engine, Name);
 
         public override EvalResult UserEval() => EngineEval();
 

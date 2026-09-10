@@ -38,39 +38,28 @@ namespace MogwaiNano.Engine
         
         private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
 
-        private delegate EvalResult PrimitiveDelegate(string name);
+        private delegate EvalResult PrimitiveDelegate(MogwaiNanoEngine engine, string name);
 
-        private Hashtable _primitives = new();
+        public static Hashtable Primitives = new();
+
         private ArrayList _stacks = new();
         private MOGStack _currentStack = new();
-        private Hashtable _timers = new();
         private Hashtable _events = new();
         private Hashtable _types = new(12);
         private ArrayList _varsContext = new();
         private Queue _fireObjectsQueue = new();
         private object _fireObjectsQueueLock = new();
         private object _fireEventLock = new();
-        private bool _disableInterrupts;
-        private VarContext _currentLocalVarsContext;
-        private Hashtable _functions = new(3);
+        private VarContext _currentLocalVarsContext;        
         private AutoResetEvent _runSignal = new(false);
         private string _pendingRunCode;
         private bool _pendingDebugMode;
-        private Thread _runThread;
-        private Hashtable _openPins = new(3);
-        private GpioController _gpioController = new();
-        private Hashtable _i2cDevices = new(2);
-        private string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM", "ADC", "UNITS" };
-        private ArrayList _flags = new();
+        private Thread _runThread;                  
+        private static readonly string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM", "ADC", "UNITS" };      
         private EvalResult _lastResult;
         private Error _lastError;
         private int _iterationCount = 0;
-        private object _lastResultLock = new(); 
-        private Ssd1306 _ssd1306;
-        private Hashtable _pwmChannels = new(2);
-        private Hashtable _adcChannels = new(2);
-        private AdcController _adcController;
-        private Hashtable _stopwatches = new(2);
+        private object _lastResultLock = new();    
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -88,6 +77,30 @@ namespace MogwaiNano.Engine
         public readonly MOGType TypeNull;
         public readonly MOGType TypeReference;
         public readonly MOGType TypeAny;
+
+        public bool DisableInterrupts { get; set; }
+
+        public Hashtable Functions { get; } = new(3);
+
+        public Hashtable Timers { get; } = new(3);
+
+        public ArrayList Flags { get; } = new();
+
+        public Hashtable Stopwatches { get; } = new(2);
+
+        public Hashtable OpenedPins { get; } = new(3);
+
+        public GpioController GpioController { get; } = new();
+
+        public Hashtable I2cDevices { get; } = new(2);
+
+        public Hashtable PwmChannels { get; } = new(2);
+
+        public Hashtable AdcChannels { get; } = new(2);
+
+        public AdcController AdcController { get; } = new();
+
+        public Ssd1306 Ssd1306 { get; set; }
 
         public Error LastError
         {
@@ -112,7 +125,7 @@ namespace MogwaiNano.Engine
 
         public bool HaltRequested { get; private set; }
 
-        public Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
+        public static Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
         public EvalResult LastResult
         {
@@ -134,9 +147,16 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public string[] Skills => _skills;
+        public static string[] Skills => _skills;
 
         public bool FrugalMode { get; set; } = false;
+
+        static MogwaiNanoEngine()
+        {
+            // load primitives
+
+            RegisterPrimitives();
+        }
 
         public MogwaiNanoEngine()
         {
@@ -175,10 +195,6 @@ namespace MogwaiNano.Engine
             _types.Add("ref", TypeReference);
             _types.Add("any", TypeAny);
 
-            // load primitives
-
-            RegisterPrimitives();
-
             // Create vars context
             // Context zéro = Global vars
 
@@ -190,7 +206,7 @@ namespace MogwaiNano.Engine
             _runThread.Start();
         }
 
-        public bool IsPrimitive(string name) => _primitives.Contains(name);
+        public bool IsPrimitive(string name) => Primitives.Contains(name);
 
         public MOGType GetType(string name)
         {
@@ -200,184 +216,184 @@ namespace MogwaiNano.Engine
             return null;
         }
 
-        public EvalResult ExecutePrimitive(string name)
+        public static EvalResult ExecutePrimitive(MogwaiNanoEngine engine, string name)
         {
-            var p = _primitives[name] as PrimitiveDelegate;
+            var p = Primitives[name] as PrimitiveDelegate;
 
             if (p == null)
-                return EvalResult.Failure(this, Error.UnknownWordError, name);
+                return EvalResult.Failure(engine, Error.UnknownWordError, name);
 
-            return p(name);
+            return p(engine, name);
         }
 
-        private void RegisterPrimitives()
+        private static void RegisterPrimitives()
         {
-            _primitives.Add("->type", new PrimitiveDelegate(PrimitiveGetType));
-            _primitives.Add("eval", new PrimitiveDelegate(PrimitiveEval));
+            Primitives.Add("->type", new PrimitiveDelegate(PrimitiveGetType));
+            Primitives.Add("eval", new PrimitiveDelegate(PrimitiveEval));
 
-            _primitives.Add("+", new PrimitiveDelegate(PrimitivePlus));
-            _primitives.Add("-", new PrimitiveDelegate(PrimitiveMathSubstraction));
-            _primitives.Add("*", new PrimitiveDelegate(PrimitiveMathMultiplication));
-            _primitives.Add("/", new PrimitiveDelegate(PrimitiveMathDivision));
-            _primitives.Add("floor", new PrimitiveDelegate(PrimitiveMathFloor));
-            _primitives.Add("mod", new PrimitiveDelegate(PrimitiveMathModulo));
+            Primitives.Add("+", new PrimitiveDelegate(PrimitivePlus));
+            Primitives.Add("-", new PrimitiveDelegate(PrimitiveMathSubstraction));
+            Primitives.Add("*", new PrimitiveDelegate(PrimitiveMathMultiplication));
+            Primitives.Add("/", new PrimitiveDelegate(PrimitiveMathDivision));
+            Primitives.Add("floor", new PrimitiveDelegate(PrimitiveMathFloor));
+            Primitives.Add("mod", new PrimitiveDelegate(PrimitiveMathModulo));
 
-            _primitives.Add("->data", new PrimitiveDelegate(PrimitiveToData));
-            _primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
-            _primitives.Add("bcd->", new PrimitiveDelegate(PrimitiveBcdToDecimal));
+            Primitives.Add("->data", new PrimitiveDelegate(PrimitiveToData));
+            Primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
+            Primitives.Add("bcd->", new PrimitiveDelegate(PrimitiveBcdToDecimal));
 
-            _primitives.Add("->vars", new PrimitiveDelegate(PrimitiveStackToVars));
-            _primitives.Add("->safeVars", new PrimitiveDelegate(PrimitiveStackToSafeVars));
-            _primitives.Add("->params", new PrimitiveDelegate(PrimitiveStackToParams));
+            Primitives.Add("->vars", new PrimitiveDelegate(PrimitiveStackToVars));
+            Primitives.Add("->safeVars", new PrimitiveDelegate(PrimitiveStackToSafeVars));
+            Primitives.Add("->params", new PrimitiveDelegate(PrimitiveStackToParams));
 
-            _primitives.Add("makeData", new PrimitiveDelegate(PrimitiveMakeData));
+            Primitives.Add("makeData", new PrimitiveDelegate(PrimitiveMakeData));
 
-            _primitives.Add("clear", new PrimitiveDelegate(PrimitiveStackClear));
-            _primitives.Add("swap", new PrimitiveDelegate(PrimitiveStackSwap));
-            _primitives.Add("dup", new PrimitiveDelegate(PrimitiveStackDup));
-            _primitives.Add("drop", new PrimitiveDelegate(PrimitiveStackDrop));
+            Primitives.Add("clear", new PrimitiveDelegate(PrimitiveStackClear));
+            Primitives.Add("swap", new PrimitiveDelegate(PrimitiveStackSwap));
+            Primitives.Add("dup", new PrimitiveDelegate(PrimitiveStackDup));
+            Primitives.Add("drop", new PrimitiveDelegate(PrimitiveStackDrop));
 
-            _primitives.Add("break", new PrimitiveDelegate(PrimitiveBreak));
+            Primitives.Add("break", new PrimitiveDelegate(PrimitiveBreak));
 
-            _primitives.Add("wait", new PrimitiveDelegate(PrimitiveWait));
-            _primitives.Add("get", new PrimitiveDelegate(PrimitiveGet));
-            _primitives.Add("set", new PrimitiveDelegate(PrimitiveSet));
-            _primitives.Add("size", new PrimitiveDelegate(PrimitiveSize));
-            _primitives.Add("purge", new PrimitiveDelegate(PrimitivePurge));
-            _primitives.Add("exists", new PrimitiveDelegate(PrimitiveExists));
+            Primitives.Add("wait", new PrimitiveDelegate(PrimitiveWait));
+            Primitives.Add("get", new PrimitiveDelegate(PrimitiveGet));
+            Primitives.Add("set", new PrimitiveDelegate(PrimitiveSet));
+            Primitives.Add("size", new PrimitiveDelegate(PrimitiveSize));
+            Primitives.Add("purge", new PrimitiveDelegate(PrimitivePurge));
+            Primitives.Add("exists", new PrimitiveDelegate(PrimitiveExists));
 
-            _primitives.Add("DI", new PrimitiveDelegate(PrimitiveDI));
-            _primitives.Add("EI", new PrimitiveDelegate(PrimitiveEI));
+            Primitives.Add("DI", new PrimitiveDelegate(PrimitiveDI));
+            Primitives.Add("EI", new PrimitiveDelegate(PrimitiveEI));
 
-            _primitives.Add("==", new PrimitiveDelegate(PrimitiveConditionEqual));
-            _primitives.Add("!=", new PrimitiveDelegate(PrimitiveConditionNotEqual));
-            _primitives.Add("<", new PrimitiveDelegate(PrimitiveConditionInferior));
-            _primitives.Add(">", new PrimitiveDelegate(PrimitiveConditionSuperior));
-            _primitives.Add("<=", new PrimitiveDelegate(PrimitiveConditionInferiorOrEqual));
-            _primitives.Add(">=", new PrimitiveDelegate(PrimitiveConditionSuperiorOrEqual));
-            _primitives.Add("not", new PrimitiveDelegate(PrimitiveNot));
-            _primitives.Add("isnull", new PrimitiveDelegate(PrimitiveConditionIsNull));
-            _primitives.Add("and", new PrimitiveDelegate(PrimitiveConditionAnd));
-            _primitives.Add("or", new PrimitiveDelegate(PrimitiveConditionOr));
-            _primitives.Add("xor", new PrimitiveDelegate(PrimitiveConditionXor));
+            Primitives.Add("==", new PrimitiveDelegate(PrimitiveConditionEqual));
+            Primitives.Add("!=", new PrimitiveDelegate(PrimitiveConditionNotEqual));
+            Primitives.Add("<", new PrimitiveDelegate(PrimitiveConditionInferior));
+            Primitives.Add(">", new PrimitiveDelegate(PrimitiveConditionSuperior));
+            Primitives.Add("<=", new PrimitiveDelegate(PrimitiveConditionInferiorOrEqual));
+            Primitives.Add(">=", new PrimitiveDelegate(PrimitiveConditionSuperiorOrEqual));
+            Primitives.Add("not", new PrimitiveDelegate(PrimitiveNot));
+            Primitives.Add("isnull", new PrimitiveDelegate(PrimitiveConditionIsNull));
+            Primitives.Add("and", new PrimitiveDelegate(PrimitiveConditionAnd));
+            Primitives.Add("or", new PrimitiveDelegate(PrimitiveConditionOr));
+            Primitives.Add("xor", new PrimitiveDelegate(PrimitiveConditionXor));
 
-            _primitives.Add("&", new PrimitiveDelegate(PrimitiveBinaryAnd));
-            _primitives.Add("|", new PrimitiveDelegate(PrimitiveBinaryOr));
-            _primitives.Add("^", new PrimitiveDelegate(PrimitiveBinaryXor));
-            _primitives.Add("~", new PrimitiveDelegate(PrimitiveBinaryComplement));
-            _primitives.Add("<<", new PrimitiveDelegate(PrimitiveLeftShift));
-            _primitives.Add(">>", new PrimitiveDelegate(PrimitiveRightShift));
+            Primitives.Add("&", new PrimitiveDelegate(PrimitiveBinaryAnd));
+            Primitives.Add("|", new PrimitiveDelegate(PrimitiveBinaryOr));
+            Primitives.Add("^", new PrimitiveDelegate(PrimitiveBinaryXor));
+            Primitives.Add("~", new PrimitiveDelegate(PrimitiveBinaryComplement));
+            Primitives.Add("<<", new PrimitiveDelegate(PrimitiveLeftShift));
+            Primitives.Add(">>", new PrimitiveDelegate(PrimitiveRightShift));
 
-            _primitives.Add("console.println", new PrimitiveDelegate(PrimitiveConsolePrintLn));
-            _primitives.Add("?", new PrimitiveDelegate(PrimitiveConsolePrintLn));
-            _primitives.Add("console.print", new PrimitiveDelegate(PrimitiveConsolePrint));
-            _primitives.Add("??", new PrimitiveDelegate(PrimitiveConsolePrint));
+            Primitives.Add("console.println", new PrimitiveDelegate(PrimitiveConsolePrintLn));
+            Primitives.Add("?", new PrimitiveDelegate(PrimitiveConsolePrintLn));
+            Primitives.Add("console.print", new PrimitiveDelegate(PrimitiveConsolePrint));
+            Primitives.Add("??", new PrimitiveDelegate(PrimitiveConsolePrint));
 
-            _primitives.Add("->format", new PrimitiveDelegate(PrimitiveToFormat));
-            _primitives.Add("sub", new PrimitiveDelegate(PrimitiveSub));
-            _primitives.Add("->num", new PrimitiveDelegate(PrimitiveToNumber));
-            _primitives.Add("->str", new PrimitiveDelegate(PrimitiveToString));
+            Primitives.Add("->format", new PrimitiveDelegate(PrimitiveToFormat));
+            Primitives.Add("sub", new PrimitiveDelegate(PrimitiveSub));
+            Primitives.Add("->num", new PrimitiveDelegate(PrimitiveToNumber));
+            Primitives.Add("->str", new PrimitiveDelegate(PrimitiveToString));
 
-            _primitives.Add("EVENT", new PrimitiveDelegate(PrimitiveEvent));
-            _primitives.Add("event.fire", new PrimitiveDelegate(PrimitiveEventFire));
-            _primitives.Add("event.purge", new PrimitiveDelegate(PrimitiveEventPurge));
+            Primitives.Add("EVENT", new PrimitiveDelegate(PrimitiveEvent));
+            Primitives.Add("event.fire", new PrimitiveDelegate(PrimitiveEventFire));
+            Primitives.Add("event.purge", new PrimitiveDelegate(PrimitiveEventPurge));
 
-            _primitives.Add("AFTER", new PrimitiveDelegate(PrimitiveTimerAfter));
-            _primitives.Add("EVERY", new PrimitiveDelegate(PrimitiveTimerEvery));
-            _primitives.Add("timer.start", new PrimitiveDelegate(PrimitiveTimerStart));
-            _primitives.Add("timer.stop", new PrimitiveDelegate(PrimitiveTimerStop));
-            _primitives.Add("timer.purge", new PrimitiveDelegate(PrimitiveTimerPurge));
+            Primitives.Add("AFTER", new PrimitiveDelegate(PrimitiveTimerAfter));
+            Primitives.Add("EVERY", new PrimitiveDelegate(PrimitiveTimerEvery));
+            Primitives.Add("timer.start", new PrimitiveDelegate(PrimitiveTimerStart));
+            Primitives.Add("timer.stop", new PrimitiveDelegate(PrimitiveTimerStop));
+            Primitives.Add("timer.purge", new PrimitiveDelegate(PrimitiveTimerPurge));
 
-            _primitives.Add("skills", new PrimitiveDelegate(PrimitiveGetSkills));
-            _primitives.Add("hasSkill", new PrimitiveDelegate(PrimitiveHasSkill));
+            Primitives.Add("skills", new PrimitiveDelegate(PrimitiveGetSkills));
+            Primitives.Add("hasSkill", new PrimitiveDelegate(PrimitiveHasSkill));
 
-            _primitives.Add("flag.set", new PrimitiveDelegate(PrimitiveFlagSet));
-            _primitives.Add("flag.clear", new PrimitiveDelegate(PrimitiveFlagClear));
-            _primitives.Add("flag.isSet", new PrimitiveDelegate(PrimitiveFlagIsSet));
-            _primitives.Add("flag.isClear", new PrimitiveDelegate(PrimitiveFlagIsClear));
+            Primitives.Add("flag.set", new PrimitiveDelegate(PrimitiveFlagSet));
+            Primitives.Add("flag.clear", new PrimitiveDelegate(PrimitiveFlagClear));
+            Primitives.Add("flag.isSet", new PrimitiveDelegate(PrimitiveFlagIsSet));
+            Primitives.Add("flag.isClear", new PrimitiveDelegate(PrimitiveFlagIsClear));
 
-            _primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
+            Primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
 
-            _primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));    
-            _primitives.Add("error.reset", new PrimitiveDelegate(PrimitiveErrorReset));
-            _primitives.Add("error.throw", new PrimitiveDelegate(PrimitiveErrorThrow));
+            Primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));    
+            Primitives.Add("error.reset", new PrimitiveDelegate(PrimitiveErrorReset));
+            Primitives.Add("error.throw", new PrimitiveDelegate(PrimitiveErrorThrow));
 
-            _primitives.Add("mogwai.halt", new PrimitiveDelegate(PrimitiveHalt));
-            _primitives.Add("mogwai.memory", new PrimitiveDelegate(PrimitiveGetMemory));
-            _primitives.Add("mogwai.reset", new PrimitiveDelegate(PrimitiveMogwaiReset));
-            _primitives.Add("mogwai.sendMessage", new PrimitiveDelegate(PrimitiveSendMessageToStudio));
-            _primitives.Add("mogwai.reboot", new PrimitiveDelegate(PrimitiveMogwaiReboot));
-            _primitives.Add("mogwai.info", new PrimitiveDelegate(PrimitiveMogwaiInfo));
-            _primitives.Add("mogwai.frugalMode", new PrimitiveDelegate(PrimitiveMogwaiFrugalMode));
-            _primitives.Add("mogwai.units", new PrimitiveDelegate(PrimitiveGetUnits));
-            _primitives.Add("mogwai.units.run", new PrimitiveDelegate(PrimitiveRunUnit));
+            Primitives.Add("mogwai.halt", new PrimitiveDelegate(PrimitiveHalt));
+            Primitives.Add("mogwai.memory", new PrimitiveDelegate(PrimitiveGetMemory));
+            Primitives.Add("mogwai.reset", new PrimitiveDelegate(PrimitiveMogwaiReset));
+            Primitives.Add("mogwai.sendMessage", new PrimitiveDelegate(PrimitiveSendMessageToStudio));
+            Primitives.Add("mogwai.reboot", new PrimitiveDelegate(PrimitiveMogwaiReboot));
+            Primitives.Add("mogwai.info", new PrimitiveDelegate(PrimitiveMogwaiInfo));
+            Primitives.Add("mogwai.frugalMode", new PrimitiveDelegate(PrimitiveMogwaiFrugalMode));
+            Primitives.Add("mogwai.units", new PrimitiveDelegate(PrimitiveGetUnits));
+            Primitives.Add("mogwai.units.run", new PrimitiveDelegate(PrimitiveRunUnit));
 
-            _primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
-            _primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
-            _primitives.Add("gpio.setMode.inputPullUp", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullUp));
-            _primitives.Add("gpio.setMode.output", new PrimitiveDelegate(PrimitiveGpioSetModeOutput));
-            _primitives.Add("gpio.read", new PrimitiveDelegate(PrimitiveGpioPinRead));
-            _primitives.Add("gpio.write.high", new PrimitiveDelegate(PrimitiveGpioPinWriteHigh));
-            _primitives.Add("gpio.write.low", new PrimitiveDelegate(PrimitiveGpioPinWriteLow));
-            _primitives.Add("gpio.toggle", new PrimitiveDelegate(PrimitiveGpioPinToggle));
-            _primitives.Add("gpio.close", new PrimitiveDelegate(PrimitiveGpioPinClose));
+            Primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
+            Primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
+            Primitives.Add("gpio.setMode.inputPullUp", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullUp));
+            Primitives.Add("gpio.setMode.output", new PrimitiveDelegate(PrimitiveGpioSetModeOutput));
+            Primitives.Add("gpio.read", new PrimitiveDelegate(PrimitiveGpioPinRead));
+            Primitives.Add("gpio.write.high", new PrimitiveDelegate(PrimitiveGpioPinWriteHigh));
+            Primitives.Add("gpio.write.low", new PrimitiveDelegate(PrimitiveGpioPinWriteLow));
+            Primitives.Add("gpio.toggle", new PrimitiveDelegate(PrimitiveGpioPinToggle));
+            Primitives.Add("gpio.close", new PrimitiveDelegate(PrimitiveGpioPinClose));
 
-            _primitives.Add("i2c.open", new PrimitiveDelegate(PrimitiveI2cOpen));
-            _primitives.Add("i2c.close", new PrimitiveDelegate(PrimitiveI2cClose));
-            _primitives.Add("i2c.write", new PrimitiveDelegate(PrimitiveI2cWrite));
-            _primitives.Add("i2c.register.write", new PrimitiveDelegate(PrimitiveI2cRegisterWrite));
-            _primitives.Add("i2c.read", new PrimitiveDelegate(PrimitiveI2cRead));
-            _primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
-            _primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
+            Primitives.Add("i2c.open", new PrimitiveDelegate(PrimitiveI2cOpen));
+            Primitives.Add("i2c.close", new PrimitiveDelegate(PrimitiveI2cClose));
+            Primitives.Add("i2c.write", new PrimitiveDelegate(PrimitiveI2cWrite));
+            Primitives.Add("i2c.register.write", new PrimitiveDelegate(PrimitiveI2cRegisterWrite));
+            Primitives.Add("i2c.read", new PrimitiveDelegate(PrimitiveI2cRead));
+            Primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
+            Primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
 
-            _primitives.Add("ssd1306.init", new PrimitiveDelegate(PrimitiveSsd1306Init));
-            _primitives.Add("ssd1306.close", new PrimitiveDelegate(PrimitiveSsd1306Close));
-            _primitives.Add("ssd1306.clear", new PrimitiveDelegate(PrimitiveSsd1306Clear));
-            _primitives.Add("ssd1306.printString", new PrimitiveDelegate(PrimitiveSsd1306PrintString));
-            _primitives.Add("ssd1306.drawString", new PrimitiveDelegate(PrimitiveSsd1306DrawString));
-            _primitives.Add("ssd1306.refresh", new PrimitiveDelegate(PrimitiveSsd1306Refresh));
-            _primitives.Add("ssd1306.drawPixel", new PrimitiveDelegate(PrimitiveSsd1306DrawPixel));
-            _primitives.Add("ssd1306.drawHorizontalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHorizontalLine));
-            _primitives.Add("ssd1306.drawVerticalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHVerticalLine));
-            _primitives.Add("ssd1306.drawRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawRectangle));
-            _primitives.Add("ssd1306.drawFilledRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawFilledRectangle));
-            _primitives.Add("ssd1306.drawBitmap", new PrimitiveDelegate(PrimitiveSsd1306DrawBitmap));
+            Primitives.Add("ssd1306.init", new PrimitiveDelegate(PrimitiveSsd1306Init));
+            Primitives.Add("ssd1306.close", new PrimitiveDelegate(PrimitiveSsd1306Close));
+            Primitives.Add("ssd1306.clear", new PrimitiveDelegate(PrimitiveSsd1306Clear));
+            Primitives.Add("ssd1306.printString", new PrimitiveDelegate(PrimitiveSsd1306PrintString));
+            Primitives.Add("ssd1306.drawString", new PrimitiveDelegate(PrimitiveSsd1306DrawString));
+            Primitives.Add("ssd1306.refresh", new PrimitiveDelegate(PrimitiveSsd1306Refresh));
+            Primitives.Add("ssd1306.drawPixel", new PrimitiveDelegate(PrimitiveSsd1306DrawPixel));
+            Primitives.Add("ssd1306.drawHorizontalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHorizontalLine));
+            Primitives.Add("ssd1306.drawVerticalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHVerticalLine));
+            Primitives.Add("ssd1306.drawRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawRectangle));
+            Primitives.Add("ssd1306.drawFilledRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawFilledRectangle));
+            Primitives.Add("ssd1306.drawBitmap", new PrimitiveDelegate(PrimitiveSsd1306DrawBitmap));
 
-            _primitives.Add("pwm.open", new PrimitiveDelegate(PrimitivePwmOpen));
-            _primitives.Add("pwm.close", new PrimitiveDelegate(PrimitivePwmClose));
-            _primitives.Add("pwm.start", new PrimitiveDelegate(PrimitivePwmStart));
-            _primitives.Add("pwm.stop", new PrimitiveDelegate(PrimitivePwmStop));
+            Primitives.Add("pwm.open", new PrimitiveDelegate(PrimitivePwmOpen));
+            Primitives.Add("pwm.close", new PrimitiveDelegate(PrimitivePwmClose));
+            Primitives.Add("pwm.start", new PrimitiveDelegate(PrimitivePwmStart));
+            Primitives.Add("pwm.stop", new PrimitiveDelegate(PrimitivePwmStop));
 
-            _primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));
-            _primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
-            _primitives.Add("adc.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
-            _primitives.Add("adc.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
-            _primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));
+            Primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));
+            Primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
+            Primitives.Add("adc.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
+            Primitives.Add("adc.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
+            Primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));
 
-            _primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
+            Primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
 
-            _primitives.Add("stopwatch.create", new PrimitiveDelegate(PrimitiveStopwatchCreate));   
-            _primitives.Add("stopwatch.start", new PrimitiveDelegate(PrimitiveStopwatchStart));
-            _primitives.Add("stopwatch.stop", new PrimitiveDelegate(PrimitiveStopwatchStop));
-            _primitives.Add("stopwatch.reset", new PrimitiveDelegate(PrimitiveStopwatchReset));
-            _primitives.Add("stopwatch.restart", new PrimitiveDelegate(PrimitiveStopwatchRestart));
-            _primitives.Add("stopwatch.isRunning", new PrimitiveDelegate(PrimitiveStopwatchIsRunning));
-            _primitives.Add("stopwatch.elapsed", new PrimitiveDelegate(PrimitiveStopwatchElapsed));
-            _primitives.Add("stopwatch.purge", new PrimitiveDelegate(PrimitiveStopwatchPurge));
+            Primitives.Add("stopwatch.create", new PrimitiveDelegate(PrimitiveStopwatchCreate));   
+            Primitives.Add("stopwatch.start", new PrimitiveDelegate(PrimitiveStopwatchStart));
+            Primitives.Add("stopwatch.stop", new PrimitiveDelegate(PrimitiveStopwatchStop));
+            Primitives.Add("stopwatch.reset", new PrimitiveDelegate(PrimitiveStopwatchReset));
+            Primitives.Add("stopwatch.restart", new PrimitiveDelegate(PrimitiveStopwatchRestart));
+            Primitives.Add("stopwatch.isRunning", new PrimitiveDelegate(PrimitiveStopwatchIsRunning));
+            Primitives.Add("stopwatch.elapsed", new PrimitiveDelegate(PrimitiveStopwatchElapsed));
+            Primitives.Add("stopwatch.purge", new PrimitiveDelegate(PrimitiveStopwatchPurge));
 
-            _primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
-            _primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
-            _primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));
-            _primitives.Add("IFELSE", new PrimitiveDelegate(PrimitiveIfElse));
-            _primitives.Add("WHILE", new PrimitiveDelegate(PrimitiveWhile));
-            _primitives.Add("FOR", new PrimitiveDelegate(PrimitiveFor));
-            _primitives.Add("FORSTEP", new PrimitiveDelegate(PrimitiveForStep));
-            _primitives.Add("FOREVER", new PrimitiveDelegate(PrimitiveForever));
-            _primitives.Add("DEFUNC", new PrimitiveDelegate(PrimitiveDefunc));
-            _primitives.Add("FOREACH", new PrimitiveDelegate(PrimitiveForeach));
-            _primitives.Add("TRAP", new PrimitiveDelegate(PrimitiveTrap));
-            _primitives.Add("GUARD", new PrimitiveDelegate(PrimitiveGuard));
-            _primitives.Add("DURING", new PrimitiveDelegate(PrimitiveDuring));    
+            Primitives.Add("STO", new PrimitiveDelegate(PrimitiveSto));
+            Primitives.Add("REPEAT", new PrimitiveDelegate(PrimitiveRepeat));
+            Primitives.Add("IF", new PrimitiveDelegate(PrimitiveIf));
+            Primitives.Add("IFELSE", new PrimitiveDelegate(PrimitiveIfElse));
+            Primitives.Add("WHILE", new PrimitiveDelegate(PrimitiveWhile));
+            Primitives.Add("FOR", new PrimitiveDelegate(PrimitiveFor));
+            Primitives.Add("FORSTEP", new PrimitiveDelegate(PrimitiveForStep));
+            Primitives.Add("FOREVER", new PrimitiveDelegate(PrimitiveForever));
+            Primitives.Add("DEFUNC", new PrimitiveDelegate(PrimitiveDefunc));
+            Primitives.Add("FOREACH", new PrimitiveDelegate(PrimitiveForeach));
+            Primitives.Add("TRAP", new PrimitiveDelegate(PrimitiveTrap));
+            Primitives.Add("GUARD", new PrimitiveDelegate(PrimitiveGuard));
+            Primitives.Add("DURING", new PrimitiveDelegate(PrimitiveDuring));    
         }
 
         private void RunLoop()
@@ -420,7 +436,7 @@ namespace MogwaiNano.Engine
 
             if (withPrimitiveChecking)
             {
-                if (_primitives.Contains(name))
+                if (Primitives.Contains(name))
                     return false;
             }
 
@@ -479,9 +495,9 @@ namespace MogwaiNano.Engine
 
                 if (result.IsError)
                 {
-                    if (_functions.Contains("MOGWAI.onError"))
+                    if (Functions.Contains("MOGWAI.onError"))
                     {
-                        var onErrorFunction = _functions["MOGWAI.onError"] as MOGFunction;
+                        var onErrorFunction = Functions["MOGWAI.onError"] as MOGFunction;
                         result2 = onErrorFunction.Execute();
 
                         if (result2.IsError)
@@ -490,9 +506,9 @@ namespace MogwaiNano.Engine
                 }
                 else
                 {
-                    if (_functions.Contains("MOGWAI.onStop"))
+                    if (Functions.Contains("MOGWAI.onStop"))
                     {
-                        var onStopFunction = _functions["MOGWAI.onStop"] as MOGFunction;
+                        var onStopFunction = Functions["MOGWAI.onStop"] as MOGFunction;
                         result2 = onStopFunction.Execute();
 
                         if (result2.IsError)
@@ -552,10 +568,10 @@ namespace MogwaiNano.Engine
 
             CleanupAdcChannels();
 
-            if (_ssd1306 != null)
+            if (Ssd1306 != null)
             {
-                _ssd1306.Dispose();
-                _ssd1306 = null;
+                Ssd1306.Dispose();
+                Ssd1306 = null;
             }
 
             _stacks.Clear();
@@ -565,9 +581,9 @@ namespace MogwaiNano.Engine
             var glb = _varsContext[0] as VarContext;
             glb.Clear();
 
-            _functions.Clear();
+            Functions.Clear();
 
-            _disableInterrupts = false;
+            DisableInterrupts = false;
 
             HaltRequested = false;
             BreakRequested = false;
@@ -605,23 +621,23 @@ namespace MogwaiNano.Engine
 
         #region PRIMITIVES
 
-        private EvalResult PrimitivePlus(string name)
+        private static EvalResult PrimitivePlus(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
                 // 15 20 +
 
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
                 n0.Value += n1.Value;
 
-                StackPush(n0);
+                engine.StackPush(n0);
 
                 return EvalResult.NoError;
             }
@@ -629,12 +645,12 @@ namespace MogwaiNano.Engine
             {
                 // "AA" "BB" +
 
-                var s1 = StackPop() as MOGString;
-                var s0 = StackPop() as MOGString;
+                var s1 = engine.StackPop() as MOGString;
+                var s0 = engine.StackPop() as MOGString;
 
                 s0.Value += s1.Value;
 
-                StackPush(s0);
+                engine.StackPush(s0);
 
                 return EvalResult.NoError;
             }
@@ -642,12 +658,12 @@ namespace MogwaiNano.Engine
             {
                 // "BB" 456 +
 
-                var s1 = StackPop() as MOGNumber;
-                var s0 = StackPop() as MOGString;
+                var s1 = engine.StackPop() as MOGNumber;
+                var s0 = engine.StackPop() as MOGString;
 
                 s0.Value += s1.Value.ToString();
 
-                StackPush(s0);
+                engine.StackPush(s0);
 
                 return EvalResult.NoError;
             }
@@ -655,12 +671,12 @@ namespace MogwaiNano.Engine
             {
                 // 456 "BB" +
 
-                var s1 = StackPop() as MOGString;
-                var s0 = StackPop() as MOGNumber;
+                var s1 = engine.StackPop() as MOGString;
+                var s0 = engine.StackPop() as MOGNumber;
 
                 s1.Value = s0.Value.ToString() + s1.Value;
 
-                StackPush(s1);
+                engine.StackPush(s1);
 
                 return EvalResult.NoError;
             }
@@ -668,12 +684,12 @@ namespace MogwaiNano.Engine
             {
                 // (1 2 3) "TOTO" + 
 
-                var item = StackPop();
+                var item = engine.StackPop();
 
-                var list = StackPop() as MOGList;
+                var list = engine.StackPop() as MOGList;
                 list.AddItem(item);
 
-                StackPush(list);
+                engine.StackPush(list);
 
                 return EvalResult.NoError;
             }
@@ -681,12 +697,12 @@ namespace MogwaiNano.Engine
             {
                 // D:FFAB45 123 +
 
-                var value = StackPop() as MOGNumber;
-                var data = StackPop() as MOGData;
+                var value = engine.StackPop() as MOGNumber;
+                var data = engine.StackPop() as MOGData;
 
                 data.AddItem((byte)value.Value);
 
-                StackPush(data);
+                engine. StackPush(data);
 
                 return EvalResult.NoError;
             }
@@ -694,45 +710,45 @@ namespace MogwaiNano.Engine
             {
                 // &ref X +
 
-                var item = StackPop();
-                var @ref = StackPop() as MOGRef;
+                var item = engine.StackPop();
+                var @ref = engine.StackPop() as MOGRef;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, @ref.ToString());
 
-                StackPush(value);
-                StackPush(item);
+                engine.StackPush(value);
+                engine.StackPush(item);
 
-                var r = PrimitivePlus(name);
+                var r = PrimitivePlus(engine, name);
 
                 if (r.IsError)
                     return r;
 
-                StackDrop();
+                engine.StackDrop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveMathSubstraction(string name)
+        private static EvalResult PrimitiveMathSubstraction(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
                 n0.Value -= n1.Value;
 
-                StackPush(n0);
+                engine.StackPush(n0);
 
                 return EvalResult.NoError;
             }
@@ -740,91 +756,91 @@ namespace MogwaiNano.Engine
             {
                 // &ref X +
 
-                var item = StackPop();
-                var @ref = StackPop() as MOGRef;
+                var item = engine.StackPop();
+                var @ref = engine.StackPop() as MOGRef;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, @ref.ToString());
 
-                StackPush(value);
-                StackPush(item);
+                engine.StackPush(value);
+                engine.StackPush(item);
 
-                var r = PrimitiveMathSubstraction(name);
+                var r = PrimitiveMathSubstraction(engine, name);
 
                 if (r.IsError)
                     return r;
 
-                StackDrop();
+                engine.StackDrop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveMathMultiplication(string name)
+        private static EvalResult PrimitiveMathMultiplication(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
                 n0.Value *= n1.Value;
 
-                StackPush(n0);
-
+                engine.StackPush(n0);
+                
                 return EvalResult.NoError;
             }
             else if (s[1] == typeof(MOGRef))
             {
                 // &ref X +
 
-                var item = StackPop();
-                var @ref = StackPop() as MOGRef;
+                var item = engine.StackPop();
+                var @ref = engine.StackPop() as MOGRef;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, @ref.ToString());
 
-                StackPush(value);
-                StackPush(item);
+                engine.StackPush(value);
+                engine.StackPush(item);
 
-                var r = PrimitiveMathMultiplication(name);
+                var r = PrimitiveMathMultiplication(engine, name);
 
                 if (r.IsError)
                     return r;
 
-                StackDrop();
+                engine.StackDrop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveMathDivision(string name)
+        private static EvalResult PrimitiveMathDivision(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
                 n0.Value /= n1.Value;
 
-                StackPush(n0);
+                engine.StackPush(n0);
 
                 return EvalResult.NoError;
             }
@@ -832,151 +848,151 @@ namespace MogwaiNano.Engine
             {
                 // &ref X +
 
-                var item = StackPop();
-                var @ref = StackPop() as MOGRef;
+                var item = engine.StackPop();
+                var @ref = engine.StackPop() as MOGRef;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, @ref.ToString());
 
-                StackPush(value);
-                StackPush(item);
+                engine.StackPush(value);
+                engine.StackPush(item);
 
-                var r = PrimitiveMathDivision(name);
+                var r = PrimitiveMathDivision(engine, name);
 
                 if (r.IsError)
                     return r;
 
-                StackDrop();
+                engine.StackDrop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveMathFloor(string name)
+        private static EvalResult PrimitiveMathFloor(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var number = StackPop() as MOGNumber;
+            var number = engine.StackPop() as MOGNumber;
 
             try
             {
-                var n = new MOGNumber(this, (float)Math.Floor((double)number.Value));
-                StackPush(n);
+                var n = new MOGNumber(engine, (float)Math.Floor((double)number.Value));
+                engine.StackPush(n);
 
                 return EvalResult.NoError;
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(this, Error.MathematicalError, name, ex.Message);
+                return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
             }
         }
 
-        private EvalResult PrimitiveMathModulo(string name)
+        private static EvalResult PrimitiveMathModulo(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop() as MOGNumber;
-            var n1 = StackPop() as MOGNumber;
+            var n0 = engine.StackPop() as MOGNumber;
+            var n1 = engine.StackPop() as MOGNumber;
 
             try
             {
                 var v = n1.Value % n0.Value;
-                StackPush(new MOGNumber(this, v));
+                engine.StackPush(new MOGNumber(engine, v));
 
                 return EvalResult.NoError;
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(this, Error.MathematicalError, name, ex.Message);
+                return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
             }
         }
 
-        private EvalResult PrimitiveGetType(string name)
+        private static EvalResult PrimitiveGetType(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize < 1)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize < 1)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var n0 = StackPop();
-            StackPush(n0.Type.Clone());
+            var n0 = engine.StackPop();
+            engine.StackPush(n0.Type.Clone());
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveEval(string name)
+        private static EvalResult PrimitiveEval(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var obj = StackPop();
+            var obj = engine.StackPop();
             return obj.UserEval();
         }
 
-        private EvalResult PrimitiveStackClear(string name)
+        private static EvalResult PrimitiveStackClear(MogwaiNanoEngine engine, string name)
         {
-            StackClear();
+            engine.StackClear();
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveStackSwap(string name)
+        private static EvalResult PrimitiveStackSwap(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize < 2)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize < 2)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            StackSwap();
+            engine.StackSwap();
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveStackDup(string name)
+        private static EvalResult PrimitiveStackDup(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize < 1)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize < 1)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            StackDup();
+            engine.StackDup();
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveStackDrop(string name)
+        private static EvalResult PrimitiveStackDrop(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            StackDrop();
+            engine.StackDrop();
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveDebugWrite(string name)
+        private static EvalResult PrimitiveDebugWrite(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var n0 = StackPop();
+            var n0 = engine.StackPop();
 
             if (n0 is MOGRef @ref)
             {
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
 
-                StackPush(value);
+                engine.StackPush(value);
 
-                var r = PrimitiveDebugWrite(name);
+                var r = PrimitiveDebugWrite(engine, name);
 
                 if (r.IsError)
                     return r;
@@ -984,37 +1000,38 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
 
-            if (Delegate != null)
+            if (engine.Delegate != null)
             {
                 if (n0 is MOGString @string)
                 {
-                    return Delegate.DebugMessage(this, @string.Value);
+                    return engine.Delegate.DebugMessage(engine, @string.Value);
                 }
                 else
                 {
-                    return Delegate.DebugMessage(this, n0.ToString());
+                    return  engine.Delegate.DebugMessage(engine, n0.ToString());
                 }
             }
+
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveConsolePrintLn(string name)
+        private static EvalResult PrimitiveConsolePrintLn(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var n0 = StackPop();
+            var n0 = engine.StackPop();
 
             if (n0 is MOGRef @ref)
             {
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
 
-                StackPush(value);
+                engine.StackPush(value);
 
-                var r = PrimitiveConsolePrintLn(name);
+                var r = PrimitiveConsolePrintLn(engine, name);
 
                 if (r.IsError)
                     return r;
@@ -1022,38 +1039,38 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
 
-            if (Delegate != null)
+            if (engine.Delegate != null)
             {
                 if (n0 is MOGString @string)
                 {
-                    return Delegate.ConsolePrintLn(this, @string.Value);
+                    return engine.Delegate.ConsolePrintLn(engine, @string.Value);
                 }
                 else
                 {
-                    return Delegate.ConsolePrintLn(this, n0.ToString());
+                    return engine.Delegate.ConsolePrintLn(engine, n0.ToString());
                 }
             }
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveConsolePrint(string name)
+        private static EvalResult PrimitiveConsolePrint(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var n0 = StackPop();
+            var n0 = engine.StackPop();
 
             if (n0 is MOGRef @ref)
             {
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
 
-                StackPush(value);
+                engine.StackPush(value);
 
-                var r = PrimitiveConsolePrint(name);
+                var r = PrimitiveConsolePrint(engine, name);
 
                 if (r.IsError)
                     return r;
@@ -1061,68 +1078,68 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
 
-            if (Delegate != null)
+            if (engine.Delegate != null)
             {
                 if (n0 is MOGString @string)
                 {
-                    return Delegate.ConsolePrint(this, @string.Value);
+                    return engine.Delegate.ConsolePrint(engine, @string.Value);
                 }
                 else
                 {
-                    return Delegate.ConsolePrint(this, n0.ToString());
+                    return engine.Delegate.ConsolePrint(engine, n0.ToString());
                 }
             }
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveSto(string name)
+        private static EvalResult PrimitiveSto(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n = StackPop() as MOGName;
-            var value = StackPop() as MOGObject;
+            var n = engine.StackPop() as MOGName;
+            var value = engine.StackPop() as MOGObject;
 
-            if (!IsValidName(n.Value, true))
-                return EvalResult.Failure(this, Error.InvalidNameError, name, n.ToString());
+            if (!engine.IsValidName(n.Value, true))
+                return EvalResult.Failure(engine, Error.InvalidNameError, name, n.ToString());
 
-            return VarWrite(n.Value, value);
+            return engine.VarWrite(n.Value, value);
         }
 
-        private EvalResult PrimitiveBreak(string name)
+        private static EvalResult PrimitiveBreak(MogwaiNanoEngine engine, string name)
         {
-            BreakRequested = true;
+            engine.BreakRequested = true;
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveHalt(string name)
+        private static EvalResult PrimitiveHalt(MogwaiNanoEngine engine, string name)
         {
-            HaltRequested = true;
+            engine.HaltRequested = true;
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveWait(string name)
+        private static EvalResult PrimitiveWait(MogwaiNanoEngine engine, string name)
         {
             // 50 wait
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var v = StackPop() as MOGNumber;
+            var v = engine.StackPop() as MOGNumber;
 
             if (v.Value < 0)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
             var stopwatch = Stopwatch.StartNew();
 
@@ -1130,7 +1147,7 @@ namespace MogwaiNano.Engine
             {
                 Thread.Sleep(0);
 
-                var result = ExecuteWaitingFireObjects();
+                var result = engine.ExecuteWaitingFireObjects();
 
                 if (result != EvalResult.NoError)
                     return result;
@@ -1139,28 +1156,28 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveGet(string name)
+        private static EvalResult PrimitiveGet(MogwaiNanoEngine engine, string name)
         {
             // (1 2 3) 0 get
             // [x: 50 y: 10] x: get
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGList))
             {
                 // (1 2 3) 0 get
 
-                var index = StackPop() as MOGNumber;
-                var list = StackPop() as MOGList;
+                var index = engine.StackPop() as MOGNumber;
+                var list = engine.StackPop() as MOGList;
 
                 if (index.Value < 0 || index.Value >= list.Items.Count)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 var item = list.GetItem((int)index.Value);
-                StackPush(item);
+                engine.StackPush(item);
 
                 return EvalResult.NoError;
             }
@@ -1168,18 +1185,18 @@ namespace MogwaiNano.Engine
             {
                 // [x: 10 y: 20] x: get
 
-                var key = StackPop() as MOGKey;
-                var record = StackPop() as MOGRecord;
+                var key = engine.StackPop() as MOGKey;
+                var record = engine.StackPop() as MOGRecord;
 
                 var item = record.GetItem(key.Value);
 
                 if (item == null)
                 {
-                    StackPush(new MOGNull(this));
+                    engine.StackPush(new MOGNull(engine));
                 }
                 else
                 {
-                    StackPush(item);
+                    engine.StackPush(item);
                 }
 
                 return EvalResult.NoError;
@@ -1188,14 +1205,14 @@ namespace MogwaiNano.Engine
             {
                 // D:FFAA45 0 get
 
-                var index = StackPop() as MOGNumber;
-                var data = StackPop() as MOGData;
+                var index = engine.StackPop() as MOGNumber;
+                var data = engine.StackPop() as MOGData;
 
                 if (index.Value < 0 || index.Value >= data.Items.Length)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 var item = data.GetItem((int)index.Value);
-                StackPush(new MOGNumber(this, item));
+                engine.StackPush(new MOGNumber(engine, item));
 
                 return EvalResult.NoError;
             }
@@ -1203,18 +1220,18 @@ namespace MogwaiNano.Engine
             {
                 // &ref X get
 
-                var item = StackPop();
-                var @ref = StackPop() as MOGRef;
+                var item = engine.StackPop();
+                var @ref = engine.StackPop() as MOGRef;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, @ref.Value);
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, @ref.Value);
 
-                StackPush(value);
-                StackPush(item);
+                engine.StackPush(value);
+                engine.StackPush(item);
 
-                var r = PrimitiveGet(name);
+                var r = PrimitiveGet(engine, name);
 
                 if (r.IsError)
                     return r;
@@ -1222,32 +1239,32 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSet(string name)
+        private static EvalResult PrimitiveSet(MogwaiNanoEngine engine, string name)
         {
             // 10 (1 2 3) 0 set ---> (10 2 3)
             // 100 [x: 10 y: 20] x: set ---> [x: 100 y: 20]
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGList))
             {
                 // 10 (1 2 3) 0 set
 
-                var index = StackPop() as MOGNumber;
-                var list = StackPop() as MOGList;
-                var value = StackPop();
+                var index = engine.StackPop() as MOGNumber;
+                var list = engine.StackPop() as MOGList;
+                var value = engine.StackPop();
 
                 if (index.Value < 0 || index.Value >= list.Items.Count)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 list.SetItem((int)index.Value, value);
-                StackPush(list);
+                engine.StackPush(list);
 
                 return EvalResult.NoError;
             }
@@ -1255,12 +1272,12 @@ namespace MogwaiNano.Engine
             {
                 // 100 [x: 10 y: 20] x: set
 
-                var key = StackPop() as MOGKey;
-                var record = StackPop() as MOGRecord;
-                var value = StackPop();
+                var key = engine.StackPop() as MOGKey;
+                var record = engine.StackPop() as MOGRecord;
+                var value = engine.StackPop();
 
                 record.SetItem(key.Value, value);
-                StackPush(record);
+                engine.StackPush(record);
 
                 return EvalResult.NoError;
             }
@@ -1268,15 +1285,15 @@ namespace MogwaiNano.Engine
             {
                 // 10 D:FFAA45 0 set
 
-                var index = StackPop() as MOGNumber;
-                var data = StackPop() as MOGData;
-                var value = StackPop() as MOGNumber;
+                var index = engine.StackPop() as MOGNumber;
+                var data = engine.StackPop() as MOGData;
+                var value = engine.StackPop() as MOGNumber;
 
                 if (index.Value < 0 || index.Value >= data.Items.Length)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 data.SetItem((int)index.Value, (byte)value.Value);
-                StackPush(data);
+                engine.StackPush(data);
 
                 return EvalResult.NoError;
             }
@@ -1285,72 +1302,72 @@ namespace MogwaiNano.Engine
                 // 10 &X 5 set
                 // 10 &X x: set
 
-                var item = StackPop();
-                var @ref = StackPop() as MOGRef;
+                var item = engine.StackPop();
+                var @ref = engine.StackPop() as MOGRef;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name);
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name);
 
-                StackPush(value);
-                StackPush(item);
+                engine.StackPush(value);
+                engine.StackPush(item);
 
-                var r = PrimitiveSet(name);
+                var r = PrimitiveSet(engine, name);
 
                 if (r.IsError)
                     return r;
 
-                StackDrop();
+                engine.StackDrop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSize(string name)
+        private static EvalResult PrimitiveSize(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGList))
             {
-                var list = StackPop() as MOGList;
-                StackPush(new MOGNumber(this, list.Items.Count));
+                var list = engine.StackPop() as MOGList;
+                engine.StackPush(new MOGNumber(engine, list.Items.Count));
                 return EvalResult.NoError;
             }
             else if (s[0] == typeof(MOGRecord))
             {
-                var record = StackPop() as MOGRecord;
-                StackPush(new MOGNumber(this, record.Items.Count));
+                var record = engine.StackPop() as MOGRecord;
+                engine.StackPush(new MOGNumber(engine, record.Items.Count));
                 return EvalResult.NoError;
             }
             else if (s[0] == typeof(MOGString))
             {
-                var @string = StackPop() as MOGString;
-                StackPush(new MOGNumber(this, @string.Value.Length));
+                var @string = engine.StackPop() as MOGString;
+                engine.StackPush(new MOGNumber(engine, @string.Value.Length));
                 return EvalResult.NoError;
             }
             else if (s[0] == typeof(MOGData))
             {
-                var data = StackPop() as MOGData;
-                StackPush(new MOGNumber(this, data.Items.Length));
+                var data = engine.StackPop() as MOGData;
+                engine.StackPush(new MOGNumber(engine, data.Items.Length));
                 return EvalResult.NoError;
             }
             else if (s[0] == typeof(MOGRef))
             {
-                var @ref = StackPop() as MOGRef;
-                var value = VarRead(@ref.Value, false);
+                var @ref = engine.StackPop() as MOGRef;
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
 
-                StackPush(value);
+                engine.StackPush(value);
 
-                var r = PrimitiveSize(name);
+                var r = PrimitiveSize(engine, name);
 
                 if (r.IsError)
                     return r;
@@ -1358,235 +1375,233 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitivePurge(string name)
+        private static EvalResult PrimitivePurge(MogwaiNanoEngine engine, string name)
         {
             // 'A' purge
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var varName = StackPop() as MOGName;
+                var varName = engine.StackPop() as MOGName;
 
-                if (VarPurge(varName.Value))
+                if (engine.VarPurge(varName.Value))
                     return EvalResult.NoError;
 
-                return EvalResult.Failure(this, Error.UnknownNameError, name, varName.Value);
+                return EvalResult.Failure(engine, Error.UnknownNameError, name, varName.Value);
             }
             else if (s[0] == typeof(MOGKey))
             {
-                s = StackSign(2);
+                s = engine.StackSign(2);
 
                 if (s.Length == 0)
-                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
                 if (s[0] == typeof(MOGKey) && s[1] == typeof(MOGRecord))
                 {
-                    var key = StackPop() as MOGKey;
-                    var record = StackPop() as MOGRecord;
+                    var key = engine.StackPop() as MOGKey;
+                    var record = engine.StackPop() as MOGRecord;
 
                     if (record.RemoveItem(key.Value))
                     {
-                        StackPush(record);
+                        engine.StackPush(record);
                         return EvalResult.NoError;
                     }
 
-                    return EvalResult.Failure(this, Error.UnknownKeyError, name, key.Value);
+                    return EvalResult.Failure(engine, Error.UnknownKeyError, name, key.Value);
                 }
                 else if (s[1] == typeof(MOGRef))
                 {
-                    var n0 = StackPop();
-
-                    var reference = StackPop() as MOGRef;
-                    var value = VarRead(reference.Value, false);
+                    var n0 = engine.StackPop();
+                    var reference = engine.StackPop() as MOGRef;
+                    var value = engine.VarRead(reference.Value, false);
 
                     if (value == null)
-                        return EvalResult.Failure(this, Error.UnknownNameError, name, reference.ToString());
+                        return EvalResult.Failure(engine, Error.UnknownNameError, name, reference.ToString());
 
                     // Le contenu de la variable doit être de type record
 
                     if (value is MOGRecord)
                     {
-                        StackPush(value);
-                        StackPush(n0);
+                        engine.StackPush(value);
+                        engine.StackPush(n0);
 
-                        var r = PrimitivePurge(name);
+                        var r = PrimitivePurge(engine, name);
 
                         if (r.IsError)
                             return r;
 
                         // On enlève la valeur modifiée de la stack qui ne sert à rien
 
-                        StackDrop();
+                        engine.StackDrop();
 
                         return EvalResult.NoError;
                     }
                     else
                     {
-                        return EvalResult.Failure(this, Error.BadArgumentTypeError, name, reference.ToString(), $"var type .{value.Type.Value} not allowed");
+                        return EvalResult.Failure(engine, Error.BadArgumentTypeError, name, reference.ToString(), $"var type .{value.Type.Value} not allowed");
                     }
                 }
             }
             else if (s[0] == typeof(MOGNumber))
             {
-                s = StackSign(2);
+                s = engine.StackSign(2);
 
                 if (s.Length == 0)
-                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
                 if (s[1] == typeof(MOGList))
                 {
-                    var index = StackPop() as MOGNumber;
-                    var list = StackPop() as MOGList;
+                    var index = engine.StackPop() as MOGNumber;
+                    var list = engine.StackPop() as MOGList;
 
                     var result = list.RemoveItem((int)index.Value);
 
                     if (result == EvalResult.NoError)
-                        StackPush(list);
+                        engine.StackPush(list);
 
                     return result;
                 }
                 else if (s[1] == typeof(MOGData))
                 {
-                    var index = StackPop() as MOGNumber;
-                    var data = StackPop() as MOGData;
+                    var index = engine.StackPop() as MOGNumber;
+                    var data = engine.StackPop() as MOGData;
 
                     var result = data.RemoveItem((int)index.Value);
 
                     if (result == EvalResult.NoError)
-                        StackPush(data);
+                        engine.StackPush(data);
 
                     return result;
                 }
                 else if (s[1] == typeof(MOGRef))
                 {
-                    var n0 = StackPop();
+                    var n0 = engine.StackPop();
 
-                    var reference = StackPop() as MOGRef;
-                    var value = VarRead(reference.Value, false);
+                    var reference = engine.StackPop() as MOGRef;
+                    var value = engine.VarRead(reference.Value, false);
 
                     if (value == null)
-                        return EvalResult.Failure(this, Error.UnknownNameError, name, reference.ToString());
+                        return EvalResult.Failure(engine, Error.UnknownNameError, name, reference.ToString());
 
                     // Le contenu de la variable doit être de type list ou data
 
                     if (value is MOGList || value is MOGData)
                     {
-                        StackPush(value);
-                        StackPush(n0);
+                        engine.StackPush(value);
+                        engine.StackPush(n0);
 
-                        var r = PrimitivePurge(name);
+                        var r = PrimitivePurge(engine, name);
 
                         if (r.IsError)
                             return r;
 
                         // On enlève la valeur modifiée de la stack qui ne sert à rien
 
-                        StackDrop();
+                        engine.StackDrop();
 
                         return EvalResult.NoError;
                     }
                     else
                     {
-                        return EvalResult.Failure(this, Error.BadArgumentTypeError, name, reference.ToString(), $"var type .{value.Type.Value} not allowed");
+                        return EvalResult.Failure(engine, Error.BadArgumentTypeError, name, reference.ToString(), $"var type .{value.Type.Value} not allowed");
                     }
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
         }
 
-        private EvalResult PrimitiveExists(string name)
+        private static EvalResult PrimitiveExists(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
             
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
             
             if (s[0] == typeof(MOGName))
             {
-                var varName = StackPop() as MOGName;
-                var exists = VarExists(varName.Value);
+                var varName = engine.StackPop() as MOGName;
+                var exists = engine.VarExists(varName.Value);
                
-                StackPush(new MOGBoolean(this, exists));
+                engine.StackPush(new MOGBoolean(engine, exists));
                 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveDI(string name)
+        private static EvalResult PrimitiveDI(MogwaiNanoEngine engine, string name)
         {
-            _disableInterrupts = true;
+            engine.DisableInterrupts = true;
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveEI(string name)
+        private static EvalResult PrimitiveEI(MogwaiNanoEngine engine, string name)
         {
-            _disableInterrupts = false;
+            engine.DisableInterrupts = false;
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveToData(string name)
+        private static EvalResult PrimitiveToData(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber))
             {
-                var n0 = StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
                 var size = (int)n0.Value;
 
-                if (size > StackSize)
-                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                if (size > engine.StackSize)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-                var types = StackSign(size);
+                var types = engine.StackSign(size);
 
                 for (int i = 0; i < size; i++)
                 {
                     if (types[i] != typeof(MOGNumber))
-                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, "only numbers between 0 and 255 are allowed.");
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "only numbers between 0 and 255 are allowed.");
                 }
 
                 var items = new byte[size];
 
                 for (int i = size - 1; i >= 0; i--)
                 {
-                    var n = StackPop() as MOGNumber;
+                    var n = engine.StackPop() as MOGNumber;
                     items[i] = (byte)n.Value;
                 }
 
-                var data = new MOGData(this, items);
-
-                StackPush(data);
+                var data = new MOGData(engine, items);
+                engine.StackPush(data);
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveMakeData(string name)
+        private static EvalResult PrimitiveMakeData(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var initValue = StackPop() as MOGNumber;
-                var size = StackPop() as MOGNumber;
+                var initValue = engine.StackPop() as MOGNumber;
+                var size = engine.StackPop() as MOGNumber;
 
                 var items = new byte[(int)size.Value];
                 var value = (byte)initValue.Value;
@@ -1597,31 +1612,31 @@ namespace MogwaiNano.Engine
                         items[i] = value;
                 }
 
-                var data = new MOGData(this, items);
+                var data = new MOGData(engine, items);
 
-                StackPush(data);
+                engine.StackPush(data);
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionEqual(string name)
+        private static EvalResult PrimitiveConditionEqual(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
                 // n1 n2 ==
 
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
-                StackPush(new MOGBoolean(this, n0.Value == n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value == n1.Value));
 
                 return EvalResult.NoError;
             }
@@ -1629,10 +1644,10 @@ namespace MogwaiNano.Engine
             {
                 // t1 t2 ==
 
-                var t1 = StackPop() as MOGType;
-                var t0 = StackPop() as MOGType;
+                var t1 = engine.StackPop() as MOGType;
+                var t0 = engine.StackPop() as MOGType;
 
-                StackPush(new MOGBoolean(this, t0.Value == t1.Value));
+                engine.StackPush(new MOGBoolean(engine, t0.Value == t1.Value));
 
                 return EvalResult.NoError;
             }
@@ -1640,34 +1655,34 @@ namespace MogwaiNano.Engine
             {
                 // s1 s2 ==
 
-                var s1 = StackPop() as MOGString;
-                var s0 = StackPop() as MOGString;
+                var s1 = engine.StackPop() as MOGString;
+                var s0 = engine.StackPop() as MOGString;
 
-                StackPush(new MOGBoolean(this, s0.Value == s1.Value));
+                engine.StackPush(new MOGBoolean(engine, s0.Value == s1.Value));
 
                 return EvalResult.NoError;
             }   
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionNotEqual(string name)
+        private static EvalResult PrimitiveConditionNotEqual(MogwaiNanoEngine engine, string name)
         {
             // v1 v2 !=
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
                 // n1 n2 != 
 
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
-                StackPush(new MOGBoolean(this, n0.Value != n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value != n1.Value));
 
                 return EvalResult.NoError;
             }
@@ -1675,10 +1690,10 @@ namespace MogwaiNano.Engine
             {
                 // t1 t2 !=
 
-                var t1 = StackPop() as MOGType;
-                var t0 = StackPop() as MOGType;
+                var t1 = engine.StackPop() as MOGType;
+                var t0 = engine.StackPop() as MOGType;
 
-                StackPush(new MOGBoolean(this, t0.Value != t1.Value));
+                engine.StackPush(new MOGBoolean(engine, t0.Value != t1.Value));
 
                 return EvalResult.NoError;
             }
@@ -1686,214 +1701,214 @@ namespace MogwaiNano.Engine
             {
                 // s1 s2 !=
 
-                var t1 = StackPop() as MOGString;
-                var t0 = StackPop() as MOGString;
+                var t1 = engine.StackPop() as MOGString;
+                var t0 = engine.StackPop() as MOGString;
 
-                StackPush(new MOGBoolean(this, t0.Value != t1.Value));
+                engine.StackPush(new MOGBoolean(engine, t0.Value != t1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionInferior(string name)
+        private static EvalResult PrimitiveConditionInferior(MogwaiNanoEngine engine, string name)
         {
             // v1 v2 <
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
-                StackPush(new MOGBoolean(this, n0.Value < n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value < n1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionInferiorOrEqual(string name)
+        private static EvalResult PrimitiveConditionInferiorOrEqual(MogwaiNanoEngine engine, string name)
         {
             // v1 v2 <=
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
-                StackPush(new MOGBoolean(this, n0.Value <= n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value <= n1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionSuperior(string name)
+        private static EvalResult PrimitiveConditionSuperior(MogwaiNanoEngine engine, string name)
         {
             // v1 v2 >
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
-                StackPush(new MOGBoolean(this, n0.Value > n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value > n1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionSuperiorOrEqual(string name)
+        private static EvalResult PrimitiveConditionSuperiorOrEqual(MogwaiNanoEngine engine, string name)
         {
             // v1 v2 >=
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n1 = StackPop() as MOGNumber;
-                var n0 = StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
 
-                StackPush(new MOGBoolean(this, n0.Value >= n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value >= n1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionIsNull(string name)
+        private static EvalResult PrimitiveConditionIsNull(MogwaiNanoEngine engine, string name)
         {
-            if (StackSize == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var n0 = StackPop();
+            var n0 = engine.StackPop();
             var b = n0 is MOGNull;
 
-            StackPush(new MOGBoolean(this, b));
+            engine.StackPush(new MOGBoolean(engine, b));
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveConditionAnd(string name)
+        private static EvalResult PrimitiveConditionAnd(MogwaiNanoEngine engine, string name)
         {
             // true false and
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGBoolean))
             {
-                var n1 = StackPop() as MOGBoolean;
-                var n0 = StackPop() as MOGBoolean;
+                var n1 = engine.StackPop() as MOGBoolean;
+                var n0 = engine.StackPop() as MOGBoolean;
 
-                StackPush(new MOGBoolean(this, n0.Value && n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value && n1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionOr(string name)
+        private static EvalResult PrimitiveConditionOr(MogwaiNanoEngine engine, string name)
         {
             // true false or
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGBoolean))
             {
-                var n1 = StackPop() as MOGBoolean;
-                var n0 = StackPop() as MOGBoolean;
+                var n1 = engine.StackPop() as MOGBoolean;
+                var n0 = engine.StackPop() as MOGBoolean;
 
-                StackPush(new MOGBoolean(this, n0.Value || n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value || n1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveConditionXor(string name)
+        private static EvalResult PrimitiveConditionXor(MogwaiNanoEngine engine, string name)
         {
             // true false xor
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGBoolean))
             {
-                var n1 = StackPop() as MOGBoolean;
-                var n0 = StackPop() as MOGBoolean;
+                var n1 = engine.StackPop() as MOGBoolean;
+                var n0 = engine.StackPop() as MOGBoolean;
 
-                StackPush(new MOGBoolean(this, n0.Value ^ n1.Value));
+                engine.StackPush(new MOGBoolean(engine, n0.Value ^ n1.Value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveNot(string name)
+        private static EvalResult PrimitiveNot(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGBoolean))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var b = StackPop() as MOGBoolean;
+            var b = engine.StackPop() as MOGBoolean;
             b.Value = !b.Value;
-            StackPush(b);
+            engine.StackPush(b);
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveRepeat(string name)
+        private static EvalResult PrimitiveRepeat(MogwaiNanoEngine engine, string name)
         {
             // 5 {...} REPEAT
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[1] != typeof(MOGNumber) || s[0] != typeof(MOGCode))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var code = StackPop() as MOGCode;
-            var n = StackPop() as MOGNumber;
+            var code = engine.StackPop() as MOGCode;
+            var n = engine.StackPop() as MOGNumber;
 
             for (int i = 0; i < n.Value; i++)
             {
@@ -1902,9 +1917,9 @@ namespace MogwaiNano.Engine
                 if (result.IsError)
                     return result;
 
-                if (BreakRequested)
+                if (engine.BreakRequested)
                 {
-                    BreakRequested = false;
+                    engine.BreakRequested = false;
                     break;
                 }
             }
@@ -1912,22 +1927,22 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveIf(string name)
+        private static EvalResult PrimitiveIf(MogwaiNanoEngine engine, string name)
         {
             try
             {
                 // true {...} IF
 
-                var s = StackSign(2);
+                var s = engine.StackSign(2);
 
                 if (s.Length == 0)
-                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
                 if (s[1] != typeof(MOGBoolean) || s[0] != typeof(MOGCode))
-                    return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-                var code = StackPop() as MOGCode;
-                var condition = StackPop() as MOGBoolean;
+                var code = engine.StackPop() as MOGCode;
+                var condition = engine.StackPop() as MOGBoolean;
 
                 if (condition.Value)
                     return code.Execute();
@@ -1936,27 +1951,27 @@ namespace MogwaiNano.Engine
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(this, Error.FatalError, name, ex.Message);
+                return EvalResult.Failure(engine, Error.FatalError, name, ex.Message);
             }
         }
 
-        private EvalResult PrimitiveIfElse(string name)
+        private static EvalResult PrimitiveIfElse(MogwaiNanoEngine engine, string name)
         {
             try
             {
                 // true {...} {...} IFELSE
 
-                var s = StackSign(3);
+                var s = engine.StackSign(3);
 
                 if (s.Length == 0)
-                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
                 if (s[2] != typeof(MOGBoolean) || s[1] != typeof(MOGCode) || s[0] != typeof(MOGCode))
-                    return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-                var code1 = StackPop() as MOGCode;
-                var code2 = StackPop() as MOGCode;
-                var condition = StackPop() as MOGBoolean;
+                var code1 = engine.StackPop() as MOGCode;
+                var code2 = engine.StackPop() as MOGCode;
+                var condition = engine.StackPop() as MOGBoolean;
 
                 if (condition.Value)
                     return code2.Execute();
@@ -1965,24 +1980,24 @@ namespace MogwaiNano.Engine
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(this, Error.FatalError, name, ex.Message);
+                return EvalResult.Failure(engine, Error.FatalError, name, ex.Message);
             }
         }
 
-        private EvalResult PrimitiveWhile(string name)
+        private static EvalResult PrimitiveWhile(MogwaiNanoEngine engine, string name)
         {
             // { condition } { code } WHILE
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGCode) || s[1] != typeof(MOGCode))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var code = StackPop() as MOGCode;
-            var conditionCode = StackPop() as MOGCode;
+            var code = engine.StackPop() as MOGCode;
+            var conditionCode = engine.StackPop() as MOGCode;
 
             while (true)
             {
@@ -1991,16 +2006,16 @@ namespace MogwaiNano.Engine
                 if (conditionResult.IsError)
                     return conditionResult;
 
-                if (BreakRequested)
+                if (engine.BreakRequested)
                 {
-                    BreakRequested = false;
+                    engine.BreakRequested = false;
                     break;
                 }
 
-                var conditionValue = StackPop() as MOGBoolean;
+                var conditionValue = engine.StackPop() as MOGBoolean;
 
                 if (conditionValue == null)
-                    return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
                 if (!conditionValue.Value)
                     break;
@@ -2010,9 +2025,9 @@ namespace MogwaiNano.Engine
                 if (result.IsError)
                     return result;
 
-                if (BreakRequested)
+                if (engine.BreakRequested)
                 {
-                    BreakRequested = false;
+                    engine.BreakRequested = false;
                     break;
                 }
             }
@@ -2020,37 +2035,37 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveFor(string name)
+        private static EvalResult PrimitiveFor(MogwaiNanoEngine engine, string name)
         {
             // 1 2 'i' {...} FOR
 
-            var s = StackSign(4);
+            var s = engine.StackSign(4);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGName) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
             {
-                var code = StackPop() as MOGCode;
-                var varName = StackPop() as MOGName;
-                var end = StackPop() as MOGNumber;
-                var start = StackPop() as MOGNumber;
+                var code = engine.StackPop() as MOGCode;
+                var varName = engine.StackPop() as MOGName;
+                var end = engine.StackPop() as MOGNumber;
+                var start = engine.StackPop() as MOGNumber;
 
                 var direction = (end!.Value - start!.Value) > 0 ? 1 : -1;
-                var varLoop = new MOGNumber(this, 0);
+                var varLoop = new MOGNumber(engine, 0);
 
                 EvalResult result = EvalResult.NoError;
 
                 for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += direction)
                 {
-                    if (BreakRequested)
+                    if (engine.BreakRequested)
                     {
-                        BreakRequested = false;
+                        engine.BreakRequested = false;
                         break;
                     }
 
                     varLoop.Value = i;
-                    result = VarWrite(varName.Value, varLoop);
+                    result = engine.VarWrite(varName.Value, varLoop);
 
                     if (result != EvalResult.NoError)
                         break;
@@ -2064,43 +2079,43 @@ namespace MogwaiNano.Engine
                 return result;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveForStep(string name)
+        private static EvalResult PrimitiveForStep(MogwaiNanoEngine engine, string name)
         {
             // 1 2 2 'i' {...} FORSTEP
 
-            var s = StackSign(5);
+            var s = engine.StackSign(5);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGName) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
             {
-                var code = StackPop() as MOGCode;
-                var varName = StackPop() as MOGName;
-                var step = StackPop() as MOGNumber;
-                var end = StackPop() as MOGNumber;
-                var start = StackPop() as MOGNumber;
+                var code = engine.StackPop() as MOGCode;
+                var varName = engine.StackPop() as MOGName;
+                var step = engine.StackPop() as MOGNumber;
+                var end = engine.StackPop() as MOGNumber;
+                var start = engine.StackPop() as MOGNumber;
 
                 var direction = (end.Value - start.Value) > 0 ? 1 : -1;
                 step.Value = Math.Abs(step.Value) * direction;
                 
-                var varLoop = new MOGNumber(this, 0);
+                var varLoop = new MOGNumber(engine, 0);
 
                 EvalResult result = EvalResult.NoError;
 
                 for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += step.Value)
                 {
-                    if (BreakRequested)
+                    if (engine.BreakRequested)
                     {
-                        BreakRequested = false;
+                        engine.BreakRequested = false;
                         break;
                     }
 
                     varLoop.Value = i;
-                    result = VarWrite(varName.Value, varLoop);
+                    result = engine.VarWrite(varName.Value, varLoop);
 
                     if (result != EvalResult.NoError)
                         break;
@@ -2114,20 +2129,20 @@ namespace MogwaiNano.Engine
                 return result;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveForever(string name)
+        private static EvalResult PrimitiveForever(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGCode))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var code = StackPop() as MOGCode;
+            var code = engine.StackPop() as MOGCode;
 
             while (true)
             {
@@ -2136,9 +2151,9 @@ namespace MogwaiNano.Engine
                 if (result.IsError)
                     return result;
 
-                if (BreakRequested)
+                if (engine.BreakRequested)
                 {
-                    BreakRequested = false;
+                    engine.BreakRequested = false;
                     break;
                 }
             }
@@ -2146,17 +2161,17 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveForeach(string name)
+        private static EvalResult PrimitiveForeach(MogwaiNanoEngine engine, string name)
         {
             // List name code FOREACH
             // (1 2 3) 'i' { i ? } FOREACH      
             // D:010203 'i' { i ? } FOREACH 
             // "XXXX" 'i' { i ? } FOREACH
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             // 0 code
             // 1 variable
@@ -2166,18 +2181,18 @@ namespace MogwaiNano.Engine
             {
                 if (s[2] == typeof(MOGList))
                 {
-                    var code = StackPop() as MOGCode;
-                    var varName = StackPop() as MOGName;
-                    var list = StackPop() as MOGList;
+                    var code = engine.StackPop() as MOGCode;
+                    var varName = engine.StackPop() as MOGName;
+                    var list = engine.StackPop() as MOGList;
 
                     EvalResult result = EvalResult.NoError;
 
                     foreach (var item in list.Items)
                     {
-                        if (BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                        if (engine.BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
                             break;
 
-                        result = VarWrite(varName.Value, item as MOGObject);
+                        result = engine.VarWrite(varName.Value, item as MOGObject);
 
                         if (result.IsError)
                             break;
@@ -2192,18 +2207,18 @@ namespace MogwaiNano.Engine
                 }
                 else if (s[2] == typeof(MOGData))
                 {
-                    var code = StackPop() as MOGCode;
-                    var varName = StackPop() as MOGName;
-                    var data = StackPop() as MOGData;
+                    var code = engine.StackPop() as MOGCode;
+                    var varName = engine.StackPop() as MOGName;
+                    var data = engine.StackPop() as MOGData;
 
                     EvalResult result = EvalResult.NoError;
 
                     foreach (var item in data.Items)
                     {
-                        if (BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                        if (engine.BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
                             break;
 
-                        result = VarWrite(varName.Value, new MOGNumber(this, (byte)item));
+                        result = engine.VarWrite(varName.Value, new MOGNumber(engine, (byte)item));
 
                         if (result != EvalResult.NoError)
                             break;
@@ -2218,18 +2233,18 @@ namespace MogwaiNano.Engine
                 }
                 else if (s[2] == typeof(MOGString))
                 {
-                    var code = StackPop() as MOGCode;
-                    var varName = StackPop() as MOGName;
-                    var @string = StackPop() as MOGString;
+                    var code = engine.StackPop() as MOGCode;
+                    var varName = engine.StackPop() as MOGName;
+                    var @string = engine.StackPop() as MOGString;
 
                     EvalResult result = EvalResult.NoError;
 
                     foreach (var item in @string.Value)
                     {
-                        if (BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                        if (engine.BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
                             break;
 
-                        result = VarWrite(varName.Value, new MOGString(this, item.ToString()));
+                        result = engine.VarWrite(varName.Value, new MOGString(engine, item.ToString()));
 
                         if (result != EvalResult.NoError)
                             break;
@@ -2245,52 +2260,51 @@ namespace MogwaiNano.Engine
 
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveTrap(string name)
+        private static EvalResult PrimitiveTrap(MogwaiNanoEngine engine, string name)
         {
             // code TRAP
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGCode))
             {
-                var code = StackPop() as MOGCode;
-
+                var code = engine.StackPop() as MOGCode;    
                 var result = code.Execute();
 
                 if (result != EvalResult.NoError)
-                    LastError = result.Error;
+                    engine.LastError = result.Error;
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveGuard(string name)
+        private static EvalResult PrimitiveGuard(MogwaiNanoEngine engine, string name)
         {
             // code elseCode GUARD
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGCode))
             {
-                var errorCode = StackPop() as MOGCode;
-                var code = StackPop() as MOGCode;
+                var errorCode = engine.StackPop() as MOGCode;
+                var code = engine.StackPop() as MOGCode;
 
                 var result = code.Execute();
 
                 if (result != EvalResult.NoError)
                 {
-                    LastError = result.Error;
+                    engine.LastError = result.Error;
 
                     return errorCode.Execute();
                 }
@@ -2298,34 +2312,34 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveDuring(string name)
+        private static EvalResult PrimitiveDuring(MogwaiNanoEngine engine, string name)
         {
             // number {code} DURING
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGCode) && s[1] == typeof(MOGNumber))
             {
-                var code = StackPop() as MOGCode;
-                var duration = StackPop() as MOGNumber;
+                var code = engine.StackPop() as MOGCode;
+                var duration = engine.StackPop() as MOGNumber;
 
                 if (duration.Value < 0)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 var result = EvalResult.NoError;
                 var stopWatch = Stopwatch.StartNew();
 
                 while (stopWatch.Elapsed.TotalMilliseconds < duration.Value)
                 {
-                    if (BreakRequested) // || ExitRequested || ReturnRequested)
+                    if (engine.BreakRequested) // || engine.ExitRequested || engine.ReturnRequested)
                     {
-                        BreakRequested = false;
+                        engine.BreakRequested = false;
                         break;
                     }
 
@@ -2340,240 +2354,240 @@ namespace MogwaiNano.Engine
                 return result;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveErrorLast(string name)
+        private static EvalResult PrimitiveErrorLast(MogwaiNanoEngine engine, string name)
         {
-            StackPush(new MOGString(this, LastError.Code));
+            engine.StackPush(new MOGString(engine, engine.LastError.Code));
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveErrorReset(string name)
+        private static EvalResult PrimitiveErrorReset(MogwaiNanoEngine engine, string name)
         {
-            LastError = Error.None;
+            engine.LastError = Error.None;
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveErrorThrow(string name)
+        private static EvalResult PrimitiveErrorThrow(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGString))
             {
-                var errCode = StackPop() as MOGString;
+                var errCode = engine.StackPop() as MOGString;
                 var error = Error.GetError(errCode.Value);
                 
-                return EvalResult.Failure(this, error);
+                return EvalResult.Failure(engine, error);
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveDefunc(string name)
+        private static EvalResult PrimitiveDefunc(MogwaiNanoEngine engine, string name)
         {
             // code name DEFUNC
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName) && s[1] == typeof(MOGFunction))
             {
-                var fname = StackPop() as MOGName;
-                var func = StackPop() as MOGFunction;
+                var fname = engine.StackPop() as MOGName;
+                var func = engine.StackPop() as MOGFunction;
 
-                if (_functions.Contains(fname.Value))
-                    return EvalResult.Failure(this, Error.FunctionAlreadyExistsError, name);
+                if (engine.Functions.Contains(fname.Value))
+                    return EvalResult.Failure(engine, Error.FunctionAlreadyExistsError, name);
 
-                _functions.Add(fname.Value, func);
+                engine.Functions.Add(fname.Value, func);
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveEvent(string name)
+        private static EvalResult PrimitiveEvent(MogwaiNanoEngine engine, string name)
         {
             // function name EVENT
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName) & s[1] == typeof(MOGFunction))
             {
-                var eventName = StackPop() as MOGName;
-                var function = StackPop() as MOGFunction;
+                var eventName = engine.StackPop() as MOGName;
+                var function = engine.StackPop() as MOGFunction;
 
-                return CreateNewEvent(eventName.Value, function);
+                return engine.CreateNewEvent(eventName.Value, function);
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveEventFire(string name)
+        private static EvalResult PrimitiveEventFire(MogwaiNanoEngine engine, string name)
         {
             // 'BTN_CLICK' data event.fire
             // 'BTN_CLICK' null event.fire
             // 'BTN_CLICK' now event.fire
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[1] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop();
-            var n1 = StackPop() as MOGName;
+            var n0 = engine.StackPop();
+            var n1 = engine.StackPop() as MOGName;
 
-            return FireEvent(n1.Value, n0);
+            return engine.FireEvent(n1.Value, n0);
         }
 
-        private EvalResult PrimitiveEventPurge(string name)
+        private static EvalResult PrimitiveEventPurge(MogwaiNanoEngine engine, string name)
         {
             // 'eventName' event.purge
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var eventName = StackPop() as MOGName;
-                return PurgeEvent(eventName.Value);
+                var eventName = engine.StackPop() as MOGName;
+                return engine.PurgeEvent(eventName.Value);
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveTimerEvery(string name)
+        private static EvalResult PrimitiveTimerEvery(MogwaiNanoEngine engine, string name)
         {
             // function interval name EVERY
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGFunction))
             {
-                var timerName = StackPop() as MOGName;
-                var interval = StackPop() as MOGNumber;
-                var function = StackPop() as MOGFunction;
+                var timerName = engine.StackPop() as MOGName;
+                var interval = engine.StackPop() as MOGNumber;
+                var function = engine.StackPop() as MOGFunction;
 
-                return CreateNewTimer(timerName.Value, (int)interval.Value, true, function);
+                return engine.CreateNewTimer(timerName.Value, (int)interval.Value, true, function);
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveTimerAfter(string name)
+        private static EvalResult PrimitiveTimerAfter(MogwaiNanoEngine engine, string name)
         {
             // function interval name AFTER
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGFunction))
             {
-                var timerName = StackPop() as MOGName;
-                var interval = StackPop() as MOGNumber;
-                var function = StackPop() as MOGFunction;
+                var timerName = engine.StackPop() as MOGName;
+                var interval = engine.StackPop() as MOGNumber;
+                var function = engine.StackPop() as MOGFunction;
 
-                return CreateNewTimer(timerName.Value, (int)interval.Value, false, function);
+                return engine.CreateNewTimer(timerName.Value, (int)interval.Value, false, function);
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
         }
 
-        private EvalResult PrimitiveTimerStart(string name)
+        private static EvalResult PrimitiveTimerStart(MogwaiNanoEngine engine, string name)
         {
             // name timer.start
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var timerName = StackPop() as MOGName;
+                var timerName = engine.StackPop() as MOGName;
 
-                if (!_timers.Contains(timerName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name);
+                if (!engine.Timers.Contains(timerName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name);
 
-                var timer = _timers[timerName.Value] as MOGTimer;
+                var timer = engine.Timers[timerName.Value] as MOGTimer;
                 return timer.Start();
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveTimerStop(string name)
+        private static EvalResult PrimitiveTimerStop(MogwaiNanoEngine engine, string name)
         {
             // name timer.stop
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var timerName = StackPop() as MOGName;
+                var timerName = engine.StackPop() as MOGName;
 
-                if (!_timers.Contains(timerName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name);
+                if (!engine.Timers.Contains(timerName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name);
 
-                var timer = _timers[timerName.Value] as MOGTimer;
+                var timer = engine.Timers[timerName.Value] as MOGTimer;
                 return timer.Stop();
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveTimerPurge(string name)
+        private static EvalResult PrimitiveTimerPurge(MogwaiNanoEngine engine, string name)
         {
             // name timer.purge
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var timerName = StackPop() as MOGName;
-                return PurgeTimer(timerName.Value);
+                var timerName = engine.StackPop() as MOGName;
+                return engine.PurgeTimer(timerName.Value);
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveMogwaiReset(string name)
+        private static EvalResult PrimitiveMogwaiReset(MogwaiNanoEngine engine, string name)
         {
-            Reset();
+            engine.Reset();
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveMogwaiReboot(string name)
+        private static EvalResult PrimitiveMogwaiReboot(MogwaiNanoEngine engine, string name)
         {
-            if (_functions.Contains("MOGWAI.onReboot"))
+            if (engine.Functions.Contains("MOGWAI.onReboot"))
             {
-                var onRebootFunction = _functions["MOGWAI.onReboot"] as MOGFunction;
+                var onRebootFunction = engine.Functions["MOGWAI.onReboot"] as MOGFunction;
                 var r = onRebootFunction.Execute();
 
                 if (r.IsError)
@@ -2587,177 +2601,176 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveGetMemory(string name)
+        private static EvalResult PrimitiveGetMemory(MogwaiNanoEngine engine, string name)
         {
             // true or false getMemory
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var b = StackPop() as MOGBoolean;
+            var b = engine.StackPop() as MOGBoolean;
             var v = GC.Run(b.Value);
 
-            StackPush(new MOGNumber(this, v));
+            engine.StackPush(new MOGNumber(engine, v));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveMogwaiInfo(string name)
+        private static EvalResult PrimitiveMogwaiInfo(MogwaiNanoEngine engine, string name)
         {
-            var record = new MOGRecord(this);
+            var record = new MOGRecord(engine);
 
-            record.SetItem("name", new MOGString(this, AppGlobal.NanoParameters.Name));
-            record.SetItem("mogwai", new MOGString(this, AppGlobal.MogwaiNanoEngine.Version.ToString()));
-            record.SetItem("ip", new MOGString(this, value: AppGlobal.IpAddress));
-            record.SetItem("session", new MOGString(this, AppGlobal.Session.ToString()));
+            record.SetItem("name", new MOGString(engine, AppGlobal.NanoParameters.Name));
+            record.SetItem("mogwai", new MOGString(engine, MogwaiNanoEngine.Version.ToString()));
+            record.SetItem("ip", new MOGString(engine, value: AppGlobal.IpAddress));
+            record.SetItem("session", new MOGString(engine, AppGlobal.Session.ToString()));
 
-            record.SetItem("platform", new MOGString(this, SystemInfo.Platform));
-            record.SetItem("target", new MOGString(this, SystemInfo.TargetName));
-            record.SetItem("oem", new MOGString(this, SystemInfo.OEMString));
-            record.SetItem("system", new MOGString(this, SystemInfo.Version.ToString()));
+            record.SetItem("platform", new MOGString(engine, SystemInfo.Platform));
+            record.SetItem("target", new MOGString(engine, SystemInfo.TargetName));
+            record.SetItem("oem", new MOGString(engine, SystemInfo.OEMString));
+            record.SetItem("system", new MOGString(engine, SystemInfo.Version.ToString()));
 
             var memory = GC.Run(false);
-            record.SetItem("memory", new MOGNumber(this, memory));
+            record.SetItem("memory", new MOGNumber(engine, memory));
 
-            var skills = new MOGList(this);
+            var skills = new MOGList(engine);
 
             foreach (var skill in _skills)
-                skills.AddItem(new MOGString(this, skill));
+                skills.AddItem(new MOGString(engine, skill));
 
             record.SetItem("skills", skills);
 
-            var units = new MOGList(this);
-
-            foreach (var unit in Units)
-                units.AddItem(new MOGString(this, unit));
+            var units = new MOGList(engine);
+            
+            foreach (var unit in engine.Units)
+                units.AddItem(new MOGString(engine, unit));
 
             record.SetItem("units", units); 
 
-            record.SetItem("frugalMode", new MOGBoolean(this, FrugalMode)); 
+            record.SetItem("frugalMode", new MOGBoolean(engine, engine.FrugalMode)); 
 
-            StackPush(record);
+            engine.StackPush(record);
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveMogwaiFrugalMode(string name)
+        private static EvalResult PrimitiveMogwaiFrugalMode(MogwaiNanoEngine engine, string name)
         {
             // true or false frugalMode
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
             
             if (s[0] == typeof(MOGBoolean))
             {
-                var b = StackPop() as MOGBoolean;
-                FrugalMode = b.Value;
+                var b = engine.StackPop() as MOGBoolean;
+                engine.FrugalMode = b.Value;
                 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);  
         }
 
-        private EvalResult PrimitiveSendMessageToStudio(string name)
+        private static EvalResult PrimitiveSendMessageToStudio(MogwaiNanoEngine engine, string name)
         {
             //"MESSAGE" mogwai.sendMessage
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGString))
             {
-                var payload = StackPop() as MOGString;
+                var payload = engine.StackPop() as MOGString;
                 var message = new ServerMessage(AppGlobal.NanoParameters.Name, "SEND.MESSAGE", payload.Value);
                 AppGlobal.TcpServer.SendMessage(message);
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveBcdToDecimal(string name)
+        private static EvalResult PrimitiveBcdToDecimal(MogwaiNanoEngine engine, string name)
         {
             // bcd->
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var number = StackPop() as MOGNumber;
+            var number = engine.StackPop() as MOGNumber;
 
             if (number == null)
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
             int bcdValue = (int)number.Value;
             int decimalValue = ((bcdValue >> 4) * 10) + (bcdValue & 0x0F);
 
-            StackPush(new MOGNumber(this, decimalValue));
+            engine.StackPush(new MOGNumber(engine, decimalValue));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveDecimalToBcd(string name)
+        private static EvalResult PrimitiveDecimalToBcd(MogwaiNanoEngine engine, string name)
         {
             // ->bcd
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
-            var number = StackPop() as MOGNumber;
+            var number = engine.StackPop() as MOGNumber;
 
             if (number == null)
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
             int decimalValue = (int)number.Value;
 
             if (decimalValue < 0 || decimalValue > 99)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name); // BCD sur un octet = 0-99
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name); // BCD sur un octet = 0-99
 
             int bcdValue = ((decimalValue / 10) << 4) | (decimalValue % 10);
 
-            StackPush(new MOGNumber(this, bcdValue));
-
+            engine.StackPush(new MOGNumber(engine, bcdValue));
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveStackToVars(string name)
+        private static EvalResult PrimitiveStackToVars(MogwaiNanoEngine engine, string name)
         {
             // 10 20 30 ( 'A' 'B' 'C') ->vars -----> A=10 B=20 C=30
             // [id: 50 name: "SIBUE" x: 'Z'] ->vars -------> id=50 name="SIBUE" x='Z'
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGList))
             {
                 // Signature 10 20 30 ( 'A' 'B' 'C') ->vars
 
-                var list = StackPop() as MOGList;
+                var list = engine.StackPop() as MOGList;
 
                 // La liste ne doit comporter QUE des names
 
                 foreach (var item in list.Items)
                 {
                     if (item is not MOGName)
-                        return EvalResult.Failure(this, Error.BadArgumentTypeError, name, "the list parameter can only contain names.");
+                        return EvalResult.Failure(engine, Error.BadArgumentTypeError, name, "the list parameter can only contain names.");
                 }
 
                 // La stack doit comporter assez d'éléments
 
-                if (StackSize < list.Items.Count)
-                    return EvalResult.Failure(this, Error.TooFewArgumentsError, name, "the stack does not contain enough elements.");
+                if (engine.StackSize < list.Items.Count)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, name, "the stack does not contain enough elements.");
 
                 // Pour chaque name on prend un item de la stack et on crée une variable avec
                 // On travaille à l'envers pour que les paramètres soient dans le bon sens
@@ -2765,9 +2778,9 @@ namespace MogwaiNano.Engine
                 for (int i = list.Items.Count - 1; i >= 0; i--)
                 {
                     var varName = list.Items[i] as MOGName;
-                    var item = StackPop();
+                    var item = engine.StackPop();
 
-                    var r2 = VarWrite(varName.Value, item!);
+                    var r2 = engine.VarWrite(varName.Value, item!);
 
                     if (r2 != EvalResult.NoError)
                         return r2;
@@ -2779,36 +2792,35 @@ namespace MogwaiNano.Engine
             {
                 // Signature [id: 50 name: "SIBUE" x: 'Z'] ->vars
 
-                var record = StackPop() as MOGRecord;
+                var record = engine.StackPop() as MOGRecord;
 
                 foreach (var key in record!.Items.Keys)
                 {
                     var item = record.Items[key] as MOGObject;
-                    VarWrite(key as string, item);
+                    engine.VarWrite(key as string, item);
                 }
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStackToSafeVars(string name)
+        private static EvalResult PrimitiveStackToSafeVars(MogwaiNanoEngine engine, string name)
         {
             // 10 "SIBUE" 'Z' [id: .number name: .string x: .name] ->safeVars -------> id=50 name="SIBUE" x='Z'
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGRecord))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
             // On récupère le record de référence et ses clés
 
-            var recf = StackPop() as MOGRecord;
-
+            var recf = engine.StackPop() as MOGRecord;
             var keys = new string[recf.Keys.Count];
             var i = 0;
 
@@ -2820,13 +2832,13 @@ namespace MogwaiNano.Engine
             foreach (var k in keys)
             {
                 if (recf.Items[k] is not MOGType)
-                    return EvalResult.Failure(this, Error.BadArgumentTypeError, "reference record must have .type values.");
+                    return EvalResult.Failure(engine, Error.BadArgumentTypeError, "reference record must have .type values.");
             }
 
             // La pile doit au moins contenir le nombre de clés du record de référence
 
-            if (StackSize < recf.Items.Count)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, "the stack does not contain enough elements.");
+            if (engine.StackSize < recf.Items.Count)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, "the stack does not contain enough elements.");
 
             // On récupère toute les valeurs depuis la pile
 
@@ -2834,7 +2846,7 @@ namespace MogwaiNano.Engine
 
             for (i = 0; i < keys.Length; i++)
             {
-                var value = StackPop();
+                var value = engine.StackPop();
                 values.Add(value);
             }
 
@@ -2855,7 +2867,7 @@ namespace MogwaiNano.Engine
                 // Si incorrect on arrête tout
 
                 if (tv.Value != "any" && tv.Value != pv.Type.Value)
-                    return EvalResult.Failure(this, Error.BadArgumentTypeError, name, $"{tv} expected but {pv.Type} found for '{keys[i]}' parameter");
+                    return EvalResult.Failure(engine, Error.BadArgumentTypeError, name, $"{tv} expected but {pv.Type} found for '{keys[i]}' parameter");
             }
 
             // On crée les variables locales
@@ -2865,7 +2877,7 @@ namespace MogwaiNano.Engine
             for (i = keys.Length - 1; i >= 0; i--)
             {
                 var v = values[index++] as MOGObject;
-                var r = VarWrite(keys[i], v);
+                var r = engine.VarWrite(keys[i], v);
 
                 if (r != EvalResult.NoError)
                     return r;
@@ -2874,20 +2886,20 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveStackToParams(string name)
+        private static EvalResult PrimitiveStackToParams(MogwaiNanoEngine engine, string name)
         {
             // [id: 50 name: "SIBUE" x: 'Z'] [id: .number name: .string u: (.boolean true)] ->params -------> id=50 name="SIBUE u=true"
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGRecord) || s[1] != typeof(MOGRecord))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop() as MOGRecord;
-            var n1 = StackPop() as MOGRecord;
+            var n0 = engine.StackPop() as MOGRecord;
+            var n1 = engine.StackPop() as MOGRecord;
 
             // On décompose n0 en liste de paramètes ayant type + éventuellement valeur par défaut
 
@@ -2911,7 +2923,7 @@ namespace MogwaiNano.Engine
                     // La liste doit être composée de 2 élements
 
                     if (list.Items.Count != 2)
-                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have 2 items (type defaultValue).");
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have 2 items (type defaultValue).");
 
                     // L'item 0 doit être un type
 
@@ -2928,17 +2940,17 @@ namespace MogwaiNano.Engine
                         }
                         else
                         {
-                            return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have a value with the good type in second position.");
+                            return EvalResult.Failure(engine, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have a value with the good type in second position.");
                         }
                     }
                     else
                     {
-                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have a type in first position.");
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, $"{key}: parameter", "default value list definition must have a type in first position.");
                     }
                 }
                 else
                 {
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{key}: parameter", "parameter definition is a type or a list (type defaultValue).");
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, $"{key}: parameter", "parameter definition is a type or a list (type defaultValue).");
                 }
             }
 
@@ -2959,7 +2971,7 @@ namespace MogwaiNano.Engine
                     }
                     else
                     {
-                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{p.VarName}: type is invalid !", $"{p.Type} expected", $"{pv.Type} provided");
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, $"{p.VarName}: type is invalid !", $"{p.Type} expected", $"{pv.Type} provided");
                     }
                 }
                 else
@@ -2968,7 +2980,7 @@ namespace MogwaiNano.Engine
                     // Si on a une valeur par défaut c'est pas grave, sinon erreur !
 
                     if (p.Value == null)
-                        return EvalResult.Failure(this, Error.BadArgumentValueError, name, $"{p.VarName}: parameter is mandatory !");
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, $"{p.VarName}: parameter is mandatory !");
                 }
             }
 
@@ -2980,7 +2992,7 @@ namespace MogwaiNano.Engine
 
             foreach (ParamDefinition pdef in pDefinitions)
             {
-                result = VarWrite(pdef.VarName, pdef.Value ?? new MOGNull(this));
+                result = engine.VarWrite(pdef.VarName, pdef.Value ?? new MOGNull(engine));
 
                 if (result != EvalResult.NoError)
                     break;
@@ -2989,139 +3001,138 @@ namespace MogwaiNano.Engine
             return result;
         }
 
-        private EvalResult PrimitiveBinaryAnd(string name)
+        private static EvalResult PrimitiveBinaryAnd(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop() as MOGNumber;
-            var n1 = StackPop() as MOGNumber;
+            var n0 = engine.StackPop() as MOGNumber;
+            var n1 = engine.StackPop() as MOGNumber;
 
             var result = (int)n0.Value & (int)n1.Value;
 
-            StackPush(new MOGNumber(this, result));
+            engine.StackPush(new MOGNumber(engine, result));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveBinaryOr(string name)
+        private static EvalResult PrimitiveBinaryOr(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop() as MOGNumber;
-            var n1 = StackPop() as MOGNumber;
+            var n0 = engine.StackPop() as MOGNumber;
+            var n1 = engine.StackPop() as MOGNumber;
 
             var result = (int)n0.Value | (int)n1.Value;
 
-            StackPush(new MOGNumber(this, result));
+            engine.StackPush(new MOGNumber(engine, result));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveBinaryXor(string name)
+        private static EvalResult PrimitiveBinaryXor(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop() as MOGNumber;
-            var n1 = StackPop() as MOGNumber;
+            var n0 = engine.StackPop() as MOGNumber;
+            var n1 = engine.StackPop() as MOGNumber;
 
             var result = (int)n0.Value ^ (int)n1.Value;
 
-            StackPush(new MOGNumber(this, result));
+            engine.StackPush(new MOGNumber(engine, result));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveBinaryComplement(string name)
+        private static EvalResult PrimitiveBinaryComplement(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop() as MOGNumber;
+            var n0 = engine.StackPop() as MOGNumber;
             var result = ~(int)n0.Value;
 
-            StackPush(new MOGNumber(this, result));
+            engine.StackPush(new MOGNumber(engine, result));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveRightShift(string name)
+        private static EvalResult PrimitiveRightShift(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n0 = StackPop() as MOGNumber;
-                var n1 = StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
 
                 int v = (int)n1.Value >> (int)n0.Value;
-                StackPush(new MOGNumber(this, v));
+                engine.StackPush(new MOGNumber(engine, v));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveLeftShift(string name)
+        private static EvalResult PrimitiveLeftShift(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var n0 = StackPop() as MOGNumber;
-                var n1 = StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
+                var n1 = engine.StackPop() as MOGNumber;
 
                 int v = (int)n1.Value << (int)n0.Value;
-                StackPush(new MOGNumber(this, v));
+                engine.StackPush(new MOGNumber(engine, v));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveToFormat(string name)
+        private static EvalResult PrimitiveToFormat(MogwaiNanoEngine engine, string name)
         {
             // 50 "D3" ->format -----> "050"
 
-            var s = StackSign(2);
-
+            var s = engine.StackSign(2);
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGString) && s[1] == typeof(MOGNumber))
             {
-                var format = StackPop() as MOGString;   
-                var number = StackPop() as MOGNumber;
+                var format = engine.StackPop() as MOGString;   
+                var number = engine.StackPop() as MOGNumber;
 
                 try
                 {
@@ -3137,19 +3148,19 @@ namespace MogwaiNano.Engine
                         result = number.Value.ToString(format.Value);
                     }
 
-                    StackPush(new MOGString(this, result));
+                    engine.StackPush(new MOGString(engine, result));
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSub(string name)
+        private static EvalResult PrimitiveSub(MogwaiNanoEngine engine, string name)
         {
             // "ABCDE" 1 1 sub ---> "B"
             // "ABCDE" 2 0 sub   ---> "CDE"
@@ -3159,28 +3170,28 @@ namespace MogwaiNano.Engine
 
             // D:FFBBEE 0 2 sub ---> D:FFBB
 
-            var sign = StackSign(3);
+            var sign = engine.StackSign(3);
 
             if (sign.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (sign[0] != typeof(MOGNumber) || sign[1] != typeof(MOGNumber) || (sign[2] != typeof(MOGString) && sign[2] != typeof(MOGList) && sign[2] != typeof(MOGData) && sign[2] != typeof(MOGRef)))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var n0 = StackPop() as MOGNumber;
-            var n1 = StackPop() as MOGNumber;
-            var n2 = StackPop();
+            var n0 = engine.StackPop() as MOGNumber;
+            var n1 = engine.StackPop() as MOGNumber;
+            var n2 = engine.StackPop();
 
             var start = (int)n1.Value;
             var count = (int)n0.Value;
 
             if (start < 0 || count < 0)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
             if (n2 is MOGString s)
             {
                 if (start >= s.Value.Length)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 if (count <= 0)
                     count = s.Value.Length;
@@ -3190,18 +3201,18 @@ namespace MogwaiNano.Engine
 
                 try
                 {
-                    StackPush(new MOGString(this, s.Value.Substring(start, count)));
+                    engine.StackPush(new MOGString(engine, s.Value.Substring(start, count)));
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, ex.Message);
                 }
             }
             else if (n2 is MOGList l)
             {
                 if (start < 0 || start >= l.Items.Count)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 if (count <= 0)
                     count = l.Items.Count;
@@ -3209,18 +3220,18 @@ namespace MogwaiNano.Engine
                 if (start + count >= l.Items.Count)
                     count = l.Items.Count - start;
 
-                var l2 = new MOGList(this);
+                var l2 = new MOGList(engine);
 
                 for (int i = 0; i < count; i++)
                     l2.Items.Add(l.Items[start + i]);
 
-                StackPush(l2);
+                engine.StackPush(l2);
                 return EvalResult.NoError;
             }
             else if (n2 is MOGData d)
             {
                 if (start < 0 || start >= d.Items.Length)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 if (count <= 0)
                     count = d.Items.Length;
@@ -3233,70 +3244,70 @@ namespace MogwaiNano.Engine
                 for (int i = 0; i < count; i++)
                     items[i] = d.Items[start + i];
 
-                var d2 = new MOGData(this, items);
+                var d2 = new MOGData(engine, items);
 
-                StackPush(d2);
+                engine.StackPush(d2);
 
                 return EvalResult.NoError;
             }
             else if (n2 is MOGRef r)
             {
-                var value = VarRead(r.Value, false);
+                var value = engine.VarRead(r.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, r.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, r.ToString());
 
-                StackPush(value);
-                StackPush(n1);
-                StackPush(n0);
+                engine.StackPush(value);
+                engine.StackPush(n1);
+                engine.StackPush(n0);
 
-                return PrimitiveSub(name);
+                return PrimitiveSub(engine, name);
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveToNumber(string name)
+        private static EvalResult PrimitiveToNumber(MogwaiNanoEngine engine, string name)
         {
             // string ->num
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGString))
             {
-                var @string = StackPop() as MOGString;
+                var @string = engine.StackPop() as MOGString;
 
                 if (float.TryParse(@string.Value, out var value))
                 {
-                    StackPush(new MOGNumber(this, value));
+                    engine.StackPush(new MOGNumber(engine, value));
                     return EvalResult.NoError;
                 }
 
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name, @string.ToString());
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, @string.ToString());
             }       
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveToString(string name)
+        private static EvalResult PrimitiveToString(MogwaiNanoEngine engine, string name)
         {
             // object ->str
 
-            if (StackSize == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
             
-            var obj = StackPop();
+            var obj = engine.StackPop();
 
             if (obj is MOGString)
             {
-                StackPush(obj);
+                engine.StackPush(obj);
             }
             else
             {
-                StackPush(new MOGString(this, obj.ToString())); 
+                engine.StackPush(new MOGString(engine, obj.ToString())); 
             }
 
             return EvalResult.NoError;
@@ -3304,31 +3315,31 @@ namespace MogwaiNano.Engine
 
         #region UNITS
 
-        private EvalResult PrimitiveGetUnits(string name)
+        private static EvalResult PrimitiveGetUnits(MogwaiNanoEngine engine, string name)
         {
-            var list = new MOGList(this);
+            var list = new MOGList(engine);
 
-            foreach (var unit in Units)
-                list.AddItem(new MOGName(this, unit));
+            foreach (var unit in engine.Units)
+                list.AddItem(new MOGName(engine, unit));
            
-            StackPush(list);
+            engine.StackPush(list);
             
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveRunUnit(string name)
+        private static EvalResult PrimitiveRunUnit(MogwaiNanoEngine engine, string name)
         {
             // 'unitName' runUnit
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var unitName = StackPop() as MOGName;
+            var unitName = engine.StackPop() as MOGName;
             var unitFilename = Path.Combine(@"I:\mogwai\units", unitName.Value);
 
             if (File.Exists(unitFilename))
@@ -3341,18 +3352,18 @@ namespace MogwaiNano.Engine
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.UnableToReadUnitError, name, unitName.Value, ex.Message);
+                    return EvalResult.Failure(engine, Error.UnableToReadUnitError, name, unitName.Value, ex.Message);
                 }
 
                 MOGFunction function;
 
                 try
                 {
-                    function = new MOGFunction(this, unitCode);
+                    function = new MOGFunction(engine, unitCode);
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.ParseError, name, unitName.Value, ex.Message);
+                    return EvalResult.Failure(engine, Error.ParseError, name, unitName.Value, ex.Message);
                 }
                     
                 var r = function.Execute();
@@ -3365,7 +3376,7 @@ namespace MogwaiNano.Engine
             }
             else
             {
-                return EvalResult.Failure(this, Error.UnknownUnitError, name, unitName.Value);
+                return EvalResult.Failure(engine, Error.UnknownUnitError, name, unitName.Value);
             }
         } 
 
@@ -3373,41 +3384,41 @@ namespace MogwaiNano.Engine
 
         #region SKILLS
 
-        private EvalResult PrimitiveGetSkills(string name)
+        private static EvalResult PrimitiveGetSkills(MogwaiNanoEngine engine, string name)
         {
-            var list = new MOGList(this);
+            var list = new MOGList(engine);
 
-            foreach (var skill in _skills)
-                list.AddItem(new MOGName(this, skill));
+            foreach (var skill in Skills)
+                list.AddItem(new MOGName(engine, skill));
 
-            StackPush(list);
+            engine.StackPush(list);
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveHasSkill(string name)
+        private static EvalResult PrimitiveHasSkill(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var skillName = StackPop() as MOGName;
+            var skillName = engine.StackPop() as MOGName;
             var skillValue = skillName.Value.ToUpper();
 
-            foreach (var skill in _skills)
+            foreach (var skill in Skills)
             {
-                if (skill == skillValue)
+                if (skill == skillValue)        
                 {
-                    StackPush(new MOGBoolean(this, true));
+                    engine.StackPush(new MOGBoolean(engine, true));
                     return EvalResult.NoError;
                 }
             }
 
-            StackPush(new MOGBoolean(this, false));
+            engine.StackPush(new MOGBoolean(engine, false));
 
             return EvalResult.NoError;
         }
@@ -3416,80 +3427,80 @@ namespace MogwaiNano.Engine
 
         #region FLAGS
 
-        private EvalResult PrimitiveFlagSet(string name)
+        private static EvalResult PrimitiveFlagSet(MogwaiNanoEngine engine, string name)
         {
             // 'name' flag.set
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var flagName = StackPop() as MOGName;
+            var flagName = engine.StackPop() as MOGName;
 
-            if (!_flags.Contains(flagName.Value))
-                _flags.Add(flagName.Value);
+            if (!engine.Flags.Contains(flagName.Value))
+                engine.Flags.Add(flagName.Value);
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveFlagClear(string name)
+        private static EvalResult PrimitiveFlagClear(MogwaiNanoEngine engine, string name)
         {
             // 'name' flag.clear
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var flagName = StackPop() as MOGName;
+            var flagName = engine.StackPop() as MOGName;
 
-            if (_flags.Contains(flagName.Value))
-                _flags.Remove(flagName.Value);
+            if (engine.Flags.Contains(flagName.Value))
+                engine.Flags.Remove(flagName.Value);
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveFlagIsSet(string name)
+        private static EvalResult PrimitiveFlagIsSet(MogwaiNanoEngine engine, string name)
         {
             // 'name' flag.isSet
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var flagName = StackPop() as MOGName;
-            var v = _flags.Contains(flagName.Value);
-            StackPush(new MOGBoolean(this, v));
+            var flagName = engine.StackPop() as MOGName;
+            var v = engine.Flags.Contains(flagName.Value);
+            engine.StackPush(new MOGBoolean(engine, v));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveFlagIsClear(string name)
+        private static EvalResult PrimitiveFlagIsClear(MogwaiNanoEngine engine, string name)
         {
             // 'name' flag.isClear
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var flagName = StackPop() as MOGName;
-            var v = _flags.Contains(flagName.Value);
-            StackPush(new MOGBoolean(this, !v));
+            var flagName = engine.StackPop() as MOGName;
+            var v = engine.Flags.Contains(flagName.Value);
+            engine.StackPush(new MOGBoolean(engine, !v));
 
             return EvalResult.NoError;
         }
@@ -3498,293 +3509,293 @@ namespace MogwaiNano.Engine
 
         #region STOPWATCHS
 
-        private EvalResult PrimitiveStopwatchCreate(string name)
+        private static EvalResult PrimitiveStopwatchCreate(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.create  
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
 
-                if (_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.NameAlreadyExistsError, name, stopwatchName.Value);
+                if (engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.NameAlreadyExistsError, name, stopwatchName.Value);
 
-                _stopwatches.Add(stopwatchName.Value, new Stopwatch());
+                engine.Stopwatches.Add(stopwatchName.Value, new Stopwatch());
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStopwatchStart(string name)
+        private static EvalResult PrimitiveStopwatchStart(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.start
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
             
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
             
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
                 
-                if (!_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+                if (!engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, stopwatchName.Value);
 
-                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                var sw = engine.Stopwatches[stopwatchName.Value] as Stopwatch;
                 sw.Start();
                 
                 return EvalResult.NoError;
             }
             
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStopwatchStop(string name)
+        private static EvalResult PrimitiveStopwatchStop(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.stop
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
 
-                if (!_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+                if (!engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, stopwatchName.Value);
 
-                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                var sw = engine.Stopwatches[stopwatchName.Value] as Stopwatch;
                 sw.Stop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStopwatchReset(string name)
+        private static EvalResult PrimitiveStopwatchReset(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.reset
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
 
-                if (!_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+                if (!engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, stopwatchName.Value);
 
-                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                var sw = engine.Stopwatches[stopwatchName.Value] as Stopwatch;
                 sw.Reset();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStopwatchRestart(string name)
+        private static EvalResult PrimitiveStopwatchRestart(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.restart
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
 
-                if (!_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+                if (!engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, stopwatchName.Value);
 
-                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                var sw = engine.Stopwatches[stopwatchName.Value] as Stopwatch;
                 sw.Restart();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStopwatchIsRunning(string name)
+        private static EvalResult PrimitiveStopwatchIsRunning(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.isRunning
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
 
-                if (!_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+                if (!engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, stopwatchName.Value);
 
-                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
-                StackPush(new MOGBoolean(this, sw.IsRunning));
+                var sw = engine.Stopwatches[stopwatchName.Value] as Stopwatch;
+                engine.StackPush(new MOGBoolean(engine, sw.IsRunning));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStopwatchPurge(string name)
+        private static EvalResult PrimitiveStopwatchPurge(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.purge
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
+                    
+                if (!engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, stopwatchName.Value);
 
-                if (!_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
-
-                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
+                var sw = engine.Stopwatches[stopwatchName.Value] as Stopwatch;
                 sw.Stop();
 
-                _stopwatches.Remove(stopwatchName.Value);
+                engine.Stopwatches.Remove(stopwatchName.Value);
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveStopwatchElapsed(string name)
+        private static EvalResult PrimitiveStopwatchElapsed(MogwaiNanoEngine engine, string name)
         {
             // 'name' stopwatch.elapsed
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var stopwatchName = StackPop() as MOGName;
+                var stopwatchName = engine.StackPop() as MOGName;
 
-                if (!_stopwatches.Contains(stopwatchName.Value))
-                    return EvalResult.Failure(this, Error.UnknownNameError, name, stopwatchName.Value);
+                if (!engine.Stopwatches.Contains(stopwatchName.Value))
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name, stopwatchName.Value);
 
-                var sw = _stopwatches[stopwatchName.Value] as Stopwatch;
-                StackPush(new MOGNumber(this, sw.ElapsedMilliseconds));
+                var sw = engine.Stopwatches[stopwatchName.Value] as Stopwatch;
+                engine.StackPush(new MOGNumber(engine, sw.ElapsedMilliseconds));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
         #endregion
 
         #region GPIO
 
-        private EvalResult PrimitiveGpioModeInput(string name) => SetPinMode(name, PinMode.Input);
+        private static EvalResult PrimitiveGpioModeInput(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.Input);
 
-        private EvalResult PrimitiveGpioSetModeInputPullDown(string name) => SetPinMode(name, PinMode.InputPullDown);
+        private static EvalResult PrimitiveGpioSetModeInputPullDown(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.InputPullDown);
 
-        private EvalResult PrimitiveGpioSetModeInputPullUp(string name) => SetPinMode(name, PinMode.InputPullUp);
+        private static EvalResult PrimitiveGpioSetModeInputPullUp(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.InputPullUp);
 
-        private EvalResult PrimitiveGpioSetModeOutput(string name) => SetPinMode(name, PinMode.Output);
+        private static EvalResult PrimitiveGpioSetModeOutput(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.Output);
+        
+        private static EvalResult PrimitiveGpioPinWriteHigh(MogwaiNanoEngine engine, string name) => GpioPinWrite(engine, name, PinValue.High);
 
-        private EvalResult PrimitiveGpioPinWriteHigh(string name) => GpioPinWrite(name, PinValue.High);
+        private static EvalResult PrimitiveGpioPinWriteLow(MogwaiNanoEngine engine, string name) => GpioPinWrite(engine, name, PinValue.Low);
 
-        private EvalResult PrimitiveGpioPinWriteLow(string name) => GpioPinWrite(name, PinValue.Low);
-
-        private EvalResult PrimitiveGpioPinRead(string name)
+        private static EvalResult PrimitiveGpioPinRead(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var numPin = StackPop() as MOGNumber;
+            var numPin = engine.StackPop() as MOGNumber;
 
             if (numPin.Value < 0)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
-            var pin = GetPin((int)numPin.Value);
+            var pin = engine.GetPin((int)numPin.Value);
 
             if (pin == null)
-                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
 
             var e = pin.Read();
-            StackPush(new MOGNumber(this, e == PinValue.High ? 1 : 0));
+            engine.StackPush(new MOGNumber(engine, e == PinValue.High ? 1 : 0));
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveGpioPinToggle(string name)
+        private static EvalResult PrimitiveGpioPinToggle(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var numPin = StackPop() as MOGNumber;
+            var numPin = engine.StackPop() as MOGNumber;
 
             if (numPin.Value < 0)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
-            var pin = GetPin((int)numPin.Value);
+            var pin = engine.GetPin((int)numPin.Value);
 
             if (pin == null)
-                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
 
             pin.Toggle();
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveGpioPinClose(string name)
+        private static EvalResult PrimitiveGpioPinClose(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var numPin = StackPop() as MOGNumber;
+            var numPin = engine.StackPop() as MOGNumber;
 
             if (numPin.Value < 0)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
             var nPin = (int)numPin.Value;
 
-            if (!ClosePin((int)numPin.Value))
-                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+            if (!engine.ClosePin(nPin))
+                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
 
             return EvalResult.NoError;
         }
@@ -3793,93 +3804,93 @@ namespace MogwaiNano.Engine
 
         #region I2C
 
-        private EvalResult PrimitiveI2cOpen(string name)
+        private static EvalResult PrimitiveI2cOpen(MogwaiNanoEngine engine, string name)
         {
             // 'name' bus address i2c.open
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber) || s[2] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var address = StackPop() as MOGNumber;
-            var bus = StackPop() as MOGNumber;
-            var deviceName = StackPop() as MOGName;
+            var address = engine.StackPop() as MOGNumber;
+            var bus = engine.StackPop() as MOGNumber;
+            var deviceName = engine.StackPop() as MOGName;
 
             int busNumber = (int)bus.Value;
 
             if (busNumber < 1 || busNumber > 2)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C bus number must be between 1 and 2");
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C bus number must be between 1 and 2");
 
             int addressNumber = (int)address.Value;
 
             if (addressNumber < 0 || addressNumber > 127)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C address number must be between 0 and 127");
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C address number must be between 0 and 127");
 
-            if (_i2cDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(this, Error.I2cDeviceAlreadyOpenedError, name, $"I2C device (bus {busNumber}, address {addressNumber:X2}) is already opened");
+            if (engine.I2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(engine, Error.I2cDeviceAlreadyOpenedError, name, $"I2C device (bus {busNumber}, address {addressNumber:X2}) is already opened");
 
             try
             {
                 var i2cSettings = new I2cConnectionSettings(busNumber, addressNumber, I2cBusSpeed.FastMode);
                 var i2cDevice = I2cDevice.Create(i2cSettings);
 
-                _i2cDevices.Add(deviceName.Value, i2cDevice);
+                engine.I2cDevices.Add(deviceName.Value, i2cDevice);
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(this, Error.I2cDeviceOpenError, name, $"failed to open I2C device (bus {busNumber}, address {addressNumber:X2})", ex.Message);
+                return EvalResult.Failure(engine, Error.I2cDeviceOpenError, name, $"failed to open I2C device (bus {busNumber}, address {addressNumber:X2})", ex.Message);
             }
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveI2cClose(string name)
+        private static EvalResult PrimitiveI2cClose(MogwaiNanoEngine engine, string name)
         {
             // name i2c.close   
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var deviceName = StackPop() as MOGName;
+            var deviceName = engine.StackPop() as MOGName;
 
-            if (!_i2cDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+            if (!engine.I2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(engine, Error.I2cUnknownDeviceNameError, name);
 
-            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
-            _i2cDevices.Remove(deviceName.Value);
+            var i2cDevice = engine.I2cDevices[deviceName.Value] as I2cDevice;
+            engine.I2cDevices.Remove(deviceName.Value);
 
             i2cDevice.Dispose();
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveI2cWrite(string name)
+        private static EvalResult PrimitiveI2cWrite(MogwaiNanoEngine engine, string name)
         {
             // name data i2c.write
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGData) && s[1] == typeof(MOGName))
             {   
-                var data = StackPop() as MOGData;
-                var deviceName = StackPop() as MOGName;
+                var data = engine.StackPop() as MOGData;
+                var deviceName = engine.StackPop() as MOGName;
 
-                if (!_i2cDevices.Contains(deviceName.Value))
-                    return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+                if (!engine.I2cDevices.Contains(deviceName.Value))
+                    return EvalResult.Failure(engine, Error.I2cUnknownDeviceNameError, name);
 
-                var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+                var i2cDevice = engine.I2cDevices[deviceName.Value] as I2cDevice;
 
                 try
                 {
@@ -3891,64 +3902,64 @@ namespace MogwaiNano.Engine
                     }
                     else
                     {
-                        return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                        return EvalResult.Failure(engine, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
+                    return EvalResult.Failure(engine, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
                 }
             }
             else if (s[0] == typeof(MOGRef) && s[1] == typeof(MOGName))
             {
-                var @ref = StackPop() as MOGRef;
-                var deviceName = StackPop() as MOGName;
+                var @ref = engine.StackPop() as MOGRef;
+                var deviceName = engine.StackPop() as MOGName;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name.ToString());
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
 
-                StackPush(deviceName);
-                StackPush(value);
+                engine.StackPush(deviceName);
+                engine.StackPush(value);
 
-                var r = PrimitiveI2cWrite(name);
+                var r = PrimitiveI2cWrite(engine, name);
 
                 if (r.IsError)
                     return r;
 
-                StackDrop();
+                engine.StackDrop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveI2cRegisterWrite(string name)
+        private static EvalResult PrimitiveI2cRegisterWrite(MogwaiNanoEngine engine, string name)
         {
             // name register data i2c.write
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGData) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGName))
             {
-                var data = StackPop() as MOGData;
-                var register = StackPop() as MOGNumber;
-                var deviceName = StackPop() as MOGName;
+                var data = engine.StackPop() as MOGData;
+                var register = engine.StackPop() as MOGNumber;
+                var deviceName = engine.StackPop() as MOGName;
 
-                if (!_i2cDevices.Contains(deviceName.Value))
-                    return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+                if (!engine.I2cDevices.Contains(deviceName.Value))
+                    return EvalResult.Failure(engine, Error.I2cUnknownDeviceNameError, name);
 
                 if (register.Value < 0 || register.Value > 255)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
 
                 var registerAddress = (byte)register.Value;
 
-                var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+                var i2cDevice = engine.I2cDevices[deviceName.Value] as I2cDevice;
 
                 try
                 {
@@ -3959,65 +3970,65 @@ namespace MogwaiNano.Engine
                     var r = i2cDevice.Write(span);
 
                     if (r.Status != I2cTransferStatus.FullTransfer)
-                        return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                        return EvalResult.Failure(engine, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
 
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
+                    return EvalResult.Failure(engine, Error.I2cWriteError, name, $"failed to write to I2C device '{deviceName.Value}'", ex.Message);
                 }
             }
             else if (s[0] == typeof(MOGRef) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGName))
             {
-                var @ref = StackPop() as MOGRef;
-                var register = StackPop() as MOGNumber;
-                var deviceName = StackPop() as MOGName;
+                var @ref = engine.StackPop() as MOGRef;
+                var register = engine.StackPop() as MOGNumber;
+                var deviceName = engine.StackPop() as MOGName;
 
-                var value = VarRead(@ref.Value, false);
+                var value = engine.VarRead(@ref.Value, false);
 
                 if (value == null)
-                    return EvalResult.Failure(this, Error.UnknownNameError, name);
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name);
 
-                StackPush(deviceName);
-                StackPush(register);
-                StackPush(value);   
+                engine.StackPush(deviceName);
+                engine.StackPush(register);
+                engine.StackPush(value);   
 
-                var r = PrimitiveI2cRegisterWrite(name);
+                var r = PrimitiveI2cRegisterWrite(engine, name);
 
                 if (r.IsError)
                     return r;
 
-                StackDrop();
+                engine.StackDrop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveI2cRead(string name)
+        private static EvalResult PrimitiveI2cRead(MogwaiNanoEngine engine, string name)
         {
             // name length i2c.read
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var length = StackPop() as MOGNumber;
-            var deviceName = StackPop() as MOGName;
+            var length = engine.StackPop() as MOGNumber;
+            var deviceName = engine.StackPop() as MOGName;
 
-            if (!_i2cDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
-
+            if (!engine.I2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(engine, Error.I2cUnknownDeviceNameError, name);
+            
             if (length.Value < 0 || length.Value > 255)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C read length must be between 0 and 255");
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C read length must be between 0 and 255");
 
-            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
+            var i2cDevice = engine.I2cDevices[deviceName.Value] as I2cDevice;
 
             try
             {
@@ -4027,53 +4038,53 @@ namespace MogwaiNano.Engine
 
                 if (r.Status == I2cTransferStatus.FullTransfer)
                 {
-                    var mogData = new MOGData(this, buffer);
-                    StackPush(mogData);
+                    var mogData = new MOGData(engine, buffer);
+                    engine.StackPush(mogData);
 
                     return EvalResult.NoError;
                 }
                 else
                 {
-                    return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                    return EvalResult.Failure(engine, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
                 }
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", ex.Message);
+                return EvalResult.Failure(engine, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", ex.Message);
             }
         }
 
-        private EvalResult PrimitiveI2cRegisterRead(string name)
+        private static EvalResult PrimitiveI2cRegisterRead(MogwaiNanoEngine engine, string name)
         {
             // name register length i2c.read
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber) || s[2] != typeof(MOGName))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var length = StackPop() as MOGNumber;
-            var register = StackPop() as MOGNumber;
-            var deviceName = StackPop() as MOGName;
+            var length = engine.StackPop() as MOGNumber;
+            var register = engine.StackPop() as MOGNumber;
+            var deviceName = engine.StackPop() as MOGName;
 
-            if (!_i2cDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(this, Error.I2cUnknownDeviceNameError, name);
+            if (!engine.I2cDevices.Contains(deviceName.Value))
+                return EvalResult.Failure(engine, Error.I2cUnknownDeviceNameError, name);
 
             if (register.Value < 0 || register.Value > 255)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C register number must be between 0 and 255");
 
             var registerAddress = (byte)register.Value;
 
             if (length.Value < 0 || length.Value > 255)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C read length must be between 0 and 255");
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C read length must be between 0 and 255");
 
             var count = (int)length.Value;
 
-            var i2cDevice = _i2cDevices[deviceName.Value] as I2cDevice;
-
+            var i2cDevice = engine.I2cDevices[deviceName.Value] as I2cDevice;
+            
             try
             {
                 byte[] writeBuffer = new byte[] { registerAddress };
@@ -4086,36 +4097,36 @@ namespace MogwaiNano.Engine
 
                 if (r.Status == I2cTransferStatus.FullTransfer)
                 {
-                    var mogData = new MOGData(this, readBuffer);
-                    StackPush(mogData);
+                    var mogData = new MOGData(engine, readBuffer);
+                    engine.StackPush(mogData);
 
                     return EvalResult.NoError;
                 }
                 else
                 {
-                    return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
+                    return EvalResult.Failure(engine, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", $"I2C transfer status: {r.Status}");
                 }
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(this, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", ex.Message);
+                return EvalResult.Failure(engine, Error.I2cReadError, name, $"failed to read from I2C device '{deviceName.Value}'", ex.Message);
             }
         }
 
-        private EvalResult PrimitiveI2cScan(string name)
+        private static EvalResult PrimitiveI2cScan(MogwaiNanoEngine engine, string name)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var bus = StackPop() as MOGNumber;
+            var bus = engine.StackPop() as MOGNumber;
             int busNumber = (int)bus.Value;
 
-            var list = new MOGList(this);
+            var list = new MOGList(engine);
 
             byte[] probe = new byte[1];
             SpanByte span = new SpanByte(probe);
@@ -4127,11 +4138,11 @@ namespace MogwaiNano.Engine
                     var res = i2c.Write(span);
 
                     if (res.Status == I2cTransferStatus.FullTransfer)
-                        list.AddItem(new MOGNumber(this, address));
+                        list.AddItem(new MOGNumber(engine, address));
                 }
             }
 
-            StackPush(list);
+            engine.StackPush(list);
 
             return EvalResult.NoError;
         }
@@ -4140,30 +4151,30 @@ namespace MogwaiNano.Engine
 
         #region PWM
 
-        private EvalResult PrimitivePwmOpen(string name)
+        private static EvalResult PrimitivePwmOpen(MogwaiNanoEngine engine, string name)
         {
             // 'name' pin frequency dutyCycle pwm.open
 
-            var s = StackSign(4);
+            var s = engine.StackSign(4);
             
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGName))
             {
-                var dutyCycle = StackPop() as MOGNumber;
-                var frequency = StackPop() as MOGNumber;
-                var pin = StackPop() as MOGNumber;
-                var pwmName = StackPop() as MOGName;    
+                var dutyCycle = engine.StackPop() as MOGNumber;
+                var frequency = engine.StackPop() as MOGNumber;
+                var pin = engine.StackPop() as MOGNumber;
+                var pwmName = engine.StackPop() as MOGName;    
 
                 if (dutyCycle.Value < 0 || dutyCycle.Value > 100)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "PWM duty cycle must be between 0 and 100");
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "PWM duty cycle must be between 0 and 100");
                 
                 if (frequency.Value <= 0)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "PWM frequency must be greater than 0");
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "PWM frequency must be greater than 0");
                 
-                if (_pwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(this, Error.PwmAlreadyOpenedError, name);
+                if (engine.PwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(engine, Error.PwmAlreadyOpenedError, name);
                 
                 int nPin = (int)pin.Value;
 
@@ -4172,222 +4183,208 @@ namespace MogwaiNano.Engine
                     var pwmChannel = PwmChannel.CreateFromPin(nPin, (int)frequency.Value, dutyCycle.Value / 100.0);
                     
                     if (pwmChannel == null)
-                        return EvalResult.Failure(this, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}");
+                        return EvalResult.Failure(engine, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}");
 
-                    _pwmChannels.Add(pwmName.Value, pwmChannel);
+                    engine.PwmChannels.Add(pwmName.Value, pwmChannel);
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}", ex.Message);
+                    return EvalResult.Failure(engine, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}", ex.Message);
                 }
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitivePwmClose(string name)
+        private static EvalResult PrimitivePwmClose(MogwaiNanoEngine engine, string name)
         {
             // 'name' pwm.close
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
             
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var pwmName = StackPop() as MOGName;
+                var pwmName = engine.StackPop() as MOGName;
 
-                if (!_pwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(this, Error.PwmUnknownNameError, name);
+                if (!engine.PwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(engine, Error.PwmUnknownNameError, name);
                 
-                var pwmChannel = _pwmChannels[pwmName.Value] as PwmChannel;               
+                var pwmChannel = engine.PwmChannels[pwmName.Value] as PwmChannel;               
                 pwmChannel.Stop();
                 pwmChannel.Dispose();
                
-                _pwmChannels.Remove(pwmName.Value);
+                engine.PwmChannels.Remove(pwmName.Value);
                 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitivePwmStart(string name)
+        private static EvalResult PrimitivePwmStart(MogwaiNanoEngine engine, string name)
         {
             // name pwm.start
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var pwmName = StackPop() as MOGName;
+                var pwmName = engine.StackPop() as MOGName;
 
-                if (!_pwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(this, Error.PwmUnknownNameError, name);
+                if (!engine.PwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(engine, Error.PwmUnknownNameError, name);
 
-                var pwmChannel = _pwmChannels[pwmName.Value] as PwmChannel;
+                var pwmChannel = engine.PwmChannels[pwmName.Value] as PwmChannel;
                 pwmChannel.Start();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitivePwmStop(string name)
+        private static EvalResult PrimitivePwmStop(MogwaiNanoEngine engine, string name)
         {
             // name pwm.stop
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var pwmName = StackPop() as MOGName;
+                var pwmName = engine.StackPop() as MOGName;
 
-                if (!_pwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(this, Error.PwmUnknownNameError, name);
+                if (!engine.PwmChannels.Contains(pwmName.Value))
+                    return EvalResult.Failure(engine, Error.PwmUnknownNameError, name);
 
-                var pwmChannel = _pwmChannels[pwmName.Value] as PwmChannel;
+                var pwmChannel = engine.PwmChannels[pwmName.Value] as PwmChannel;
                 pwmChannel.Stop();
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
         #endregion
 
         #region ADC
 
-        private EvalResult PrimitiveAdcOpen(string name)
+        private static EvalResult PrimitiveAdcOpen(MogwaiNanoEngine engine, string name)
         {
-
             // 'name' channel adc.open
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGName))
             {
-                var channel = StackPop() as MOGNumber;
-                var adcName = StackPop() as MOGName;
+                var channel = engine.StackPop() as MOGNumber;
+                var adcName = engine.StackPop() as MOGName;
              
-                if (_adcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(this, Error.AdcAlreadyOpenedError, name);
+                if (engine.AdcChannels.Contains(adcName.Value))
+                    return EvalResult.Failure(engine, Error.AdcAlreadyOpenedError, name);
 
                 int nChannel = (int)channel.Value;
 
                 try
                 {
-                    if (_adcController == null)
-                        _adcController = new AdcController();
-
-                    var adcChannel = _adcController.OpenChannel(nChannel);
-
-                    _adcChannels.Add(adcName.Value, adcChannel);
+                    var adcChannel = engine.AdcController.OpenChannel(nChannel);
+                    engine.AdcChannels.Add(adcName.Value, adcChannel);
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.AdcOpenError, name, $"failed to open ADC channel {nChannel}", ex.Message);
+                    return EvalResult.Failure(engine, Error.AdcOpenError, name, $"failed to open ADC channel {nChannel}", ex.Message);
                 }
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveAdcClose(string name)
+        private static EvalResult PrimitiveAdcClose(MogwaiNanoEngine engine, string name)
         {
             // 'name' adc.close
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var adcName = StackPop() as MOGName;
+                var adcName = engine.StackPop() as MOGName;
 
-                if (!_adcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(this, Error.AdcUnknownNameError, name);
+                if (!engine.AdcChannels.Contains(adcName.Value))
+                    return EvalResult.Failure(engine, Error.AdcUnknownNameError, name);
 
-                var adcChannel = _adcChannels[adcName.Value] as AdcChannel;
+                var adcChannel = engine.AdcChannels[adcName.Value] as AdcChannel;
                 adcChannel.Dispose();
 
-                _adcChannels.Remove(adcName.Value);
-
-                if (_adcChannels.Count == 0)
-                    _adcController = null;
+                engine.AdcChannels.Remove(adcName.Value);
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveAdcReadValue(string name)
+        private static EvalResult PrimitiveAdcReadValue(MogwaiNanoEngine engine, string name)
         {
             // name adc.readValue
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGName))
             {
-                var adcName = StackPop() as MOGName;
+                var adcName = engine.StackPop() as MOGName;
 
-                if (!_adcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(this, Error.AdcUnknownNameError, name);
+                if (!engine.AdcChannels.Contains(adcName.Value))
+                    return EvalResult.Failure(engine, Error.AdcUnknownNameError, name);
 
-                var adcChannel = _adcChannels[adcName.Value] as AdcChannel;
+                var adcChannel = engine.AdcChannels[adcName.Value] as AdcChannel;
                 var value = adcChannel.ReadValue();
 
-                StackPush(new MOGNumber(this, value));
+                engine.StackPush(new MOGNumber(engine, value));
 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveAdcGetMaxValue(string name)
+        private static EvalResult PrimitiveAdcGetMaxValue(MogwaiNanoEngine engine, string name)
         {
             // adc.maxValue
 
-            if (_adcController == null)
-                _adcController = new AdcController();
-
-            var maxValue = _adcController.MaxValue;
-            StackPush(new MOGNumber(this, maxValue));
+            var maxValue = engine.AdcController.MaxValue;
+            engine.StackPush(new MOGNumber(engine, maxValue));
             
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveAdcGetResolutionInBits(string name)
+        private static EvalResult PrimitiveAdcGetResolutionInBits(MogwaiNanoEngine engine, string name)
         {
             // adc.resolutionInBits
 
-            if (_adcController == null)
-                _adcController = new AdcController();
-
-            var resolutionInBits = _adcController.ResolutionInBits;
-            StackPush(new MOGNumber(this, resolutionInBits));
+            var resolutionInBits = engine.AdcController.ResolutionInBits;
+            engine.StackPush(new MOGNumber(engine, resolutionInBits));
 
             return EvalResult.NoError;
         }
@@ -4396,282 +4393,282 @@ namespace MogwaiNano.Engine
 
         #region SSD1306 OLED SCREEN
 
-        private EvalResult PrimitiveSsd1306Init(string name)
+        private static EvalResult PrimitiveSsd1306Init(MogwaiNanoEngine engine, string name)
         {
             // bus address ssd1306.init
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
             
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var address = StackPop() as MOGNumber;
-                var bus = StackPop() as MOGNumber;
+                var address = engine.StackPop() as MOGNumber;
+                var bus = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 != null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsOpenedError, name);
+                if (engine.Ssd1306 != null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsOpenedError, name);
 
                 int busNumber = (int)bus.Value;
                 int addressNumber = (int)address.Value;
 
                 if (busNumber < 1 || busNumber > 2)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C bus number must be between 1 and 2");
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C bus number must be between 1 and 2");
                 
                 if (addressNumber < 0 || addressNumber > 127)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name, "I2C address number must be between 0 and 127");
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C address number must be between 0 and 127");
 
-                if (_ssd1306 != null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsOpenedError, name);
+                if (engine.Ssd1306 != null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsOpenedError, name);
 
                 try
                 {
                     I2cConnectionSettings settings = new(busNumber, addressNumber, I2cBusSpeed.FastMode);
                     I2cDevice i2cDevice = I2cDevice.Create(settings);
 
-                    _ssd1306 = new(i2cDevice, DisplayResolution.OLED128x64);
-                    _ssd1306.ClearScreen();
+                    engine.Ssd1306 = new(i2cDevice, DisplayResolution.OLED128x64);
+                    engine.Ssd1306.ClearScreen();
                 }
                 catch (Exception ex)
                 {
-                    if (_ssd1306 != null)
+                    if (engine.Ssd1306 != null)
                     {
-                        _ssd1306.Dispose();
-                        _ssd1306 = null;
+                        engine.Ssd1306.Dispose();
+                        engine.Ssd1306 = null;
                     }
 
-                    return EvalResult.Failure(this, Error.Ssd1306InitError, name, "failed to initialize ssd1306 display", $"bus {busNumber}", $"address {addressNumber:X2}", ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306InitError, name, "failed to initialize ssd1306 display", $"bus {busNumber}", $"address {addressNumber:X2}", ex.Message);
                 }
                 
                 return EvalResult.NoError;
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSsd1306Close(string name)
+        private static EvalResult PrimitiveSsd1306Close(MogwaiNanoEngine engine, string name)
         {
-            if (_ssd1306 != null)
+            if (engine.Ssd1306 != null)
             { 
-                _ssd1306.Dispose();
-                _ssd1306 = null;
+                engine.Ssd1306.Dispose();
+                engine.Ssd1306 = null;
             }   
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveSsd1306Clear(string name)
+        private static EvalResult PrimitiveSsd1306Clear(MogwaiNanoEngine engine, string name)
         {
-            if (_ssd1306 == null)
-                return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+            if (engine.Ssd1306 == null)
+                return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
             
-            _ssd1306.ClearScreen();
+            engine.Ssd1306.ClearScreen();
             
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveSsd1306PrintString(string name)
+        private static EvalResult PrimitiveSsd1306PrintString(MogwaiNanoEngine engine, string name)
         {
             // x y text size center ssd1306.printString
 
-            var s = StackSign(5);
+            var s = engine.StackSign(5);
             
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
             {
-                var center = StackPop() as MOGBoolean;
-                var size = StackPop() as MOGNumber;
-                var text = StackPop() as MOGString;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var center = engine.StackPop() as MOGBoolean;
+                var size = engine.StackPop() as MOGNumber;
+                var text = engine.StackPop() as MOGString;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
-                    if (_ssd1306.Font == null)
-                        _ssd1306.Font = new BasicFont();
+                    if (engine.Ssd1306.Font == null)
+                        engine.Ssd1306.Font = new BasicFont();
 
-                    _ssd1306.Write((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
+                    engine.Ssd1306.Write((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
                     return EvalResult.NoError;  
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);  
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);  
         }
 
-        private EvalResult PrimitiveSsd1306DrawString(string name)
+        private static EvalResult PrimitiveSsd1306DrawString(MogwaiNanoEngine engine, string name)
         {
             // x y text size center ssd1306.drawString
 
-            var s = StackSign(5);
+            var s = engine.StackSign(5);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
             {
-                var center = StackPop() as MOGBoolean;
-                var size = StackPop() as MOGNumber;
-                var text = StackPop() as MOGString;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var center = engine.StackPop() as MOGBoolean;
+                var size = engine.StackPop() as MOGNumber;
+                var text = engine.StackPop() as MOGString;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
-                    if (_ssd1306.Font == null)
-                        _ssd1306.Font = new BasicFont();
+                    if (engine.Ssd1306.Font == null)
+                        engine.Ssd1306.Font = new BasicFont();
 
-                    _ssd1306.DrawString((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
+                    engine.Ssd1306.DrawString((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSsd1306Refresh(string name)
+        private static EvalResult PrimitiveSsd1306Refresh(MogwaiNanoEngine engine, string name)
         {
-            if (_ssd1306 == null)
-                return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+            if (engine.Ssd1306 == null)
+                return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
-            _ssd1306.Display();
+            engine.Ssd1306.Display();
 
             return EvalResult.NoError;
         }
 
-        private EvalResult PrimitiveSsd1306DrawPixel(string name)
+        private static EvalResult PrimitiveSsd1306DrawPixel(MogwaiNanoEngine engine, string name)
         {
             // x y true ssd1306.drawPixel   
 
-            var s = StackSign(3);
+            var s = engine.StackSign(3);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber))
             {
-                var set = StackPop() as MOGBoolean;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var set = engine.StackPop() as MOGBoolean;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
                 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
-                    _ssd1306.DrawPixel((int)x.Value, (int)y.Value, set.Value);
+                    engine.Ssd1306.DrawPixel((int)x.Value, (int)y.Value, set.Value);
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSsd1306DrawHorizontalLine(string name)
+        private static EvalResult PrimitiveSsd1306DrawHorizontalLine(MogwaiNanoEngine engine, string name)
         {
             // x y len true ssd1306.drawHorizontalLine  
 
-            var s = StackSign(4);
+            var s = engine.StackSign(4);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
             {
-                var set = StackPop() as MOGBoolean;
-                var len = StackPop() as MOGNumber;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var set = engine.StackPop() as MOGBoolean;
+                var len = engine.StackPop() as MOGNumber;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
-                    _ssd1306.DrawHorizontalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
+                    engine.Ssd1306.DrawHorizontalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSsd1306DrawHVerticalLine(string name)
+        private static EvalResult PrimitiveSsd1306DrawHVerticalLine(MogwaiNanoEngine engine, string name)
         {
             // x y len true ssd1306.drawVerticalLine 
 
-            var s = StackSign(4);
+            var s = engine.StackSign(4);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
             {
-                var set = StackPop() as MOGBoolean;
-                var len = StackPop() as MOGNumber;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var set = engine.StackPop() as MOGBoolean;
+                var len = engine.StackPop() as MOGNumber;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
-                    _ssd1306.DrawVerticalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
+                    engine.Ssd1306.DrawVerticalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSsd1306DrawRectangle(string name)
+        private static EvalResult PrimitiveSsd1306DrawRectangle(MogwaiNanoEngine engine, string name)
         {
             // x y w h true ssd1306.drawRectangle
 
-            var s = StackSign(5);
-
+            var s = engine.StackSign(5);
+            
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
             {
-                var set = StackPop() as MOGBoolean;
-                var height = StackPop() as MOGNumber;
-                var width = StackPop() as MOGNumber;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var set = engine.StackPop() as MOGBoolean;
+                var height = engine.StackPop() as MOGNumber;
+                var width = engine.StackPop() as MOGNumber;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
@@ -4680,111 +4677,111 @@ namespace MogwaiNano.Engine
                     int vw = (int)width.Value;
                     int vh = (int)height.Value;
 
-                    _ssd1306.DrawHorizontalLine(vx, vy, vw,  set.Value);
-                    _ssd1306.DrawVerticalLine(vx + vw - 1,vy, vh, set.Value);
-                    _ssd1306.DrawHorizontalLine(vx, vy + vh - 1, vw, set.Value);
-                    _ssd1306.DrawVerticalLine(vx, vy, vh, set.Value);
+                    engine.Ssd1306.DrawHorizontalLine(vx, vy, vw,  set.Value);
+                    engine.Ssd1306.DrawVerticalLine(vx + vw - 1,vy, vh, set.Value);
+                    engine.Ssd1306.DrawHorizontalLine(vx, vy + vh - 1, vw, set.Value);
+                    engine.Ssd1306.DrawVerticalLine(vx, vy, vh, set.Value);
                     
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSsd1306DrawFilledRectangle(string name)
+        private static EvalResult PrimitiveSsd1306DrawFilledRectangle(MogwaiNanoEngine engine, string name)
         {
             // x y w h true ssd1306.drawFilledRectangle
 
-            var s = StackSign(5);
+            var s = engine.StackSign(5);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
             {
-                var set = StackPop() as MOGBoolean;
-                var height = StackPop() as MOGNumber;
-                var width = StackPop() as MOGNumber;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var set = engine.StackPop() as MOGBoolean;
+                var height = engine.StackPop() as MOGNumber;
+                var width = engine.StackPop() as MOGNumber;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
-                    _ssd1306.DrawFilledRectangle((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value,set.Value);
+                    engine.Ssd1306.DrawFilledRectangle((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value,set.Value);
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSsd1306DrawBitmap(string name)
+        private static EvalResult PrimitiveSsd1306DrawBitmap(MogwaiNanoEngine engine, string name)
         {
             // x y w h data size ssd1306.drawBitmap
 
-            var s = StackSign(6);
-
+            var s = engine.StackSign(6);
+                
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGData) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber) && s[5] == typeof(MOGNumber))
             {
-                var size = StackPop() as MOGNumber;
-                var data = StackPop() as MOGData;
-                var height = StackPop() as MOGNumber;
-                var width = StackPop() as MOGNumber;
-                var y = StackPop() as MOGNumber;
-                var x = StackPop() as MOGNumber;
+                var size = engine.StackPop() as MOGNumber;
+                var data = engine.StackPop() as MOGData;
+                var height = engine.StackPop() as MOGNumber;
+                var width = engine.StackPop() as MOGNumber;
+                var y = engine.StackPop() as MOGNumber;
+                var x = engine.StackPop() as MOGNumber;
 
-                if (_ssd1306 == null)
-                    return EvalResult.Failure(this, Error.Ssd1306IsClosedError, name);
+                if (engine.Ssd1306 == null)
+                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
 
                 try
                 {
-                    _ssd1306.DrawBitmap((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value, data.Items, (byte)size.Value);
+                    engine.Ssd1306.DrawBitmap((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value, data.Items, (byte)size.Value);
                     return EvalResult.NoError;
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.Ssd1306OperationError, name, ex.Message);
+                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
         #endregion
 
         #region DEVICE
 
-        private EvalResult PrimitiveDeviceSetPinFunction(string name)
+        private static EvalResult PrimitiveDeviceSetPinFunction(MogwaiNanoEngine engine, string name)
         {
             // pin setvalue device.setPin
 
-            var s = StackSign(2);
+            var s = engine.StackSign(2);    
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);  
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);  
 
             if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
             {
-                var setValue = StackPop() as MOGNumber;
-                var pin = StackPop() as MOGNumber;  
+                var setValue = engine.StackPop() as MOGNumber;
+                var pin = engine.StackPop() as MOGNumber;  
 
                 if (pin.Value < 0)
-                    return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
                 if (SystemInfo.Platform == "ESP32")
                 {
@@ -4794,18 +4791,18 @@ namespace MogwaiNano.Engine
                     }
                     catch (Exception ex)
                     {
-                        return EvalResult.Failure(this, Error.PlatformNotSupportedError, name, ex.Message);
+                        return EvalResult.Failure(engine, Error.PlatformNotSupportedError, name, ex.Message);
                     }
 
                     return EvalResult.NoError;
                 }
                 else
                 {
-                    return EvalResult.Failure(this, Error.PlatformNotSupportedError, name);
+                    return EvalResult.Failure(engine, Error.PlatformNotSupportedError, name);
                 }
             }
 
-            return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
         #endregion
@@ -4853,7 +4850,7 @@ namespace MogwaiNano.Engine
         {
             // This name is used by a func ?
 
-            if (_functions.Contains(name))
+            if (Functions.Contains(name))
                 return EvalResult.Failure(this, Error.NameAlreadyUsedByFunctionError);
 
             bool r = false;
@@ -4988,8 +4985,8 @@ namespace MogwaiNano.Engine
 
         public MOGFunction GetFunction(string name)
         {
-            if (_functions.Contains(name))
-                return _functions[name] as MOGFunction;
+            if (Functions.Contains(name))
+                return Functions[name] as MOGFunction;
 
             return null;
         }
@@ -5010,13 +5007,13 @@ namespace MogwaiNano.Engine
                 _fireObjectsQueue.Clear();
         }
 
-        public bool HasWaitingFireObjects => !_disableInterrupts && _fireObjectsQueue.Count > 0;
+        public bool HasWaitingFireObjects => !DisableInterrupts && _fireObjectsQueue.Count > 0;
 
         public EvalResult ExecuteWaitingFireObjects()
         {
             var result = EvalResult.NoError;
 
-            if (!_disableInterrupts && _fireObjectsQueue.Count > 0)
+            if (!DisableInterrupts && _fireObjectsQueue.Count > 0)
             {
                 MOGFireObject fireObject = null;
 
@@ -5039,11 +5036,11 @@ namespace MogwaiNano.Engine
 
         public EvalResult PurgeTimer(string name)
         {
-            if (_timers.Contains(name))
+            if (Timers.Contains(name))
             {
-                var timer = _timers[name] as MOGTimer;
+                var timer = Timers[name] as MOGTimer;
                 timer.Stop();
-                _timers.Remove(name);
+                Timers.Remove(name);
                 return EvalResult.NoError;
             }
 
@@ -5052,27 +5049,27 @@ namespace MogwaiNano.Engine
 
         public EvalResult CreateNewTimer(string name, int interval, bool isCyclic, MOGFunction function, bool isLaterTimer = false)
         {
-            if (_timers.Contains(name))
+            if (Timers.Contains(name))
                 return EvalResult.Failure(this, Error.NameAlreadyExistsError, $"timer '{name}' already exists.");
 
             if (interval < 0)
                 return EvalResult.Failure(this, Error.BadArgumentValueError, "timer interval must be a positive value.");
 
             var timer = new MOGTimer(this, name, interval, isCyclic, function, isLaterTimer);
-            _timers.Add(name, timer);
+            Timers.Add(name, timer);
 
             return EvalResult.NoError;
         }
 
         public void CleanupTimers()
         {
-            foreach (var key in _timers.Keys)
+            foreach (var key in Timers.Keys)
             {
-                var timer = _timers[key] as MOGTimer;
+                var timer = Timers[key] as MOGTimer;
                 timer.Stop();
             }
 
-            _timers.Clear();
+            Timers.Clear();
         }
 
         #endregion
@@ -5157,33 +5154,33 @@ namespace MogwaiNano.Engine
 
         private void CleanupStopwatchs()
         {
-            foreach (var key in _stopwatches.Keys)
+            foreach (var key in Stopwatches.Keys)
             {
-                var stopwatch = _stopwatches[key] as Stopwatch;
+                var stopwatch = Stopwatches[key] as Stopwatch;
                 stopwatch.Stop();
             }
 
-            _stopwatches.Clear();
+            Stopwatches.Clear();
         }
 
         #endregion
 
         #region GPIO
 
-        private GpioPin GetPin(int pinNumber)
+        public GpioPin GetPin(int pinNumber)
         {
-            if (_openPins.Contains(pinNumber))
-                return _openPins[pinNumber] as GpioPin;
+            if (OpenedPins.Contains(pinNumber))
+                return OpenedPins[pinNumber] as GpioPin;
 
             return null;
         }
 
-        private bool ClosePin(int pinNumber)
+        public bool ClosePin(int pinNumber)
         {
-            if (_openPins.Contains(pinNumber))
+            if (OpenedPins.Contains(pinNumber))
             {
-                var pin = _openPins[pinNumber] as GpioPin;
-                _openPins.Remove(pin);
+                var pin = OpenedPins[pinNumber] as GpioPin;
+                OpenedPins.Remove(pin);
                 pin.ValueChanged -= GpioPin_ValueChanged;
                 pin.Dispose();
                 return true;
@@ -5192,25 +5189,25 @@ namespace MogwaiNano.Engine
             return false;
         }
 
-        private EvalResult GpioPinWrite(string name, PinValue pinValue)
+        private static EvalResult GpioPinWrite(MogwaiNanoEngine engine, string name, PinValue pinValue)
         {
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var numPin = StackPop() as MOGNumber;
+            var numPin = engine.StackPop() as MOGNumber;
 
             if (numPin.Value < 0)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
-            var pin = GetPin((int)numPin.Value);
+            var pin = engine.GetPin((int)numPin.Value);
 
             if (pin == null)
-                return EvalResult.Failure(this, Error.GpioUnknownPinError, name);
+                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
 
             pin.Write(pinValue);
 
@@ -5219,52 +5216,53 @@ namespace MogwaiNano.Engine
 
         private void CleanupOpenPins()
         {
-            foreach (int pinNumber in _openPins.Keys)
+            foreach (int pinNumber in OpenedPins.Keys)
             {
-                var pin = _openPins[pinNumber] as GpioPin;
+                var pin = OpenedPins[pinNumber] as GpioPin;
                 pin.ValueChanged -= GpioPin_ValueChanged;
                 pin.Dispose();
             }
 
-            _openPins.Clear();
+            OpenedPins.Clear();
         }
 
-        private EvalResult SetPinMode(string name, PinMode mode)
+        private static EvalResult SetPinMode(MogwaiNanoEngine engine, string name, PinMode mode)
         {
             // Used by all pin mode known
             // 4 gpio.setMode.xxx
 
-            var s = StackSign(1);
+            var s = engine.StackSign(1);
 
             if (s.Length == 0)
-                return EvalResult.Failure(this, Error.TooFewArgumentsError, name);
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
 
             if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(this, Error.BadArgumentTypeError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
-            var numPin = StackPop() as MOGNumber;
+            var numPin = engine.StackPop() as MOGNumber;
 
             if (numPin.Value < 0)
-                return EvalResult.Failure(this, Error.BadArgumentValueError, name);
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
 
             var nPin = (int)numPin.Value;
 
-            if (_openPins.Contains(nPin))
+            if (engine.OpenedPins.Contains(nPin))
             {
-                var pin = _openPins[nPin] as GpioPin;
+                var pin = engine.   OpenedPins[nPin] as GpioPin;
                 pin.SetPinMode(mode);
             }
             else
             {
-                GpioPin newPin = _gpioController.OpenPin(nPin, mode);
-                _openPins.Add(nPin, newPin);
+                GpioPin newPin = engine.GpioController.OpenPin(nPin, mode);
+                engine.OpenedPins.Add(nPin, newPin);
 
-                newPin.ValueChanged += GpioPin_ValueChanged;
+                newPin.ValueChanged += engine.GpioPin_ValueChanged;
             }
+
             return EvalResult.NoError;
         }
 
-        private void GpioPin_ValueChanged(object sender, PinValueChangedEventArgs e)
+        public void GpioPin_ValueChanged(object sender, PinValueChangedEventArgs e)
         {
             var eventType = e.ChangeType == PinEventTypes.Rising ? 1 : 0;
 
@@ -5277,40 +5275,39 @@ namespace MogwaiNano.Engine
 
         #region I2C
 
-        private void CleanupI2cDevices()
+        public void CleanupI2cDevices()
         {
-            foreach (var key in _i2cDevices.Keys)
+            foreach (var key in I2cDevices.Keys)
             {
-                var i2cDevice = _i2cDevices[key] as I2cDevice;
+                var i2cDevice = I2cDevices[key] as I2cDevice;
                 i2cDevice.Dispose();
             }
 
-            _i2cDevices.Clear();
+            I2cDevices.Clear();
         }
 
-        private void CleanupAdcChannels()
+        public void CleanupAdcChannels()
         {
-            foreach (var key in _adcChannels.Keys)
+            foreach (var key in AdcChannels.Keys)
             {
-                var adcChannel = _adcChannels[key] as AdcChannel;
+                var adcChannel = AdcChannels[key] as AdcChannel;
                 adcChannel.Dispose();
             }
 
-            _adcChannels.Clear();
-            _adcController = null;
+            AdcChannels.Clear();
         }
 
-        private void CleanupPwmChannels()
+        public void CleanupPwmChannels()
         {
-            foreach (var key in _pwmChannels.Keys)
+            foreach (var key in PwmChannels.Keys)
             {
-                var pwmChannel = _pwmChannels[key] as PwmChannel;
+                var pwmChannel = PwmChannels[key] as PwmChannel;
 
                 pwmChannel.Stop();
                 pwmChannel.Dispose();
             }
 
-            _pwmChannels.Clear();
+            PwmChannels.Clear();
         }
 
         #endregion

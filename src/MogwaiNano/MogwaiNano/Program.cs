@@ -34,7 +34,7 @@ namespace MogwaiNano
             Power.OnRebootEvent += Power_OnRebootEvent;
 
             Debug.WriteLine("MOGWAI NANO");
-            Debug.WriteLine($"Version {AppGlobal.MogwaiNanoEngine.Version}");
+            Debug.WriteLine($"Version {MogwaiNanoEngine.Version}");
             Debug.WriteLine("(c) 2026 Stéphane Sibué");
 
             AppGlobal.NanoParameters = NanoParameters.Load(AppGlobal.PARAMETERS_FILE);
@@ -185,7 +185,7 @@ namespace MogwaiNano
 
                 var skillsBuilder = new StringBuilder();
 
-                foreach (var skill in AppGlobal.MogwaiNanoEngine.Skills)
+                foreach (var skill in MogwaiNanoEngine.Skills)
                 {
                     if (skillsBuilder.Length > 0)
                         skillsBuilder.Append('\n');
@@ -207,7 +207,7 @@ namespace MogwaiNano
                         AppGlobal.NanoParameters.Name,
                         "INFO.GET",
                         AppGlobal.NanoParameters.Name,
-                        AppGlobal.MogwaiNanoEngine.Version.ToString(),
+                        MogwaiNanoEngine.Version.ToString(),
                         AppGlobal.IpAddress,
                         AppGlobal.Session.ToString(),
                         SystemInfo.Platform,
