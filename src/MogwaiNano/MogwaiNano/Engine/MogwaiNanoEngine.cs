@@ -1769,7 +1769,18 @@ namespace MogwaiNano.Engine
                 engine.StackPush(new MOGBoolean(engine, s0.Value == s1.Value));
 
                 return EvalResult.NoError;
-            }   
+            }
+            else if (s[0] == typeof(MOGName) && s[1] == typeof(MOGName))
+            {
+                // 's1' 's2' ==
+
+                var s1 = engine.StackPop() as MOGName;
+                var s0 = engine.StackPop() as MOGName;
+
+                engine.StackPush(new MOGBoolean(engine, s0.Value == s1.Value));
+
+                return EvalResult.NoError;
+            }
 
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
