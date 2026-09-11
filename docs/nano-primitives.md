@@ -43,8 +43,8 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
-| `==` | 🔗 | `a b ==` | Equality |
-| `!=` | 🔗 | `a b !=` | Inequality |
+| `==` | 🔗 | `a b ==` | Equality. Also works on two `MOGName` values (e.g. `'foo' 'foo' ==`), comparing them by name text — previously raised a type error |
+| `!=` | 🔗 | `a b !=` | Inequality. Same `MOGName` support as `==` |
 | `<` | 🔗 | `a b <` | Less than |
 | `>` | 🔗 | `a b >` | Greater than |
 | `<=` | 🔗 | `a b <=` | Less than or equal |

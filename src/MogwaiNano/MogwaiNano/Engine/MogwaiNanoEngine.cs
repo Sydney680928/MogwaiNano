@@ -1828,6 +1828,18 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
 
+            else if (s[0] == typeof(MOGName) && s[1] == typeof(MOGName))
+            {
+                // 's1' 's2' !=
+
+                var t1 = engine.StackPop() as MOGName;
+                var t0 = engine.StackPop() as MOGName;
+
+                engine.StackPush(new MOGBoolean(engine, t0.Value != t1.Value));
+
+                return EvalResult.NoError;
+            }
+
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
