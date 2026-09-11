@@ -40,7 +40,7 @@ namespace MogwaiNano.Engine
 
         private delegate EvalResult PrimitiveDelegate(MogwaiNanoEngine engine, string name);
 
-        public static Hashtable Primitives = new();
+        public static Hashtable Primitives = new(150);
 
         private ArrayList _stacks = new();
         private MOGStack _currentStack = new();
@@ -80,8 +80,6 @@ namespace MogwaiNano.Engine
         public readonly MOGType TypeAny;
 
         public string Name { get; init; }
-
-        public string TaskName { get; set; }    
 
         public MogwaiNanoEngine MotherEngine { get; set; }
 
@@ -162,7 +160,7 @@ namespace MogwaiNano.Engine
 
         public MOGObject TaskResult { get; set; }
 
-        public bool IsTask => MotherEngine != null;
+        public bool IsTask { get; init; }
 
         static MogwaiNanoEngine()
         {
@@ -171,10 +169,17 @@ namespace MogwaiNano.Engine
             RegisterPrimitives();
         }
 
-        public MogwaiNanoEngine(string name = "MogwaiNanoEngine")
+        public MogwaiNanoEngine(string name, MogwaiNanoEngine motherEngine = null)
         {
             Name = name;
             TaskResult = new MOGNull(this);
+
+            if (motherEngine != null)
+            {
+                MotherEngine = motherEngine;
+                Delegate = motherEngine.Delegate;
+                IsTask = true;
+            }
 
             // Create general parser 
 
@@ -220,11 +225,29 @@ namespace MogwaiNano.Engine
 
             _varsContext.Add(new VarContext("GLOBAL"));
 
-            // Create and start running thread
+            // Create and start running thread if not a task
 
-            _runThread = new Thread(RunLoop);
-            _runThread.Start();
+            if (!IsTask)
+            {
+                _runThread = new Thread(RunLoop);
+                _runThread.Start();
+            }
         }
+
+        ~MogwaiNanoEngine()
+        {
+            Debug.WriteLine($"MogwaiNanoEngine '{Name}' is being finalized.");
+
+            if (_runThread != null)
+            {
+                _runThread.Abort();
+                _runThread.Join();
+                _runThread = null;
+            }
+
+            Reset();
+        }   
+
 
         public ArrayList Parse(string code) => _parser.Parse(code);
 
@@ -483,7 +506,14 @@ namespace MogwaiNano.Engine
 
         public EvalResult Run(string code, bool debugMode = false)
         {
-            Debug.WriteLine($"run: GC: {GC.Run(true)} bytes free");
+            if (IsTask)
+            {
+                Debug.WriteLine($"task   '{Name}' run with {GC.Run(true)} bytes free");
+            }
+            else
+            {
+                Debug.WriteLine($"mother '{Name}' run with {GC.Run(true)} bytes free");
+            }
 
             try
             {
@@ -495,8 +525,8 @@ namespace MogwaiNano.Engine
 
                 var stopwatch = Stopwatch.StartNew();
 
-                if (MotherEngine != null && TaskName != null)
-                    MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_START, new MOGName(MotherEngine, TaskName));
+                if (IsTask)
+                    MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_START, new MOGName(MotherEngine, Name));
 
                 if (Delegate != null)
                     Delegate.ProgramStart(this, code);
@@ -517,7 +547,7 @@ namespace MogwaiNano.Engine
                     if (IsTask)
                     {
                         var failureInformations = new MOGRecord(MotherEngine);
-                        failureInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                        failureInformations.SetItem("task", new MOGName(MotherEngine, Name));
                         failureInformations.SetItem("error", new MOGString(MotherEngine, LastResult.Error.Code));
                         failureInformations.SetItem("message", new MOGString(MotherEngine, LastResult.Error.Message));
 
@@ -579,10 +609,10 @@ namespace MogwaiNano.Engine
 
                 if (LastResult != EvalResult.NoError)
                 {
-                    if (MotherEngine != null && TaskName != null)
+                    if (IsTask)
                     {
                         var failureInformations = new MOGRecord(MotherEngine);
-                        failureInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                        failureInformations.SetItem("task", new MOGName(MotherEngine, Name));
                         failureInformations.SetItem("error", new MOGString(MotherEngine, LastResult.Error.Code));
                         failureInformations.SetItem("message", new MOGString(MotherEngine, LastResult.Error.Message));
 
@@ -591,10 +621,10 @@ namespace MogwaiNano.Engine
                 }
                 else
                 {
-                    if (MotherEngine != null && TaskName != null)
+                    if (IsTask)
                     {
                         var endInformations = new MOGRecord(MotherEngine);
-                        endInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                        endInformations.SetItem("task", new MOGName(MotherEngine, Name));
                         endInformations.SetItem("result",TaskResult);
 
                         MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_END, endInformations);
@@ -626,6 +656,8 @@ namespace MogwaiNano.Engine
 
         public void Reset(bool keepAlive = false)
         {
+            CurrentEvalObject = null;
+
             CleanupTasks();
 
             CleanupStopwatchs();
@@ -3637,7 +3669,7 @@ namespace MogwaiNano.Engine
         {
             if (engine.IsTask)
             {
-                engine.StackPush(new MOGName(engine, engine.TaskName));
+                engine.StackPush(new MOGName(engine, engine.Name));
                 return EvalResult.NoError;
             }
 
@@ -5436,6 +5468,8 @@ namespace MogwaiNano.Engine
                 result = fireObject.Function.Execute();
 
                 RemoveLastStack();
+
+                fireObject = null;
             }
 
             return result;
@@ -5757,13 +5791,7 @@ namespace MogwaiNano.Engine
         {
             if (Tasks.Contains(name))
             {
-                var task = Tasks[name] as MOGTask;
-                task.Stop();
-                task.ReapIfFinished();
-                task.Dispose();
-                
                 Tasks.Remove(name);
-
                 return EvalResult.NoError;
             }
 
@@ -5786,7 +5814,7 @@ namespace MogwaiNano.Engine
                 }
 
                 var messageInformations = new MOGRecord(MotherEngine!);
-                messageInformations.SetItem("task", new MOGName(MotherEngine, TaskName));
+                messageInformations.SetItem("task", new MOGName(MotherEngine, Name));
                 messageInformations.SetItem("message",items[0] as MOGObject);
 
                 return MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_PUBLISH, messageInformations);
@@ -5797,15 +5825,6 @@ namespace MogwaiNano.Engine
 
         internal void CleanupTasks()
         {
-            foreach (var key in Tasks.Keys)
-            {
-                var task = Tasks[key] as MOGTask;
-
-                task.Stop();
-                task.ReapIfFinished();
-                task.Dispose();
-            }
-
             Tasks.Clear();
         }
 

@@ -14,6 +14,7 @@
 
 using MogwaiNano.Engine;
 using System;
+using System.Diagnostics;
 
 namespace MogwaiNano.Objects
 {

@@ -15,7 +15,7 @@
 using MogwaiNano.Exceptions;
 using MogwaiNano.Objects;
 using System.Collections;
-using System.Globalization;
+using System.Diagnostics;
 using System.Text;
 
 namespace MogwaiNano.Engine
@@ -35,7 +35,7 @@ namespace MogwaiNano.Engine
 
         public ArrayList Parse(string code)
         {
-            _items = new(); 
+            _items = new();
             _index = 0;
             _code = code;
             _item = new();

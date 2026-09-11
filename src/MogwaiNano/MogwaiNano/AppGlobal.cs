@@ -31,7 +31,7 @@ namespace MogwaiNano
 
         public const string AUTORUN_FILE = @"I:\autorun.mog";
 
-        public static MogwaiNanoEngine MogwaiNanoEngine { get; } = new MogwaiNanoEngine();
+        public static MogwaiNanoEngine MogwaiNanoEngine { get; } = new MogwaiNanoEngine("RootMogwaiNanoEngine");
 
         public static Random RandomGenerator { get; } = new();
 

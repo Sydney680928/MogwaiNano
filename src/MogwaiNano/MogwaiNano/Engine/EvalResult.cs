@@ -69,6 +69,7 @@ namespace MogwaiNano.Engine
                 Error = error,
                 Informations = informations ?? new string[0]
             };
+
             return result;
         }
 

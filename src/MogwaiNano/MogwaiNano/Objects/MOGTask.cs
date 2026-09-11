@@ -15,6 +15,7 @@
 using MogwaiNano.Engine;
 using System;
 using System.Collections;
+using System.Diagnostics;
 using System.Threading;
 
 namespace MogwaiNano.Objects
@@ -40,7 +41,17 @@ namespace MogwaiNano.Objects
 
         public string Job { get; init; }
 
-        public MogwaiNanoEngine MotherEngine { get; private set; }
+        public MogwaiNanoEngine MotherEngine
+        {
+            get
+            {
+                if (TaskEngine != null)
+                    return TaskEngine.MotherEngine;
+
+                return null;
+            }
+        }
+
 
         public MogwaiNanoEngine TaskEngine { get; private set; }
 
@@ -68,14 +79,20 @@ namespace MogwaiNano.Objects
         {
             Name = name;
             Job = code;
-            MotherEngine = engine;
+            TaskEngine = new MogwaiNanoEngine(name, engine);
+        }
 
-            TaskEngine = new MogwaiNanoEngine($"TASK ENGINE OF {MotherEngine.Name} MOTHER ENGINE")
-            {
-                TaskName = name,
-                MotherEngine = MotherEngine,
-                Delegate = MotherEngine.Delegate,
-            };
+        ~MOGTask()
+        {
+            Debug.WriteLine($"MOGTask '{Name}' is being finalized.");
+
+            Stop();
+
+            Result = null; 
+            
+            TaskEngine.MotherEngine = null;
+            TaskEngine.Delegate = null;
+            TaskEngine = null;
         }
 
         public EvalResult Start(string parameter = null)
@@ -98,45 +115,29 @@ namespace MogwaiNano.Objects
 
                 for (int i = items.Count - 1; i >= 0; i--)
                     TaskEngine.StackPush(items[i] as MOGObject);
+
+                items.Clear();
             }
 
             _isRunning = true;
 
-            _thread = new Thread(() =>
-            {
-                LastEvalResult = TaskEngine.Run(Job, false); 
-                _isRunning = false;
-            });
-
+            _thread = new Thread(ThreadJob);
             _thread.Start();
 
             return EvalResult.NoError;
+        }
+
+        private void ThreadJob()
+        {
+            LastEvalResult = TaskEngine.Run(Job, false);
+            _isRunning = false;
+            _thread = null;
         }
 
         public void Stop()
         {
             if (_isRunning)
                 TaskEngine.HaltRequested = true;
-        }
-
-        public void ReapIfFinished()
-        {
-            if (_thread != null && !_isRunning)
-            {
-                _thread.Join();
-                _thread = null;
-            }
-        }
-
-        public void Dispose()
-        {
-            Stop();
-            ReapIfFinished();
-
-            TaskEngine.Delegate = null;
-            TaskEngine = null;
-            MotherEngine = null;
-            LastEvalResult = null;
         }
 
         public EvalResult SendMessage(string message)
@@ -157,13 +158,11 @@ namespace MogwaiNano.Objects
 
         public EvalResult Wait()
         {
-            while (_thread != null)
+            while (_isRunning)
             {
                 Thread.Sleep(10);
                 MotherEngine.ExecuteWaitingFireObjects();
             }
-
-            ReapIfFinished();
 
             return LastEvalResult;
         }
