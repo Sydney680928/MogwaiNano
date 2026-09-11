@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tasks were leaking a full engine instance's worth of memory (~7KB) on every single run, even with all references properly cleaned up and a garbage collection forced immediately after.** The root cause took a long debugging session to isolate, since it wasn't in the managed reference graph at all: `MogwaiNanoEngine`'s constructor always spins up its own permanently-running background thread (`RunLoop`, used to receive and execute code sent via `nano.run`) — but a task's own engine instance doesn't need this at all, since `MOGTask.Start()` already drives its execution directly on its own thread. That unused `RunLoop` thread ran forever regardless, and being an instance method, its closure implicitly captured the whole engine instance — keeping it permanently reachable no matter how thoroughly everything else referencing it was cleaned up (`Dispose()`, clearing the tasks table, even repeated forced garbage collections). No amount of managed-side cleanup could ever have fixed this, since the reachability root was a live native thread, not a stray object reference. The constructor now takes the mother engine as a parameter; when present, the instance is marked as a task and skips creating `RunLoop` entirely. Confirmed fixed with a 20-run stress test: memory now returns to (within noise of) its starting point after every run, including with 3 tasks running concurrently, where it previously drifted down by roughly 15-30KB per run without ever recovering.
+
 ## [0.4.0] - 2026-09-04
 
 ### Added
