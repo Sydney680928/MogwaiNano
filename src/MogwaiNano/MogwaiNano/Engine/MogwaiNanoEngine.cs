@@ -55,7 +55,7 @@ namespace MogwaiNano.Engine
         private string _pendingRunCode;
         private bool _pendingDebugMode;
         private Thread _runThread;                  
-        private static readonly string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM", "ADC", "UNITS" };      
+        private static readonly string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM", "ADC", "UNITS", "TASKS", "EVENTS", "TIMERS" };      
         private EvalResult _lastResult;
         private Error _lastError;
         private int _iterationCount = 0;
@@ -5759,6 +5759,8 @@ namespace MogwaiNano.Engine
             {
                 var task = Tasks[name] as MOGTask;
                 task.Stop();
+                task.ReapIfFinished();
+                task.Dispose();
                 
                 Tasks.Remove(name);
 
@@ -5798,7 +5800,10 @@ namespace MogwaiNano.Engine
             foreach (var key in Tasks.Keys)
             {
                 var task = Tasks[key] as MOGTask;
+
                 task.Stop();
+                task.ReapIfFinished();
+                task.Dispose();
             }
 
             Tasks.Clear();
