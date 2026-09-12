@@ -597,6 +597,8 @@ namespace MogwaiNano.Engine
                     }
                 }
 
+                StopAllTasks();
+
                 stopwatch.Stop();
                 result.Duration = stopwatch.Elapsed;
 
@@ -1254,6 +1256,9 @@ namespace MogwaiNano.Engine
             while (stopwatch.Elapsed.TotalMilliseconds <= v.Value)
             {
                 Thread.Sleep(0);
+
+                if (engine.HaltRequested)
+                    return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
 
                 var result = engine.ExecuteWaitingFireObjects();
 
@@ -5846,6 +5851,14 @@ namespace MogwaiNano.Engine
 
         internal void CleanupTasks()
         {
+            StopAllTasks();
+            Tasks.Clear();
+        }
+
+        internal void StopAllTasks()
+        {
+            Debug.WriteLine("StopAllTasks...");
+
             foreach (var key in Tasks.Keys)
             {
                 var task = Tasks[key] as MOGTask;
@@ -5859,16 +5872,18 @@ namespace MogwaiNano.Engine
                 foreach (var key in Tasks.Keys)
                 {
                     var task = Tasks[key] as MOGTask;
-                    
+
                     if (task.Status == MOGTask.TaskStatus.Running)
                         countRunning++;
                 }
 
                 if (countRunning == 0)
                     break;
+
+                Thread.Sleep(10);
             }
 
-            Tasks.Clear();
+            Debug.WriteLine("StopAllTasks done.");
         }
 
         #endregion
