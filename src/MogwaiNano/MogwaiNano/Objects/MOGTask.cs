@@ -52,7 +52,6 @@ namespace MogwaiNano.Objects
             }
         }
 
-
         public MogwaiNanoEngine TaskEngine { get; private set; }
 
         public TaskStatus Status

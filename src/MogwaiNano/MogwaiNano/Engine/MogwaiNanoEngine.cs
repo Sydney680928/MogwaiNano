@@ -365,7 +365,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("task.stop", new PrimitiveDelegate(PrimitiveTaskStop));
             Primitives.Add("task.purge", new PrimitiveDelegate(PrimitiveTaskPurge));
             Primitives.Add("task.publish", new PrimitiveDelegate(PrimitiveTaskPublish));
-            Primitives.Add("task.send", new PrimitiveDelegate(PrimitiveTaskSend));
+            Primitives.Add("TASK.SEND", new PrimitiveDelegate(PrimitiveTaskSend));
             Primitives.Add("task.setResult", new PrimitiveDelegate(PrimitiveTaskSetResult));
             Primitives.Add("task.result", new PrimitiveDelegate(PrimitiveTaskGetResult));
             Primitives.Add("task.name", new PrimitiveDelegate(PrimitiveTaskGetName));
@@ -5491,8 +5491,6 @@ namespace MogwaiNano.Engine
                 result = fireObject.Function.Execute();
 
                 RemoveLastStack();
-
-                fireObject = null;
             }
 
             return result;
