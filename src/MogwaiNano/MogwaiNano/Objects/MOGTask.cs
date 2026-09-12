@@ -159,6 +159,9 @@ namespace MogwaiNano.Objects
         {
             while (_isRunning)
             {
+                if (MotherEngine.HaltRequested)
+                    return EvalResult.Failure(MotherEngine, Error.HaltEncounteredError, Name);
+
                 Thread.Sleep(10);
                 MotherEngine.ExecuteWaitingFireObjects();
             }

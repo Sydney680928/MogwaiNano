@@ -3754,6 +3754,9 @@ namespace MogwaiNano.Engine
 
                     while (names.Count > 0)
                     {
+                        if (engine.HaltRequested)
+                            return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
                         Thread.Sleep(10);
 
                         for (int i = names.Count - 1; i >= 0; i--)
