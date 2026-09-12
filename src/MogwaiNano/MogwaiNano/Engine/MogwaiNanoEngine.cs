@@ -5848,6 +5848,28 @@ namespace MogwaiNano.Engine
 
         internal void CleanupTasks()
         {
+            foreach (var key in Tasks.Keys)
+            {
+                var task = Tasks[key] as MOGTask;
+                task.Stop();
+            }
+
+            while (true)
+            {
+                int countRunning = 0;
+
+                foreach (var key in Tasks.Keys)
+                {
+                    var task = Tasks[key] as MOGTask;
+                    
+                    if (task.Status == MOGTask.TaskStatus.Running)
+                        countRunning++;
+                }
+
+                if (countRunning == 0)
+                    break;
+            }
+
             Tasks.Clear();
         }
 
