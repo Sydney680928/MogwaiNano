@@ -210,6 +210,9 @@ Only two states exist, matching the desktop engine exactly: a task is either `Ru
 | `TASK_DID_FAIL` | a record with `task:`, `error:`, `message:` | A task finishes with an error, or fails to even parse |
 | `TASK_DID_PUBLISH` | a record with `task:` and the published message | A running task calls `task.publish` |
 | `TASK_DID_RECEIVE` | the message sent | Fired *inside* the task itself when the parent calls `task.send` |
+| `TASK_DID_ABORT` | the task's name (`.name`) | A task had to be force-killed — see below |
+
+**Ending a program with tasks still running.** When a program ends (whether it reaches its natural end, or is stopped via `mogwai.halt`/`mogwai.exit`/an error), every task it declared is asked to stop cooperatively first (the same mechanism as `task.stop` — setting a flag the task's own code checks between operations), then the engine waits up to **10 seconds** for all of them to actually finish. If any task still hasn't stopped by then — most likely because it's stuck in a long-running native operation that never checks back in — it's forcibly killed, firing `TASK_DID_ABORT` with its name. This is a genuine last resort, not a routine occurrence: force-killing a task can leave whatever hardware operation it was in the middle of (an I2C transaction, a GPIO left mid-toggle) in an inconsistent state, so a task that triggers this is worth investigating rather than treating as normal.
 
 **Memory cost, measured:** roughly 7KB for the task's own `MogwaiNanoEngine` instance plus roughly 3KB for its native thread — about 10KB per task. This is why tasks are only practical on an ESP32-S3 with PSRAM (see [Memory considerations](../README.md#memory-considerations)) — on a plain ESP32's ~40KB budget, even a couple of tasks would eat most of the available headroom.
 
@@ -331,6 +334,7 @@ All ⚙️ **NANO-only** (though most have a conceptual desktop equivalent).
 | Primitive | Signature | Description |
 |---|---|---|
 | `mogwai.halt` | `mogwai.halt` | Stops the current program immediately, raising `MW.2` (`HaltEncounteredError`) — the mechanism by which a script halts itself voluntarily |
+| `mogwai.exit` | `mogwai.exit` | Stops the current program immediately, from anywhere, with no error — a clean exit rather than `mogwai.halt`'s voluntary-halt error |
 | `mogwai.memory` | `forceCollect mogwai.memory` → `.number` | Returns free RAM in bytes. `true` forces a garbage collection before measuring; `false` returns the current figure without forcing one |
 | `mogwai.reset` | `mogwai.reset` | Resets engine state (stack, variables, timers, etc.) |
 | `mogwai.reboot` | `mogwai.reboot` | Reboots the device. Runs `MOGWAI.onReboot` first if defined (unlike the Studio-side `nano.reboot`, which bypasses it), waits 1 second, then reboots |
