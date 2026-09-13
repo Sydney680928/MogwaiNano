@@ -27,6 +27,7 @@ namespace MogwaiNano.Objects
         public const string EVENT_TASK_DID_FAIL = "TASK_DID_FAIL";
         public const string EVENT_TASK_DID_PUBLISH = "TASK_DID_PUBLISH";
         public const string EVENT_TASK_DID_RECEIVE = "TASK_DID_RECEIVE";
+        public const string EVENT_TASK_DID_ABORT = "TASK_DID_ABORT";
 
         public enum TaskStatus
         {
@@ -143,20 +144,20 @@ namespace MogwaiNano.Objects
         {
             if (_isRunning && _thread != null)
             {
+                Debug.WriteLine($"Force-killing task '{Name}' after it failed to stop within the timeout.");
+
                 try
                 {
                     _thread.Abort();
                 }
-                catch (ThreadAbortException)
-                {
-                    // Thread was aborted, ignore the exception
-                }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Error while aborting thread: {ex.Message}");
+                    Debug.WriteLine($"Error while aborting task '{Name}' thread: {ex.Message}");
                 }
                 finally
                 {
+                    MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_ABORT, new MOGName(MotherEngine, Name));
+
                     _isRunning = false;
                     _thread = null;
                 }

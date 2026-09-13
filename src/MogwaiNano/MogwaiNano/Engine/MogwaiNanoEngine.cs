@@ -5895,7 +5895,7 @@ namespace MogwaiNano.Engine
             foreach (var key in Tasks.Keys)
             {
                 var task = Tasks[key] as MOGTask;
-                task.Stop();
+                //task.Stop();
             }
 
             int countRunning = 0;
@@ -5905,6 +5905,8 @@ namespace MogwaiNano.Engine
 
             while (stopwatch.ElapsedMilliseconds < 10000)
             {
+                countRunning = 0;
+
                 foreach (var key in Tasks.Keys)
                 {
                     var task = Tasks[key] as MOGTask;
@@ -5916,7 +5918,7 @@ namespace MogwaiNano.Engine
                 if (countRunning == 0)
                     break;
 
-                Thread.Sleep(10);
+                Thread.Sleep(10);             
             }
 
             stopwatch.Stop();
