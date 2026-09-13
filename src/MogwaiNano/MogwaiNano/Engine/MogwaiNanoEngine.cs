@@ -5895,7 +5895,7 @@ namespace MogwaiNano.Engine
             foreach (var key in Tasks.Keys)
             {
                 var task = Tasks[key] as MOGTask;
-                //task.Stop();
+                task.Stop();
             }
 
             int countRunning = 0;
