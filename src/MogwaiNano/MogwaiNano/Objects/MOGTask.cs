@@ -136,7 +136,31 @@ namespace MogwaiNano.Objects
         public void Stop()
         {
             if (_isRunning)
-                TaskEngine.HaltRequested = true;
+                TaskEngine.ExitRequested = true;
+        }
+
+        public void Kill()
+        {
+            if (_isRunning && _thread != null)
+            {
+                try
+                {
+                    _thread.Abort();
+                }
+                catch (ThreadAbortException)
+                {
+                    // Thread was aborted, ignore the exception
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error while aborting thread: {ex.Message}");
+                }
+                finally
+                {
+                    _isRunning = false;
+                    _thread = null;
+                }
+            }
         }
 
         public EvalResult SendMessage(string message)
@@ -159,6 +183,9 @@ namespace MogwaiNano.Objects
         {
             while (_isRunning)
             {
+                if (MotherEngine.ExitRequested)
+                    break;
+
                 if (MotherEngine.HaltRequested)
                     return EvalResult.Failure(MotherEngine, Error.HaltEncounteredError, Name);
 

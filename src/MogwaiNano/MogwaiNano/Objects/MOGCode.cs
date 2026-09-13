@@ -81,6 +81,9 @@ namespace MogwaiNano.Objects
             if (Engine.HaltRequested)
                 return EvalResult.Failure(Engine, Error.HaltEncounteredError);
 
+            if (Engine.ExitRequested)
+                return EvalResult.NoError;
+
             if (Content == null && Items == null)
                 return EvalResult.Failure(Engine, Error.FatalError, "unabled to execute code, content and items are empty");    
 
@@ -107,7 +110,7 @@ namespace MogwaiNano.Objects
                         if (result != EvalResult.NoError)
                             break;
 
-                        if (Engine.BreakRequested)
+                        if (Engine.BreakRequested || Engine.ExitRequested)
                             break;
 
                         if (Engine.HaltRequested)

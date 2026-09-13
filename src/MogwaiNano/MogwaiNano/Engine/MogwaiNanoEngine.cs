@@ -132,6 +132,8 @@ namespace MogwaiNano.Engine
 
         public bool HaltRequested { get; set; }
 
+        public bool ExitRequested { get; set; }
+
         public static Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
         public EvalResult LastResult
@@ -379,6 +381,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("error.throw", new PrimitiveDelegate(PrimitiveErrorThrow));
 
             Primitives.Add("mogwai.halt", new PrimitiveDelegate(PrimitiveHalt));
+            Primitives.Add("mogwai.exit", new PrimitiveDelegate(PrimitiveExit));
             Primitives.Add("mogwai.memory", new PrimitiveDelegate(PrimitiveGetMemory));
             Primitives.Add("mogwai.reset", new PrimitiveDelegate(PrimitiveMogwaiReset));
             Primitives.Add("mogwai.sendMessage", new PrimitiveDelegate(PrimitiveSendMessageToStudio));
@@ -561,15 +564,16 @@ namespace MogwaiNano.Engine
                 }
 
                 HaltRequested = false;
-                //ExitRequested = false;
+                ExitRequested = false;
                 //ReturnRequested = false;
 
                 EvalResult result = program.Execute();
-
                 program = null;
 
+                StopTasks();
+
                 HaltRequested = false;
-                //ExitRequested = false;
+                ExitRequested = false;
                 //ReturnRequested = false;
 
                 EvalResult result2;
@@ -596,8 +600,6 @@ namespace MogwaiNano.Engine
                             result = result2;
                     }
                 }
-
-                StopAllTasks();
 
                 stopwatch.Stop();
                 result.Duration = stopwatch.Elapsed;
@@ -697,11 +699,14 @@ namespace MogwaiNano.Engine
 
             HaltRequested = false;
             BreakRequested = false;
+            ExitRequested = false;
 
             FrugalMode = false;
         }
 
         public void Halt() => HaltRequested = true;
+
+        public void Exit() => ExitRequested = true; 
 
         public string[] Units
         {
@@ -1234,6 +1239,12 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
+        private static EvalResult PrimitiveExit(MogwaiNanoEngine engine, string name)
+        {
+            engine.ExitRequested = true;
+            return EvalResult.NoError;
+        }
+
         private static EvalResult PrimitiveWait(MogwaiNanoEngine engine, string name)
         {
             // 50 wait
@@ -1260,6 +1271,9 @@ namespace MogwaiNano.Engine
                 if (engine.HaltRequested)
                     return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
 
+                if (engine.ExitRequested)
+                    break;
+    
                 var result = engine.ExecuteWaitingFireObjects();
 
                 if (result != EvalResult.NoError)
@@ -2058,6 +2072,9 @@ namespace MogwaiNano.Engine
                     engine.BreakRequested = false;
                     break;
                 }
+
+                if (engine.ExitRequested)
+                    break;
             }
 
             return EvalResult.NoError;
@@ -2148,6 +2165,9 @@ namespace MogwaiNano.Engine
                     break;
                 }
 
+                if (engine.ExitRequested)
+                    break;
+
                 var conditionValue = engine.StackPop() as MOGBoolean;
 
                 if (conditionValue == null)
@@ -2166,6 +2186,9 @@ namespace MogwaiNano.Engine
                     engine.BreakRequested = false;
                     break;
                 }
+
+                if (engine.ExitRequested)
+                    break;
             }
 
             return EvalResult.NoError;
@@ -2199,6 +2222,9 @@ namespace MogwaiNano.Engine
                         engine.BreakRequested = false;
                         break;
                     }
+
+                    if (engine.ExitRequested)
+                        break;
 
                     varLoop.Value = i;
                     result = engine.VarWrite(varName.Value, varLoop);
@@ -2249,6 +2275,9 @@ namespace MogwaiNano.Engine
                         engine.BreakRequested = false;
                         break;
                     }
+
+                    if (engine.ExitRequested)
+                        break;
 
                     varLoop.Value = i;
                     result = engine.VarWrite(varName.Value, varLoop);
@@ -2325,7 +2354,7 @@ namespace MogwaiNano.Engine
 
                     foreach (var item in list.Items)
                     {
-                        if (engine.BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                        if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
                         result = engine.VarWrite(varName.Value, item as MOGObject);
@@ -2351,7 +2380,7 @@ namespace MogwaiNano.Engine
 
                     foreach (var item in data.Items)
                     {
-                        if (engine.BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                        if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
                         result = engine.VarWrite(varName.Value, new MOGNumber(engine, (byte)item));
@@ -2377,7 +2406,7 @@ namespace MogwaiNano.Engine
 
                     foreach (var item in @string.Value)
                     {
-                        if (engine.BreakRequested) // || Engine.ExitRequested || Engine.ReturnRequested)
+                        if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
                         result = engine.VarWrite(varName.Value, new MOGString(engine, item.ToString()));
@@ -2473,7 +2502,7 @@ namespace MogwaiNano.Engine
 
                 while (stopWatch.Elapsed.TotalMilliseconds < duration.Value)
                 {
-                    if (engine.BreakRequested) // || engine.ExitRequested || engine.ReturnRequested)
+                    if (engine.BreakRequested || engine.ExitRequested) // || engine.ReturnRequested)
                     {
                         engine.BreakRequested = false;
                         break;
@@ -3756,6 +3785,9 @@ namespace MogwaiNano.Engine
                     {
                         if (engine.HaltRequested)
                             return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
+                        if (engine.ExitRequested)
+                            return EvalResult.NoError;
 
                         Thread.Sleep(10);
 
@@ -5854,24 +5886,25 @@ namespace MogwaiNano.Engine
 
         internal void CleanupTasks()
         {
-            StopAllTasks();
+            StopTasks();
             Tasks.Clear();
         }
 
-        internal void StopAllTasks()
+        internal void StopTasks()
         {
-            Debug.WriteLine("StopAllTasks...");
-
             foreach (var key in Tasks.Keys)
             {
                 var task = Tasks[key] as MOGTask;
                 task.Stop();
             }
 
-            while (true)
-            {
-                int countRunning = 0;
+            int countRunning = 0;
 
+            var stopwatch = new Stopwatch();  
+            stopwatch.Start();
+
+            while (stopwatch.ElapsedMilliseconds < 10000)
+            {
                 foreach (var key in Tasks.Keys)
                 {
                     var task = Tasks[key] as MOGTask;
@@ -5886,7 +5919,18 @@ namespace MogwaiNano.Engine
                 Thread.Sleep(10);
             }
 
-            Debug.WriteLine("StopAllTasks done.");
+            stopwatch.Stop();
+
+            if (countRunning > 0)
+            {
+                foreach (var key in Tasks.Keys)
+                {
+                    var task = Tasks[key] as MOGTask;
+                    
+                    if (task.Status == MOGTask.TaskStatus.Running)
+                        task.Kill();
+                }
+            }   
         }
 
         #endregion
