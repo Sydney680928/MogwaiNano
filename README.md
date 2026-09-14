@@ -165,7 +165,7 @@ Two companion apps let you talk to a device from your PC — pick whichever suit
 - **MOGWAI NANO Studio (console)** — a lightweight, cross-platform terminal app. Connect, run scripts, and watch live output, all from the command line.
 - **MOGWAI NANO Studio GUI** — a graphical companion built with [Avalonia](https://avaloniaui.net/): its own code editor, a REPL-style command line, separate live views for the device's console and debug output, file management, and light/dark themes.
 
-![MOGWAI NANO Studio GUI](docs/images/studio-gui-screenshot.png)
+![MOGWAI NANO Studio GUI](images/studio-gui-screenshot.png)
 
 Both talk to a device over the same network protocol, so pick whichever fits your workflow — or use both.
 
