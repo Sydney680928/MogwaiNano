@@ -1,0 +1,36 @@
+<!--
+Copyright 2026 Stéphane Sibué
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MogwaiNanoStudioGui.AboutDialog"
+        Title="About MOGWAI NANO Studio"
+        Width="380"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+    <StackPanel Margin="20" Spacing="16">
+        <Image Source="avares://MogwaiNanoStudioGui/Assets/mogwai-mascot.png"
+               Width="120"
+               HorizontalAlignment="Center"/>
+        <StackPanel Spacing="2">
+            <TextBlock x:Name="StudioVersionText" FontWeight="Bold"/>
+            <TextBlock x:Name="StudioCopyrightText"/>
+        </StackPanel>
+        <TextBlock x:Name="EngineInfoText" TextWrapping="Wrap"/>
+        <Button Content="OK" Click="OnOkClick" HorizontalAlignment="Right"/>
+    </StackPanel>
+</Window>

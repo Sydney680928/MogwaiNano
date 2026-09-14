@@ -1,0 +1,198 @@
+<!--
+Copyright 2026 Stéphane Sibué
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MogwaiNanoStudioGui.MainWindow"
+        Title="MOGWAI NANO Studio"
+        Width="1000" Height="700">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- VS Code's own default keyword blue for each theme —
+                     recognizable, and readable against each background -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="EditorTextBrush" Color="#0000FF"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="EditorTextBrush" Color="#569CD6"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- Shared style for the Debug lists (MOGWAI/NANO): tighter rows
+             than the Fluent theme's default padding, applied implicitly to
+             every ListBoxItem generated in this window -->
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="6,1"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="120"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="220" MinHeight="100"/>
+        </Grid.RowDefinitions>
+
+        <!-- Menu -->
+        <Menu x:Name="MainMenu" Grid.Row="0">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" InputGesture="Ctrl+N" Click="OnNewClick"/>
+                <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpenClick"/>
+                <MenuItem Header="_Save" InputGesture="Ctrl+S" Click="OnSaveClick"/>
+                <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Click="OnSaveAsClick"/>
+                <MenuItem x:Name="RecentFilesMenuItem" Header="Recent _Files"/>
+                <Separator/>
+                <MenuItem Header="E_xit" Click="OnExitClick"/>
+            </MenuItem>
+            <MenuItem Header="_Script">
+                <MenuItem Header="_Run" InputGesture="F5" Click="OnRunEditorClick"/>
+                <MenuItem Header="_Stop" InputGesture="Shift+F5" Click="OnStopScriptClick"/>
+                <Separator/>
+                <MenuItem x:Name="StudioModeMenuItem" Header="Start _Studio Mode (VS Code)..." Click="OnStartStudioModeClick"/>
+            </MenuItem>
+            <MenuItem Header="_Device">
+                <MenuItem x:Name="ConnectMenuItem" Header="_Connect..." Click="OnConnectClick"/>
+                <MenuItem x:Name="DisconnectMenuItem" Header="_Disconnect" Click="OnDisconnectClick"/>
+                <Separator/>
+                <MenuItem x:Name="RebootMenuItem" Header="Re_boot" Click="OnRebootClick"/>
+                <MenuItem x:Name="HaltMenuItem" Header="_Halt running program" Click="OnHaltDeviceProgramClick"/>
+                <Separator/>
+                <MenuItem x:Name="InfoMenuItem" Header="Device info (nano.info)" Click="OnNanoInfoClick"/>
+                <MenuItem x:Name="MemoryMenuItem" Header="Free memory (nano.memory)" Click="OnNanoMemoryClick"/>
+                <MenuItem x:Name="StateMenuItem" Header="State (nano.state)" Click="OnNanoStateClick"/>
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="_Font..." Click="OnFontClick"/>
+                <MenuItem Header="_Theme">
+                    <MenuItem Header="_System" Click="OnThemeSystemClick"/>
+                    <MenuItem Header="_Light" Click="OnThemeLightClick"/>
+                    <MenuItem Header="_Dark" Click="OnThemeDarkClick"/>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="_Clear">
+                    <MenuItem Header="All" Click="OnClearAllClick"/>
+                    <Separator/>
+                    <MenuItem Header="Console MOGWAI" Click="OnClearMogwaiConsoleClick"/>
+                    <MenuItem Header="Debug MOGWAI" Click="OnClearMogwaiDebugClick"/>
+                    <Separator/>
+                    <MenuItem Header="Console NANO" Click="OnClearNanoConsoleClick"/>
+                    <MenuItem Header="Debug NANO" Click="OnClearNanoDebugClick"/>
+                </MenuItem>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About..." Click="OnAboutClick"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Status bar -->
+        <Border Grid.Row="1"
+                Padding="10,6"
+                BorderBrush="{DynamicResource SystemBaseLowColor}"
+                BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="Gray" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusText" Text="Not connected" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Code editor -->
+        <TextBox Grid.Row="2"
+                 x:Name="Editor"
+                 AcceptsReturn="True"
+                 AcceptsTab="True"
+                 FontFamily="Consolas,Cascadia Code,monospace"
+                 FontSize="14"
+                 TextWrapping="NoWrap"
+                 BorderThickness="0"
+                 Margin="8,8,8,8"
+                 Foreground="{DynamicResource EditorTextBrush}"/>
+
+        <!-- Resize handle, drag to adjust the height of the panel below -->
+        <GridSplitter Grid.Row="3"
+                      Height="5"
+                      HorizontalAlignment="Stretch"
+                      ResizeDirection="Rows"
+                      Background="{DynamicResource SystemBaseLowColor}"/>
+
+        <!-- Output panel: Console MOGWAI (with command line) / Debug MOGWAI / Console NANO / Debug NANO -->
+        <Border Grid.Row="4"
+                MinHeight="100"
+                Margin="8,0,8,8"
+                BorderBrush="{DynamicResource SystemBaseLowColor}"
+                BorderThickness="0,1,0,0">
+            <TabControl x:Name="OutputTabControl">
+
+                <TabItem x:Name="ConsoleMogwaiTab" Header="Console MOGWAI" FontSize="{Binding #MainMenu.FontSize}">
+                    <DockPanel>
+                        <TextBox x:Name="CommandInput"
+                                 DockPanel.Dock="Bottom"
+                                 Watermark="Type a MOGWAI command and press Enter — Up/Down for history"
+                                 FontFamily="Consolas,Cascadia Code,monospace"
+                                 FontSize="13"
+                                 Height="80"
+                                 TextWrapping="Wrap"
+                                 VerticalContentAlignment="Top"
+                                 Padding="8,10"
+                                 Margin="0,6,0,12"
+                                 KeyDown="OnCommandInputKeyDown"/>
+                        <TextBox x:Name="ConsoleMogwaiOutput"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 FontFamily="Consolas,Cascadia Code,monospace"
+                                 FontSize="12"
+                                 TextWrapping="NoWrap"
+                                 BorderThickness="0"/>
+                    </DockPanel>
+                </TabItem>
+
+                <TabItem Header="Debug MOGWAI" FontSize="{Binding #MainMenu.FontSize}">
+                    <ListBox x:Name="MogwaiDebugOutput"
+                             FontFamily="Consolas,Cascadia Code,monospace"
+                             FontSize="12"
+                             BorderThickness="0"
+                             Background="{Binding #ConsoleMogwaiOutput.Background}"/>
+                </TabItem>
+
+                <TabItem x:Name="ConsoleNanoTab" Header="Console NANO" FontSize="{Binding #MainMenu.FontSize}">
+                    <TextBox x:Name="ConsoleNanoOutput"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             FontFamily="Consolas,Cascadia Code,monospace"
+                             FontSize="12"
+                             TextWrapping="NoWrap"
+                             BorderThickness="0"/>
+                </TabItem>
+
+                <TabItem x:Name="DebugNanoTab" Header="Debug NANO" FontSize="{Binding #MainMenu.FontSize}">
+                    <ListBox x:Name="NanoDebugOutput"
+                             FontFamily="Consolas,Cascadia Code,monospace"
+                             FontSize="12"
+                             BorderThickness="0"
+                             Background="{Binding #ConsoleMogwaiOutput.Background}"/>
+                </TabItem>
+
+            </TabControl>
+        </Border>
+
+    </Grid>
+</Window>
