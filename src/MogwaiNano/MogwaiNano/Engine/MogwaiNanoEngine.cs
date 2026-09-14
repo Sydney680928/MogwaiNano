@@ -457,7 +457,8 @@ namespace MogwaiNano.Engine
             Primitives.Add("FOREACH", new PrimitiveDelegate(PrimitiveForeach));
             Primitives.Add("TRAP", new PrimitiveDelegate(PrimitiveTrap));
             Primitives.Add("GUARD", new PrimitiveDelegate(PrimitiveGuard));
-            Primitives.Add("DURING", new PrimitiveDelegate(PrimitiveDuring));    
+            Primitives.Add("DURING", new PrimitiveDelegate(PrimitiveDuring));
+            Primitives.Add("SWITCH", new PrimitiveDelegate(PrimitiveSwitch));
         }
 
         private void RunLoop()
@@ -2517,6 +2518,71 @@ namespace MogwaiNano.Engine
                 stopWatch.Stop();
 
                 return result;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveSwitch(MogwaiNanoEngine engine, string name)
+        {
+            // { { test } { code } { test } { code } { test } { code } } SWITCH
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGCode))
+            {
+                var globalCode = engine.StackPop() as MOGCode;
+
+                if (globalCode.Items == null)
+                {
+                    if (!globalCode.Parse())
+                        return EvalResult.Failure(engine, Error.ParseError, name, "switch body is not valid.");
+                }
+
+                // Il faut un nombre de paire d'éléments
+
+                if (globalCode.Items.Count % 2 != 0)
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "you must provide collection of test and code.");
+
+                // Il faut QUE des codes
+
+                foreach (var item in globalCode.Items)
+                    if (item is not MOGCode)
+                        return EvalResult.Failure(engine, Error.BadArgumentTypeError, name, "you must provide collecion of test and code.");
+
+                // On execute chaque test et si OK on execute son code et on sort
+
+                for (int i = 0; i < globalCode.Items.Count; i += 2)
+                {
+                    var test = globalCode.Items[i] as MOGCode;
+                    var code = globalCode.Items[i + 1] as MOGCode;
+
+                    var testResult = test.Execute();
+
+                    if (testResult.IsError)
+                        return testResult;
+
+                    if (engine.StackSize == 0)
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "test result is empty.");
+
+                    var resultValue = engine.StackPop() as MOGBoolean;  
+
+                    if (resultValue == null)
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "test result is not a boolean value.");
+
+                    if (resultValue.Value)
+                    {
+                        // Résultat du test positif
+                        // On exécute le code correspondant et on sort
+
+                        return code.Execute();
+                    }
+                }
+
+                return EvalResult.NoError;
             }
 
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
