@@ -158,12 +158,24 @@ if (device ->type .record ==) then { device->ip: nano.connect }
 
 Your device is now blinking an LED, controlled remotely from your PC. 🎉
 
+## MOGWAI NANO Studio
+
+Two companion apps let you talk to a device from your PC — pick whichever suits how you like to work:
+
+- **MOGWAI NANO Studio (console)** — a lightweight, cross-platform terminal app. Connect, run scripts, and watch live output, all from the command line.
+- **MOGWAI NANO Studio GUI** — a graphical companion built with [Avalonia](https://avaloniaui.net/): its own code editor, a REPL-style command line, separate live views for the device's console and debug output, file management, and light/dark themes.
+
+![MOGWAI NANO Studio GUI](docs/images/studio-gui-screenshot.png)
+
+Both talk to a device over the same network protocol, so pick whichever fits your workflow — or use both.
+
 ## Project structure
 
 ```
 src/MogwaiNano/
-├── MogwaiNano/          # Device runtime (deployed to ESP32 / Pico W)
-└── MogwaiNanoStudio/    # Desktop companion app (editor, network client)
+├── MogwaiNano/             # Device runtime (deployed to ESP32 / Pico W)
+├── MogwaiNanoStudio/       # Desktop companion app, console (editor, network client)
+└── MogwaiNanoStudioGui/    # Desktop companion app, GUI (Avalonia)
 ```
 
 ## Documentation
@@ -187,7 +199,7 @@ src/MogwaiNano/
 - [ ] BLE support
 - [x] `.mog` library system ("units") — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library)
 - [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the units system above on more capable boards
-- [ ] MOGWAI NANO Studio rebuilt on Avalonia, focused on device monitoring and orchestration (VS Code + the MOGWAI extension remains the recommended way to write and edit code)
+- [x] MOGWAI NANO Studio GUI, built on Avalonia — grew beyond the originally planned "monitoring only" scope into a genuinely capable companion: its own code editor, a REPL-style command line, live console/debug views, file management, and themes. VS Code + the MOGWAI extension remains a great way to write and edit code too — pick whichever fits your workflow
 
 ## About
 

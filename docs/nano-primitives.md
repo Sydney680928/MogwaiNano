@@ -129,6 +129,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 |---|---|---|---|
 | `IF` | `if (...) then { ... }` | `condition block IF` | Executes `block` if `condition` is true |
 | `IFELSE` | `if (...) then { ... } else { ... }` | `condition thenBlock elseBlock IFELSE` | Executes `thenBlock` if true, `elseBlock` if false |
+| `SWITCH` | `switch { (test) then { ... } (test) then { ... } ... }` | `{ testBlock1 codeBlock1 testBlock2 codeBlock2 ... } SWITCH` | A single block alternating test/code pairs. Runs the code block belonging to the *first* test that returns true, and only that one. If none match, nothing happens — a final `(true) then { ... }` is the common way to write a default/catch-all branch |
 | `WHILE` | `while (...) do { ... }` | `conditionBlock codeBlock WHILE` | Re-executes `conditionBlock` on every pass; stops once it leaves `false` on the stack |
 | `REPEAT` | `n repeat { ... }` | `n block REPEAT` | Executes `block` exactly `n` times |
 | `FOR` | `start end for 'var' do { ... }` | `start end 'var' block FOR` | Loops from `start` to `end` inclusive (direction auto-detected). The loop variable object is reused and updated in place on every iteration for performance — a reference to it (`&var`) always reflects its *current* value, even after the loop has moved past that point. To keep a snapshot from a specific iteration, copy it explicitly (`var -> 'snapshot'`) |
@@ -322,6 +323,8 @@ task 'TSK2' do
 | `?` / `console.println` | 🔗 | `v ?` | Prints the top of stack, with a newline |
 | `??` / `console.print` | 🔗 | `v ??` | Prints the top of stack, no newline |
 | `debug.write` | ⚙️ | `v debug.write` | Writes a debug message — on a connected NANO device, streamed back to MOGWAI NANO Studio in real time via `nano.user.view` |
+| `console.clear` | ⚙️ | `console.clear` | Sends `CONSOLE.CLEAR` to a connected Studio, clearing its Console NANO output. Currently only understood by the Avalonia Studio — has no effect on the CLI Studio |
+| `debug.clear` | ⚙️ | `debug.clear` | Sends `DEBUG.CLEAR` to a connected Studio, clearing its Debug NANO output. Same Avalonia-only scope as `console.clear` above |
 
 All three accept a `MOGRef` (`&variable`) and dereference it automatically before printing.
 

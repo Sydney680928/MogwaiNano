@@ -335,6 +335,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("?", new PrimitiveDelegate(PrimitiveConsolePrintLn));
             Primitives.Add("console.print", new PrimitiveDelegate(PrimitiveConsolePrint));
             Primitives.Add("??", new PrimitiveDelegate(PrimitiveConsolePrint));
+            Primitives.Add("console.clear", new PrimitiveDelegate(PrimitiveConsoleClear));
 
             Primitives.Add("->format", new PrimitiveDelegate(PrimitiveToFormat));
             Primitives.Add("sub", new PrimitiveDelegate(PrimitiveSub));
@@ -375,6 +376,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("task.join", new PrimitiveDelegate(PrimitiveTaskJoin));
 
             Primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
+            Primitives.Add("debug.clear", new PrimitiveDelegate(PrimitiveDebugClear));
 
             Primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));    
             Primitives.Add("error.reset", new PrimitiveDelegate(PrimitiveErrorReset));
@@ -1131,6 +1133,14 @@ namespace MogwaiNano.Engine
             return EvalResult.NoError;
         }
 
+        private static EvalResult PrimitiveDebugClear(MogwaiNanoEngine engine, string name)
+        {
+            if (engine.Delegate != null)
+                return engine.Delegate.DebugClear(engine);
+
+            return EvalResult.NoError;
+        }
+
         private static EvalResult PrimitiveConsolePrintLn(MogwaiNanoEngine engine, string name)
         {
             if (engine.StackSize == 0)
@@ -1166,6 +1176,14 @@ namespace MogwaiNano.Engine
                     return engine.Delegate.ConsolePrintLn(engine, n0.ToString());
                 }
             }
+
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveConsoleClear(MogwaiNanoEngine engine, string name)
+        {
+            if (engine.Delegate != null)
+                return engine.Delegate.ConsoleClearScreen(engine);
 
             return EvalResult.NoError;
         }

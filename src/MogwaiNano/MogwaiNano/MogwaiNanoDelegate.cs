@@ -77,5 +77,27 @@ namespace MogwaiNano
 
             return EvalResult.NoError;
         }
+
+        public EvalResult ConsoleClearScreen(MogwaiNanoEngine engine)
+        {
+            if (AppGlobal.TcpServer.IsClientConnected)
+            {
+                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "CONSOLE.CLEAR");
+                AppGlobal.TcpServer.EnqueueMessage(msg);
+            }
+
+            return EvalResult.NoError;
+        }
+
+        public EvalResult DebugClear(MogwaiNanoEngine engine)
+        {
+            if (AppGlobal.TcpServer.IsClientConnected)
+            {
+                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.CLEAR");
+                AppGlobal.TcpServer.EnqueueMessage(msg);
+            }
+
+            return EvalResult.NoError;
+        }
     }
 }
