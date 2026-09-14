@@ -69,15 +69,18 @@ jobs:
         shell: bash
         run: chmod +x "publish/${{ matrix.rid }}/${{ steps.bin.outputs.name }}"
 
-      - name: Package archive
+      - name: Package archive (Windows)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "publish/${{ matrix.rid }}/${{ steps.bin.outputs.name }}" -DestinationPath "mogwai-nano-studio-gui-${{ github.event.release.tag_name }}-${{ matrix.rid }}.zip"
+
+      - name: Package archive (Linux/macOS)
+        if: matrix.rid != 'win-x64'
         shell: bash
         run: |
           cd publish/${{ matrix.rid }}
-          if [ "${{ matrix.rid }}" = "win-x64" ]; then
-            zip "../../mogwai-nano-studio-gui-${{ github.event.release.tag_name }}-${{ matrix.rid }}.zip" "${{ steps.bin.outputs.name }}"
-          else
-            tar -czf "../../mogwai-nano-studio-gui-${{ github.event.release.tag_name }}-${{ matrix.rid }}.tar.gz" "${{ steps.bin.outputs.name }}"
-          fi
+          tar -czf "../../mogwai-nano-studio-gui-${{ github.event.release.tag_name }}-${{ matrix.rid }}.tar.gz" "${{ steps.bin.outputs.name }}"
           cd ../../
 
       - name: Attach to GitHub Release
