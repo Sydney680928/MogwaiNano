@@ -7,7 +7,7 @@ Project("{11A8DD76-328B-46DF-9F39-F559912D0360}") = "MogwaiNano", "MogwaiNano\Mo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MogwaiNanoStudio", "MogwaiNanoStudio\MogwaiNanoStudio.csproj", "{F90DB1D7-3F21-4211-B2B6-D39BD6711C2A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MogwaiNanoStudioGui", "..\..\..\MogwaiNanoStudioGui\src\MogwaiNano\MogwaiNanoStudioGui\MogwaiNanoStudioGui.csproj", "{A8B6F68B-C8F9-5342-11AA-DA342D1A810F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MogwaiNanoStudioGui", "MogwaiNanoStudioGui\MogwaiNanoStudioGui.csproj", "{A8B6F68B-C8F9-5342-11AA-DA342D1A810F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -8,7 +8,7 @@ permissions:
   contents: write   # required to create the release and upload assets
 
 jobs:
-  publish-studio-gui:
+  build:
     strategy:
       fail-fast: false
       matrix:
@@ -53,16 +53,6 @@ jobs:
           -p:DebugType=none
           --output publish/${{ matrix.rid }}
 
-      - name: Diagnostic — list publish output (Windows)
-        if: matrix.rid == 'win-x64'
-        shell: pwsh
-        run: Get-ChildItem -Path "publish/${{ matrix.rid }}" -Recurse | Select-Object FullName, Length
-
-      - name: Diagnostic — list publish output (Linux/macOS)
-        if: matrix.rid != 'win-x64'
-        shell: bash
-        run: ls -la "publish/${{ matrix.rid }}"
-
       - name: Set binary name
         id: bin
         shell: bash
@@ -90,7 +80,32 @@ jobs:
         run: |
           tar -czf "mogwai-nano-studio-gui-${{ github.event.release.tag_name }}-${{ matrix.rid }}.tar.gz" -C "publish/${{ matrix.rid }}" .
 
+      # Deposited as a workflow artifact rather than attached to the release
+      # directly here — with 5 matrix jobs running in parallel, each calling
+      # softprops/action-gh-release independently against the SAME release
+      # caused a race condition: all 5 jobs succeeded, but only 1 artifact
+      # actually ended up attached to the release (the others silently lost
+      # the race). Uploading, then attaching everything in one single later
+      # job (see publish-release below) avoids any concurrent release calls.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mogwai-nano-studio-gui-${{ matrix.rid }}
+          path: mogwai-nano-studio-gui-${{ github.event.release.tag_name }}-${{ matrix.rid }}.*
+          if-no-files-found: error
+
+  publish-release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: mogwai-nano-studio-gui-${{ github.event.release.tag_name }}-${{ matrix.rid }}.*
+          files: artifacts/*
