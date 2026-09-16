@@ -76,6 +76,12 @@ namespace MogwaiNano.Engine
             _adcOpenError,
             _adcUnknownNameError,
 
+            _spiDeviceAlreadyOpenedError,
+            _spiDeviceOpenError,
+            _spiUnknownDeviceNameError,
+            _spiWriteError,
+            _spiReadError,
+
             _unknownUnitError,
             _unableToReadUnitError,
 
@@ -143,6 +149,12 @@ namespace MogwaiNano.Engine
             _adcAlreadyOpenedError = RegisterError("MW.540", "adc already opened error");
             _adcOpenError = RegisterError("MW.541", "adc open error");
             _adcUnknownNameError = RegisterError("MW.542", "adc unknown name error");
+
+            _spiDeviceAlreadyOpenedError = RegisterError("MW.550", "spi device already opened error");
+            _spiDeviceOpenError = RegisterError("MW.551", "spi device open error"); 
+            _spiUnknownDeviceNameError = RegisterError("MW.552", "spi unknown device name error");
+            _spiWriteError = RegisterError("MW.553", "spi write error");
+            _spiReadError = RegisterError("MW.554", "spi read error");
 
             _unknownUnitError = RegisterError("MW.580", "unit not found error");
             _unableToReadUnitError = RegisterError("MW.581", "unable to read unit error");
@@ -240,6 +252,16 @@ namespace MogwaiNano.Engine
         public static Error AdcOpenError { get { EnsureInitialized(); return _adcOpenError; } }
 
         public static Error AdcUnknownNameError { get { EnsureInitialized(); return _adcUnknownNameError; } }
+
+        public static Error SpiDeviceAlreadyOpenedError { get { EnsureInitialized(); return _spiDeviceAlreadyOpenedError; } }
+
+        public static Error SpiDeviceOpenError { get { EnsureInitialized(); return _spiDeviceOpenError; } }
+
+        public static Error SpiUnknownDeviceNameError { get { EnsureInitialized(); return _spiUnknownDeviceNameError; } }
+
+        public static Error SpiWriteError { get { EnsureInitialized(); return _spiWriteError; } }   
+
+        public static Error SpiReadError { get { EnsureInitialized(); return _spiReadError; } } 
 
         public static Error UnknownUnitError { get { EnsureInitialized(); return _unknownUnitError; } }
 
