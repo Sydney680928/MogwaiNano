@@ -442,6 +442,8 @@ namespace MogwaiNano.Engine
             Primitives.Add("spi.close", new PrimitiveDelegate(PrimitiveSpiClose));
             Primitives.Add("spi.read", new PrimitiveDelegate(PrimitiveSpiRead));
             Primitives.Add("spi.write", new PrimitiveDelegate(PrimitiveSpiWrite));
+            Primitives.Add("spi.minClockFrequency", new PrimitiveDelegate(PrimitiveSpiMinClockFrequency));
+            Primitives.Add("spi.maxClockFrequency", new PrimitiveDelegate(PrimitiveSpiMaxClockFrequency));
 
             Primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
 
@@ -5128,6 +5130,51 @@ namespace MogwaiNano.Engine
             }
 
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private EvalResult PrimitiveSpiMinClockFrequency(MogwaiNanoEngine engine, string name)
+        {
+            // bus spi.minClockFrequency
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var bus = engine.StackPop() as MOGNumber;
+            var busNumber = (int)bus.Value; 
+
+            var busInfo = SpiDevice.GetBusInfo(busNumber);
+
+            engine.StackPush(new MOGNumber(engine, busInfo.MinClockFrequency));
+
+            return EvalResult.NoError;
+        }
+
+
+        private EvalResult PrimitiveSpiMaxClockFrequency(MogwaiNanoEngine engine, string name)
+        {
+            // bus spi.maxClockFrequency
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var bus = engine.StackPop() as MOGNumber;
+            var busNumber = (int)bus.Value;
+
+            var busInfo = SpiDevice.GetBusInfo(busNumber);
+
+            engine.StackPush(new MOGNumber(engine, busInfo.MaxClockFrequency));
+
+            return EvalResult.NoError;
         }
 
         private static EvalResult PrimitiveSpiRead(MogwaiNanoEngine engine, string name)
