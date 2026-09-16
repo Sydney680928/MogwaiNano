@@ -5132,7 +5132,7 @@ namespace MogwaiNano.Engine
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        private EvalResult PrimitiveSpiMinClockFrequency(MogwaiNanoEngine engine, string name)
+        private static EvalResult PrimitiveSpiMinClockFrequency(MogwaiNanoEngine engine, string name)
         {
             // bus spi.minClockFrequency
 
@@ -5155,7 +5155,7 @@ namespace MogwaiNano.Engine
         }
 
 
-        private EvalResult PrimitiveSpiMaxClockFrequency(MogwaiNanoEngine engine, string name)
+        private static EvalResult PrimitiveSpiMaxClockFrequency(MogwaiNanoEngine engine, string name)
         {
             // bus spi.maxClockFrequency
 
