@@ -442,6 +442,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("spi.close", new PrimitiveDelegate(PrimitiveSpiClose));
             Primitives.Add("spi.read", new PrimitiveDelegate(PrimitiveSpiRead));
             Primitives.Add("spi.write", new PrimitiveDelegate(PrimitiveSpiWrite));
+            Primitives.Add("spi.transfer", new PrimitiveDelegate(PrimitiveSpiTransfer));
             Primitives.Add("spi.minClockFrequency", new PrimitiveDelegate(PrimitiveSpiMinClockFrequency));
             Primitives.Add("spi.maxClockFrequency", new PrimitiveDelegate(PrimitiveSpiMaxClockFrequency));
 
@@ -687,6 +688,8 @@ namespace MogwaiNano.Engine
             CleanupOpenPins();
 
             CleanupI2cDevices();
+
+            CleanupSpiDevices();
 
             CleanupPwmChannels();
 
@@ -5043,7 +5046,7 @@ namespace MogwaiNano.Engine
                     Mode = (SpiMode)modeNumber
                 };
 
-                engine.SpiDevices[name] = SpiDevice.Create(settings);
+                engine.SpiDevices[deviceName.Value] = SpiDevice.Create(settings);
             }
             catch (Exception ex)
             {
@@ -5131,6 +5134,67 @@ namespace MogwaiNano.Engine
 
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
+
+        private static EvalResult PrimitiveSpiTransfer(MogwaiNanoEngine engine, string name)
+        {
+            // name data spi.transfert
+
+            var s = engine.StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGData) && s[1] == typeof(MOGName))
+            {
+                var data = engine.StackPop() as MOGData;
+                var deviceName = engine.StackPop() as MOGName;
+
+                if (!engine.SpiDevices.Contains(deviceName.Value))
+                    return EvalResult.Failure(engine, Error.SpiUnknownDeviceNameError, name);
+
+                var spiDevice = engine.SpiDevices[deviceName.Value] as SpiDevice;
+                SpanByte readBuffer = new byte[data.Items.Length];
+
+                try
+                {
+                    spiDevice.TransferFullDuplex(data.ToSpanByte(), readBuffer);                   
+                    
+                    var reponse = new MOGData(engine, readBuffer.ToArray());
+                    engine.StackPush(reponse);
+
+                    return EvalResult.NoError;
+                }
+                catch (Exception ex)
+                {
+                    return EvalResult.Failure(engine, Error.SpiTransferError, name, $"failed to transfert to SPI device '{deviceName}'", ex.Message);
+                }
+            }
+            else if (s[0] == typeof(MOGRef) && s[1] == typeof(MOGName))
+            {
+                var @ref = engine.StackPop() as MOGRef;
+                var deviceName = engine.StackPop() as MOGName;
+
+                var value = engine.VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
+
+                engine.StackPush(deviceName);
+                engine.StackPush(value);
+
+                var r = PrimitiveSpiTransfer(engine, name);
+
+                if (r.IsError)
+                    return r;
+
+                engine.StackDrop();
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
 
         private static EvalResult PrimitiveSpiMinClockFrequency(MogwaiNanoEngine engine, string name)
         {
@@ -6138,6 +6202,21 @@ namespace MogwaiNano.Engine
             }
 
             PwmChannels.Clear();
+        }
+
+        #endregion
+
+        #region SPI
+
+        public void CleanupSpiDevices()
+        {
+            foreach (var key in SpiDevices.Keys)
+            {
+                var spiDevice = SpiDevices[key] as SpiDevice;
+                spiDevice.Dispose();
+            }
+
+            SpiDevices.Clear();
         }
 
         #endregion

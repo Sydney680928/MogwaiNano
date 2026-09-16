@@ -81,6 +81,7 @@ namespace MogwaiNano.Engine
             _spiUnknownDeviceNameError,
             _spiWriteError,
             _spiReadError,
+            _spiTransferError,
 
             _unknownUnitError,
             _unableToReadUnitError,
@@ -155,6 +156,7 @@ namespace MogwaiNano.Engine
             _spiUnknownDeviceNameError = RegisterError("MW.552", "spi unknown device name error");
             _spiWriteError = RegisterError("MW.553", "spi write error");
             _spiReadError = RegisterError("MW.554", "spi read error");
+            _spiTransferError = RegisterError("MW.555", "spi transfer error");
 
             _unknownUnitError = RegisterError("MW.580", "unit not found error");
             _unableToReadUnitError = RegisterError("MW.581", "unable to read unit error");
@@ -262,6 +264,8 @@ namespace MogwaiNano.Engine
         public static Error SpiWriteError { get { EnsureInitialized(); return _spiWriteError; } }   
 
         public static Error SpiReadError { get { EnsureInitialized(); return _spiReadError; } } 
+
+        public static Error SpiTransferError { get { EnsureInitialized(); return _spiTransferError; } }
 
         public static Error UnknownUnitError { get { EnsureInitialized(); return _unknownUnitError; } }
 
