@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+## [0.5.0] - 2026-09-17
+
+### Added
+
 - **SPI support** — `spi.open`/`spi.close`/`spi.write`/`spi.transfer`, following the same by-name channel management pattern as I2C/PWM/ADC. `spi.open` takes a channel name, bus (`1` or `2` — like I2C, ESP32 exposes exactly two SPI buses), CS pin (any GPIO — handled automatically by the driver, no manual chip-select toggling needed), clock frequency in Hz, and mode (`0`-`3`, standard SPI CPOL/CPHA combinations). `spi.write` sends a `MOGData` buffer of any length in a single transaction. `spi.transfer` is full-duplex — sends a buffer and returns a same-length `MOGData` of whatever was clocked back in simultaneously, needed for chips (like the MFRC522 RFID reader) whose register-read protocol requires reading and writing in the same continuous transaction. `spi.minClockFrequency`/`spi.maxClockFrequency` query a bus's supported clock range directly (no fixed number documented here, since it varies by target — query it at runtime instead). Unlike I2C, SPI has no default pin mapping on any bus, even bus 1 — `device.setPinFunction` is mandatory for MOSI/MISO/SCK before `spi.open`, every time.
 
   **Validated end-to-end against real hardware, not just unit-tested in isolation:** a full MFRC522 RFID reader driver — register read/write, the chip's CRC coprocessor, card presence detection (REQA), and UID/SAK retrieval (anticollision + select) — was written entirely in MOGWAI NANO script on top of `spi.write`/`spi.transfer`, with no additional C# needed. Successfully read a real card's UID and SAK, confirming the primitives hold up against a genuinely demanding, independently-documented third-party protocol, not just a toy round-trip.
@@ -218,7 +226,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.2.0
