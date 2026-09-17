@@ -401,7 +401,24 @@ All ⚙️ **NANO-only.** Devices are identified by a user-chosen name rather th
 
 ---
 
-## 12. PWM
+## 12. SPI
+
+All ⚙️ **NANO-only.** Channels identified by a user-chosen name, like I2C/PWM/ADC.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `spi.open` | `'name' bus csPin frequency mode spi.open` | Opens a named SPI channel. `bus` must be `1` or `2` (like I2C, exactly two SPI buses exist). `csPin` is any GPIO — chip-select toggling is handled automatically by the driver, no manual write needed. `frequency` in Hz. `mode` is `0`-`3` (standard SPI CPOL/CPHA combinations). Refuses to reopen an already-used name. Unlike I2C, **no default pin mapping exists on either bus** — `device.setPinFunction` is mandatory for MOSI/MISO/SCK before every `spi.open`, no exceptions |
+| `spi.close` | `'name' spi.close` | Closes the channel and releases the resource |
+| `spi.write` | `'name' data spi.write` | Sends a `MOGData` buffer of any length in a single transaction |
+| `spi.transfer` | `'name' data spi.transfer` → `.data` | Full-duplex: sends a buffer and returns a same-length `MOGData` of whatever was clocked back in simultaneously. Needed for chips whose protocol requires reading and writing within the same continuous transaction — for example, reading a register on an MFRC522 RFID reader, where the requested register's value only comes back one byte after it was addressed |
+| `spi.minClockFrequency` | `bus spi.minClockFrequency` → `.number` | Queries the minimum clock frequency (Hz) supported by a bus, directly by bus number — no channel needs to be open first |
+| `spi.maxClockFrequency` | `bus spi.maxClockFrequency` → `.number` | Same as above, for the maximum supported frequency. No fixed number is documented here since it varies by target — query it at runtime instead |
+
+**Validated against real hardware:** a full MFRC522 RFID reader driver (register read/write, the chip's CRC coprocessor, card detection, UID/SAK retrieval) was written entirely in MOGWAI NANO script on top of `spi.write`/`spi.transfer`, with no additional C# needed — successfully read a real card's UID and SAK.
+
+---
+
+## 13. PWM
 
 All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, following the same pattern as I2C. Requires the pin to already be configured for PWM via `device.setPinFunction` (see [ESP32 DeviceFunction values reference](esp32-device-function-values.md)) beforehand.
 
@@ -418,7 +435,7 @@ All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, followi
 
 ---
 
-## 13. SSD1306 OLED display
+## 14. SSD1306 OLED display
 
 All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `nanoFramework.Iot.Device.Ssd13xx` binding, built after dense per-pixel drawing in pure RPN proved impractically slow. Fixed to 128x64 resolution over I2C Fast Mode; only one display instance is supported at a time (no naming).
 
@@ -441,7 +458,7 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ---
 
-## 14. Device-level platform access
+## 15. Device-level platform access
 
 ⚙️ **NANO-only.**
 

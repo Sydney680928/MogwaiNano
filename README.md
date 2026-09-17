@@ -55,7 +55,7 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 ## Key features
 
 - **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags, structured error handling (`trap`/`guard`)
-- **Hardware support** — GPIO, I2C, PWM, ADC, and a dedicated SSD1306 OLED display driver; SPI planned for an upcoming release
+- **Hardware support** — GPIO, I2C, SPI, PWM, ADC, and a dedicated SSD1306 OLED display driver
 - **Tasks** — real parallel execution, each on its own native thread with a fully isolated runtime instance, communicating with the parent only through events. Practical only on a PSRAM-equipped board (~10KB per task) — see [Memory considerations](#memory-considerations)
 - **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~40KB-RAM devices
 - **Reusable code libraries** — *units*, stored on flash and loaded on demand, for sharing functions (an RTC helper library, for example) across scripts without copy-pasting
@@ -106,7 +106,12 @@ dotnet tool install -g nanoff
 # 1. Flash the firmware (--masserase avoids issues from leftover factory partitions on a brand-new board)
 nanoff --target ESP32_REV3 --serialport COMx --masserase --update
 
-# 2. Deploy the application
+# 2. Power-cycle the board now — unplug, wait ~2 seconds, plug back in.
+#    Required: deploying the application right after flashing the firmware,
+#    without power-cycling in between, has been unreliable. Confirmed
+#    consistently reliable with this power cycle in between.
+
+# 3. Deploy the application
 nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --address 0x1E0000
 ```
 
@@ -120,7 +125,31 @@ nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --a
 
 > **Raspberry Pi Pico W:** flashing the firmware and deploying the application both work, but WiFi network configuration via `nanoff --networkdeployment` currently hangs on this target — see [Known Limitations](CHANGELOG.md) below. Until this is resolved, ESP32 is the recommended target to follow this guide with.
 
+### 1b. Flash the firmware + application (ESP32-S3 with Octal PSRAM)
+
+If you're targeting an ESP32-S3 board instead of a classic ESP32/REV3 (recommended — see [Memory considerations](#memory-considerations)):
+
+```bash
+# 1. Flash the firmware — be explicit about the target: nanoff cannot
+# auto-detect Octal vs Quad PSRAM, and silently picking the wrong one
+# will cause boot failures
+nanoff --target ESP32_S3_OCTAL --serialport COMx --masserase --update
+
+# 2. Power-cycle the board now — unplug, wait ~2 seconds, plug back in.
+#    Required: deploying the application right after flashing the firmware,
+#    without power-cycling in between, has been unreliable. Confirmed
+#    consistently reliable with this power cycle in between.
+
+# 3. Deploy the application — unlike ESP32_REV3 above, no explicit
+# --address is needed here; confirmed across 4 different S3 boards
+nanoff --target ESP32_S3_OCTAL --serialport COMx --deploy --image MogwaiNano.bin
+```
+
+> **Known S3 quirk:** flashing can take noticeably longer than on a classic ESP32 — several minutes rather than seconds is normal, not a sign of a hung process. Let it run.
+
 ### 2. Configure WiFi
+
+> **Recommended, not confirmed strictly necessary:** power-cycle the board again (unplug, wait ~2 seconds, plug back in) before this step, as a precaution — done as standard practice, without having isolated whether it's actually required here the way it is after flashing.
 
 ```bash
 nanoff --networkdeployment wifi.json
@@ -191,7 +220,7 @@ src/MogwaiNano/
 - [x] I2C support
 - [x] SSD1306 OLED display support (128x64, I2C Fast Mode)
 - [x] PWM and ADC helper primitives — building on the same pattern already validated with I2C
-- [ ] SPI — same pattern again, not yet implemented
+- [x] SPI — `spi.open`/`close`/`write`/`transfer`, same by-name pattern as I2C/PWM/ADC. Validated against real hardware: a full MFRC522 RFID reader driver (register read/write, CRC coprocessor, card detection, UID/SAK retrieval) was written entirely in MOGWAI NANO script on top of it, with no additional C# needed
 - [ ] `.binary`/`B:` support on NANO — for register-level bit manipulation
 - [ ] STM32 and TI validation
 - [x] ESP32-S3 / PSRAM validation — confirmed transparently usable by the managed heap, and confirmed to resolve the memory-fragmentation instability seen on plain ESP32 under sustained, multi-subsystem load (see [Memory considerations](#memory-considerations))
