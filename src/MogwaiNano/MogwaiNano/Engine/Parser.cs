@@ -138,6 +138,22 @@ namespace MogwaiNano.Engine
                 }
             }
 
+            if (item.StartsWith("D:"))
+            {
+                var content = item.Substring(2);
+
+                if (content.Length == 0)
+                {
+                    var data = new MOGData(_engine);
+                    return data;
+                }
+                else
+                {
+                    var data = new MOGData(_engine, content);
+                    return data;
+                }
+            }
+
             if (item.EndsWith(":") && item.Length > 1)
             {
                 var name = item.Substring(0, item.Length - 1);
@@ -171,22 +187,6 @@ namespace MogwaiNano.Engine
                     throw new MogwaiParseErrorException($"invalid reference {item}");
 
                 return new MOGRef(_engine, name);
-            }
-
-            if (item.StartsWith("D:"))
-            {
-                var content = item.Substring(2);
-
-                if (content.Length == 0)
-                {
-                    var data = new MOGData(_engine);
-                    return data;
-                }
-                else
-                {
-                    var data = new MOGData(_engine, content);
-                    return data;
-                }
             }
 
             if (LooksLikeNumber(item))
