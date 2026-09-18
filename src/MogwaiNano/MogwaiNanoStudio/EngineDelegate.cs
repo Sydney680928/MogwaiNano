@@ -137,6 +137,23 @@ namespace MogwaiNanoStudio
             "adc.resolutionInBits",
             "adc.maxValue",
 
+            "spi.open",
+            "spi.close",
+            "spi.write",
+            "spi.read",
+            "spi.transfer",
+            "spi.minClockFrequency",
+            "spi.maxClockFrequency",
+
+            "stopwatch.create",
+            "stopwatch.start",
+            "stopwatch.stop",
+            "stopwatch.reset",
+            "stopwatch.elapsed",
+            "stopwatch.reset",
+            "stopwatch.isRunning",
+            "stopwatch.purge",
+
             "device.setPinFunction"
 
             ];
