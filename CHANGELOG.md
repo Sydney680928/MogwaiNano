@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `nano.user.connect?` — same as `nano.user.connect`, but skips discovery and selection entirely if a device is already connected, pushing `true` immediately in that case. Lets a script lead with `if (nano.user.connect?) then { { ... } nano.run }` without worrying whether it's already connected to something
 - **Find in the editor** (`Ctrl+F`) — MOGWAI NANO Studio GUI only. A non-modal bar overlaid on the editor, rather than a dialog, so repeated Enter/Shift+Enter to step through matches never loses focus. Case-insensitive, wraps around at the start/end of the document.
 
 ### Updated
@@ -51,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Console/debug output caps** — each of the four output views keeps at most 500 lines/entries, trimming the oldest first, so memory use and the cost of each further append stay bounded no matter how long a session runs. The Debug MOGWAI/Debug NANO lists only auto-scroll to a newly added entry when the user was already scrolled near the bottom, so scrolling up to read earlier output is never yanked back down by new messages arriving.
 - **New extended primitives, understood only by this Studio (not the CLI Studio):** `nano.console.show`/`nano.debug.show` (switch the visible output tab) and `nano.console.clear`/`nano.debug.clear` (clear the corresponding output), callable from a Studio-side script. The device's own `console.clear`/`debug.clear` (see above) are received and handled the same way whenever this Studio is the one connected.
 - The device's final result, delivered via `PROGRAM.DID.END`, is now written automatically to Console NANO as soon as it arrives — this Studio's output views are always live, with nothing equivalent to `nano.user.view` needed first.
+
+### Updated
 
 ### Fixed
 

@@ -91,6 +91,27 @@ None of this is a bug to "just fix" — it's a direct, measured consequence of r
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 
+## MOGWAI NANO Studio
+
+Two companion apps let you talk to a device from your PC:
+
+- **MOGWAI NANO Studio GUI** — a graphical companion built with [Avalonia](https://avaloniaui.net/): its own code editor, a REPL-style command line, separate live views for the device's console and debug output, file management, and light/dark themes. **The easiest way to get started** — download, run, no terminal required.
+- **MOGWAI NANO Studio (console)** — a lightweight, cross-platform terminal app. Connect, run scripts, and watch live output, all from the command line — a good fit if you'd rather work from a terminal, script your own workflow, or connect over SSH.
+
+![MOGWAI NANO Studio GUI](images/studio-gui-screenshot.png)
+
+Both talk to a device over the same network protocol and understand the exact same commands — pick whichever fits you, or use both.
+
+## What's in a release
+
+Every [release](https://github.com/Sydney680928/MogwaiNano/releases) attaches everything below — same version number across the board, since the whole ecosystem ships together:
+
+- **`MogwaiNano.bin`** — the device firmware/application. This is the file used in [Quick start](#quick-start) below, deployed with `nanoff --deploy --image MogwaiNano.bin`.
+- **`mogwai-nano-studio-gui-<version>-<platform>.zip`/`.tar.gz`** — the graphical Studio, self-contained, one archive per platform (`win-x64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`). Pick the one matching your PC, extract, and run — no install, no .NET runtime required.
+- **`mogwai-nano-studio-<version>-<platform>.zip`/`.tar.gz`** — the console Studio, same self-contained approach, same five platforms.
+
+You only need the firmware if you're setting up a new device, and only one Studio archive for the platform and flavor (console or GUI) you intend to use — you don't need every file in a release, just the ones matching your situation.
+
 ## Quick start
 
 ### 1. Flash the firmware + application
@@ -169,7 +190,7 @@ with a `wifi.json` file:
 
 ### 3. Run your first program
 
-From **MOGWAI NANO Studio**:
+From either Studio's command line — the GUI's Console MOGWAI tab, or the console app's own prompt:
 
 ```
 "192.168.1.75" nano.connect
@@ -186,17 +207,6 @@ if (device ->type .record ==) then { device->ip: nano.connect }
 `nano.user.select` scans the network, lists the responding devices (platform and IP), and lets you pick one interactively — pushing `null` on the stack if you abort or nothing responds.
 
 Your device is now blinking an LED, controlled remotely from your PC. 🎉
-
-## MOGWAI NANO Studio
-
-Two companion apps let you talk to a device from your PC — pick whichever suits how you like to work:
-
-- **MOGWAI NANO Studio (console)** — a lightweight, cross-platform terminal app. Connect, run scripts, and watch live output, all from the command line.
-- **MOGWAI NANO Studio GUI** — a graphical companion built with [Avalonia](https://avaloniaui.net/): its own code editor, a REPL-style command line, separate live views for the device's console and debug output, file management, and light/dark themes.
-
-![MOGWAI NANO Studio GUI](images/studio-gui-screenshot.png)
-
-Both talk to a device over the same network protocol, so pick whichever fits your workflow — or use both.
 
 ## Project structure
 

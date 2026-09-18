@@ -14,6 +14,7 @@ This page only covers Studio's own `nano.*` primitives. For everything that actu
 | `nano.disconnect` | `nano.disconnect` | Disconnects from the currently connected device |
 | `nano.isConnected` | `nano.isConnected` → `.boolean` | Tests whether a device is currently connected |
 | `nano.user.connect` | `nano.user.connect` → `.boolean` | Guided connection shortcut combining discovery, interactive selection, and connection in one call: scans for devices, lists the ones that responded (with their name, firmware version, IP, and platform) for the user to pick from, and connects to the selected one. Pushes `true` on a successful connection, `false` if nothing responded, no device was selected, or the connection failed — same boolean convention as `nano.connect` |
+| `nano.user.connect?` | `nano.user.connect?` → `.boolean` | Same as `nano.user.connect`, but skips discovery and selection entirely if a device is already connected — pushes `true` immediately in that case, with no scan and no prompt. Otherwise behaves exactly like `nano.user.connect`, including on failure. Lets a script safely lead with this without worrying whether it's already connected: `if (nano.user.connect?) then { { ... } nano.run }` |
 
 ## Units (reusable code libraries)
 

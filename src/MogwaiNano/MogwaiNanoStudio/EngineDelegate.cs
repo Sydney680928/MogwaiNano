@@ -79,7 +79,8 @@ namespace MogwaiNanoStudio
             
             "nano.user.select",
             "nano.user.view",
-            "nano.user.connect",          
+            "nano.user.connect", 
+            "nano.user.connect?",
 
             "nano.units.install",
             "nano.units",
@@ -356,6 +357,63 @@ namespace MogwaiNanoStudio
 
                 Console.WriteLine();
                 Console.WriteLine("MOGWAI NANO DEVICES ON THE NETWORK");
+
+                var r = await AppGlobal.NanoRuntime.Select();
+
+                if (r != EvalResult.NoError)
+                    return r;
+
+                var s = _engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(_engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGNull))
+                {
+                    // no device or no device selected or user canceled selection
+
+                    _engine.StackPushBoolean(false);
+                    return EvalResult.NoError;
+                }
+                else if (s[0] == typeof(MOGRecord))
+                {
+                    var record = _engine.StackPopRecord();
+
+                    // ip: key is mandatory, value is the IP address of the device
+
+                    var ip = record.GetItem("ip") as MOGString;
+
+                    if (ip == null)
+                        return EvalResult.Failure(_engine, Error.BadArgumentValueError, word, "ip: key is mandatory");
+
+                    try
+                    {
+                        AppGlobal.NanoClient.Connect(ip.Value, AppGlobal.TCP_PORT);
+
+                        var name = await AppGlobal.NanoRuntime.GetNameValue();
+
+                        NanoConnect?.Invoke(name ?? "unknown name", ip.Value);
+
+                        engine.StackPushBoolean(true);
+                    }
+                    catch
+                    {
+                        _engine.StackPushBoolean(false);
+                    }
+
+                    return EvalResult.NoError;
+                }
+            }
+            else if (word == "nano.user.connect?")
+            {
+                // nano.user.connect? = nano.user.select + nano.connect si aucun device déjà connecté                
+                // true if connected, false if not or no device selected
+
+                if (AppGlobal.NanoClient.IsConnected)
+                {
+                    _engine.StackPushBoolean(true);
+                    return EvalResult.NoError;
+                }
 
                 var r = await AppGlobal.NanoRuntime.Select();
 
