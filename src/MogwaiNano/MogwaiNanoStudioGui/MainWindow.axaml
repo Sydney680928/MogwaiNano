@@ -64,6 +64,9 @@ limitations under the License.
                 <Separator/>
                 <MenuItem Header="E_xit" Click="OnExitClick"/>
             </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Find..." InputGesture="Ctrl+F" Click="OnFindClick"/>
+            </MenuItem>
             <MenuItem Header="_Script">
                 <MenuItem Header="_Run" InputGesture="F5" Click="OnRunEditorClick"/>
                 <MenuItem Header="_Stop" InputGesture="Shift+F5" Click="OnStopScriptClick"/>
@@ -115,17 +118,42 @@ limitations under the License.
             </StackPanel>
         </Border>
 
-        <!-- Code editor -->
-        <TextBox Grid.Row="2"
-                 x:Name="Editor"
-                 AcceptsReturn="True"
-                 AcceptsTab="True"
-                 FontFamily="Consolas,Cascadia Code,monospace"
-                 FontSize="14"
-                 TextWrapping="NoWrap"
-                 BorderThickness="0"
-                 Margin="8,8,8,8"
-                 Foreground="{DynamicResource EditorTextBrush}"/>
+        <!-- Code editor, with a non-modal find bar overlaid on top so it
+             never steals focus away from repeated Enter/Shift+Enter presses
+             the way a modal dialog would. -->
+        <Grid Grid.Row="2">
+            <TextBox x:Name="Editor"
+                     AcceptsReturn="True"
+                     AcceptsTab="True"
+                     FontFamily="Consolas,Cascadia Code,monospace"
+                     FontSize="14"
+                     TextWrapping="NoWrap"
+                     BorderThickness="0"
+                     Margin="8,8,8,8"
+                     Foreground="{DynamicResource EditorTextBrush}"/>
+
+            <Border x:Name="FindBar"
+                    IsVisible="False"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Right"
+                    Margin="0,4,20,0"
+                    Padding="8,6"
+                    CornerRadius="4"
+                    Background="{DynamicResource SystemAltHighColor}"
+                    BorderBrush="{DynamicResource SystemBaseLowColor}"
+                    BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBox x:Name="FindTextBox"
+                             Width="200"
+                             Watermark="Find"
+                             KeyDown="OnFindTextBoxKeyDown"/>
+                    <Button Content="↑" Width="28" Click="OnFindPreviousClick" ToolTip.Tip="Previous match (Shift+Enter)"/>
+                    <Button Content="↓" Width="28" Click="OnFindNextClick" ToolTip.Tip="Next match (Enter)"/>
+                    <TextBlock x:Name="FindStatusText" VerticalAlignment="Center" MinWidth="70" Opacity="0.7"/>
+                    <Button Content="✕" Width="28" Click="OnCloseFindBarClick" ToolTip.Tip="Close (Esc)"/>
+                </StackPanel>
+            </Border>
+        </Grid>
 
         <!-- Resize handle, drag to adjust the height of the panel below -->
         <GridSplitter Grid.Row="3"

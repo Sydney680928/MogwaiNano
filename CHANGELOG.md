@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Find in the editor** (`Ctrl+F`) — MOGWAI NANO Studio GUI only. A non-modal bar overlaid on the editor, rather than a dialog, so repeated Enter/Shift+Enter to step through matches never loses focus. Case-insensitive, wraps around at the start/end of the document.
+
 ### Updated
 
 ### Fixed
@@ -40,11 +42,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stopwatch support** — `stopwatch.create`/`purge`/`start`/`stop`/`reset`/`restart`/`isRunning`/`elapsed` (milliseconds), following the same by-name management pattern as I2C/PWM/ADC. `stopwatch.create` refuses to reuse an already-taken name (`MW.41`, the same error used for name collisions elsewhere in the language). NANO-only — no desktop MOGWAI equivalent
 - `DURING`/`during <ms> do { ... }` — ported from the desktop MOGWAI engine: repeats a block for a given duration in milliseconds, then stops — a time-bounded `FOREVER` rather than count- or condition-bounded. Supports `break` for early exit, same as the other loop forms
 
+**MOGWAI NANO Studio GUI**
+
+- **A new graphical companion app, built on Avalonia** — cross-platform (Windows/Linux/macOS): a code editor, a status bar showing connection state, and an output panel with four tabs — Console MOGWAI (with an integrated command line supporting history via Up/Down), Debug MOGWAI, Console NANO, Debug NANO. A graphical device-scan dialog replaces the CLI's console-based device selection for `nano.user.select`/`nano.user.connect`.
+- **File management** — New/Open/Save/Save As, a Recent Files list (up to 5, most-recent-first), and protection against losing unsaved changes: New, Open, opening a recent file, Exit, and closing the window itself all prompt Save/Discard/Cancel first if the editor has unsaved changes.
+- **Keyboard shortcuts** — `Ctrl+N`/`O`/`S`/`Shift+S` for file operations, `F5` to run the editor's script, `Shift+F5` to stop it.
+- **Appearance** — a System/Light/Dark theme switch (`View > Theme`), with the editor's text color adapted to each (VS Code's own default keyword blue), a font family/size picker (`View > Font...`) drawing on the fonts actually installed on the machine, the window's position and size remembered across launches (validated against the currently connected screens, so a stale position from a now-disconnected monitor never leaves the window running but invisible), and an application/window icon plus the MOGWAI mascot in the About dialog.
+- **Console/debug output caps** — each of the four output views keeps at most 500 lines/entries, trimming the oldest first, so memory use and the cost of each further append stay bounded no matter how long a session runs. The Debug MOGWAI/Debug NANO lists only auto-scroll to a newly added entry when the user was already scrolled near the bottom, so scrolling up to read earlier output is never yanked back down by new messages arriving.
+- **New extended primitives, understood only by this Studio (not the CLI Studio):** `nano.console.show`/`nano.debug.show` (switch the visible output tab) and `nano.console.clear`/`nano.debug.clear` (clear the corresponding output), callable from a Studio-side script. The device's own `console.clear`/`debug.clear` (see above) are received and handled the same way whenever this Studio is the one connected.
+- The device's final result, delivered via `PROGRAM.DID.END`, is now written automatically to Console NANO as soon as it arrives — this Studio's output views are always live, with nothing equivalent to `nano.user.view` needed first.
+
 ### Updated
 
 ### Fixed
 
 - **Tasks were leaking a full engine instance's worth of memory (~7KB) on every single run, even with all references properly cleaned up and a garbage collection forced immediately after.** The root cause took a long debugging session to isolate, since it wasn't in the managed reference graph at all: `MogwaiNanoEngine`'s constructor always spins up its own permanently-running background thread (`RunLoop`, used to receive and execute code sent via `nano.run`) — but a task's own engine instance doesn't need this at all, since `MOGTask.Start()` already drives its execution directly on its own thread. That unused `RunLoop` thread ran forever regardless, and being an instance method, its closure implicitly captured the whole engine instance — keeping it permanently reachable no matter how thoroughly everything else referencing it was cleaned up (`Dispose()`, clearing the tasks table, even repeated forced garbage collections). No amount of managed-side cleanup could ever have fixed this, since the reachability root was a live native thread, not a stray object reference. The constructor now takes the mother engine as a parameter; when present, the instance is marked as a task and skips creating `RunLoop` entirely. Confirmed fixed with a 20-run stress test: memory now returns to (within noise of) its starting point after every run, including with 3 tasks running concurrently, where it previously drifted down by roughly 15-30KB per run without ever recovering.
+
+**MOGWAI NANO Studio GUI**
+
+- A window position saved from a monitor that's no longer connected (or never was — a corrupted/stale value) previously left the window running — visible in the taskbar — but placed entirely off any visible screen, with no way to reach it. The saved position is now checked against the currently connected screens before being applied; an invalid one is simply ignored in favor of the platform's own default placement.
+- Loading the custom window icon could throw if the `.ico` file's internal format wasn't cleanly decodable, silently preventing the window from ever appearing at all. Icon loading is now defensive — a failure falls back to no icon rather than crashing the app.
+- Detecting unsaved changes could wrongly prompt to save a file that had just been opened untouched. `TextChanged` turned out not to always fire synchronously with the `Text` assignment that triggers it, so resetting the "unsaved changes" flag right after a programmatic assignment could run *before* the notification, which then overrode it back to dirty. Fixed by deferring the reset through the UI dispatcher, so it always runs after, regardless of whether `TextChanged` itself fires synchronously or not.
+- Rapidly adding entries to a Debug list while the user was actively scrolling through it could throw an "Invalid Arrange rectangle" exception from Avalonia's virtualized list panel — a known class of fragility in that panel under overlapping layout passes. Worked around by only auto-scrolling a list when the user was already near the bottom (which also makes the two layout passes far less likely to ever overlap in the first place) and catching the exception as a last resort.
 
 ## [0.4.0] - 2026-09-04
 

@@ -17,7 +17,6 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
-using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -321,6 +320,10 @@ public partial class MainWindow : Window
                     OnSaveClick(this, e);
                     e.Handled = true;
                     break;
+                case Key.F:
+                    OnFindClick(this, e);
+                    e.Handled = true;
+                    break;
             }
         }
         else if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
@@ -347,6 +350,132 @@ public partial class MainWindow : Window
                 e.Handled = true;
             }
         }
+    }
+
+    // --- Find, via the View... actually Edit menu / Ctrl+F ---
+    // A non-modal overlay rather than a dialog, so repeated Enter/Shift+Enter
+    // presses to step through matches never lose focus the way they would
+    // if a modal Window sat on top of the editor.
+
+    private void OnFindClick(object? sender, RoutedEventArgs e)
+    {
+        FindBar.IsVisible = true;
+
+        // Pre-fill with the current selection, if any — matches the
+        // common "select a word, press Ctrl+F" habit from other editors.
+        if (Editor.SelectionStart != Editor.SelectionEnd)
+        {
+            var start = Math.Min(Editor.SelectionStart, Editor.SelectionEnd);
+            var length = Math.Abs(Editor.SelectionEnd - Editor.SelectionStart);
+            FindTextBox.Text = (Editor.Text ?? string.Empty).Substring(start, length);
+        }
+
+        FindTextBox.Focus();
+        FindTextBox.SelectAll();
+    }
+
+    private void OnCloseFindBarClick(object? sender, RoutedEventArgs e) => CloseFindBar();
+
+    private void CloseFindBar()
+    {
+        FindBar.IsVisible = false;
+        FindStatusText.Text = string.Empty;
+        Editor.Focus();
+    }
+
+    private void OnFindTextBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            if (e.KeyModifiers == KeyModifiers.Shift)
+                FindPrevious();
+            else
+                FindNext();
+
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            CloseFindBar();
+            e.Handled = true;
+        }
+    }
+
+    private void OnFindNextClick(object? sender, RoutedEventArgs e) => FindNext();
+
+    private void OnFindPreviousClick(object? sender, RoutedEventArgs e) => FindPrevious();
+
+    private void FindNext()
+    {
+        var query = FindTextBox.Text;
+
+        if (string.IsNullOrEmpty(query))
+            return;
+
+        var text = Editor.Text ?? string.Empty;
+
+        if (text.Length == 0)
+        {
+            FindStatusText.Text = "Not found";
+            return;
+        }
+
+        var searchFrom = Math.Max(Editor.SelectionStart, Editor.SelectionEnd);
+        var index = text.IndexOf(query, searchFrom, StringComparison.OrdinalIgnoreCase);
+        var wrapped = false;
+
+        if (index < 0)
+        {
+            index = text.IndexOf(query, 0, StringComparison.OrdinalIgnoreCase);
+            wrapped = true;
+        }
+
+        ShowFindResult(index, query.Length, wrapped);
+    }
+
+    private void FindPrevious()
+    {
+        var query = FindTextBox.Text;
+
+        if (string.IsNullOrEmpty(query))
+            return;
+
+        var text = Editor.Text ?? string.Empty;
+
+        if (text.Length == 0)
+        {
+            FindStatusText.Text = "Not found";
+            return;
+        }
+
+        var searchFrom = Math.Min(Editor.SelectionStart, Editor.SelectionEnd) - 1;
+        var index = searchFrom >= 0
+            ? text.LastIndexOf(query, searchFrom, StringComparison.OrdinalIgnoreCase)
+            : -1;
+        var wrapped = false;
+
+        if (index < 0)
+        {
+            index = text.LastIndexOf(query, text.Length - 1, StringComparison.OrdinalIgnoreCase);
+            wrapped = true;
+        }
+
+        ShowFindResult(index, query.Length, wrapped);
+    }
+
+    private void ShowFindResult(int index, int length, bool wrapped)
+    {
+        if (index < 0)
+        {
+            FindStatusText.Text = "Not found";
+            return;
+        }
+
+        Editor.CaretIndex = index + length; // triggers the scroll-into-view
+        Editor.SelectionStart = index;
+        Editor.SelectionEnd = index + length;
+
+        FindStatusText.Text = wrapped ? "Wrapped" : string.Empty;
     }
 
     // Guarantees the action runs on the UI thread, whether we're already on
