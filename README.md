@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET nanoFramework](https://img.shields.io/badge/.NET-nanoFramework-blue.svg)](https://nanoframework.net/)
 
-**Give your ESP32 or Raspberry Pi Pico W a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
+**Give your ESP32 a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
 > **Target hardware: boards with real memory headroom.** MOGWAI NANO is built and tested primarily for microcontrollers with several megabytes of RAM available — an ESP32-S3 with PSRAM being our validated reference platform (a classic ESP32/WROVER with PSRAM, flashed with nanoFramework's `ESP32_PSRAM_REV3` target, should work comparably too, though we haven't tested that combination ourselves yet). A plain ESP32 (~40KB free RAM, no PSRAM) works for the simplest single-purpose scripts, but quickly runs into real, confirmed limits the moment a project combines more than one or two things — and some newer features (like [tasks](docs/nano-primitives.md#5-tasks)) simply aren't practical on it at all. If you're picking hardware for this project, start with a PSRAM-equipped board rather than the cheapest ESP32 you can find. See [Memory considerations](#memory-considerations) below for the full picture.
 
@@ -63,7 +63,7 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
 - **Network protocol** — UDP discovery + reliable TCP communication, with automatic disconnection detection and clean recovery
 - **Persistent autorun** — store code to run automatically on every boot, for standalone production deployments
-- **Cross-platform** — the exact same compiled binary runs on ESP32 and Raspberry Pi Pico W
+- **ESP32-focused** — the current build targets ESP32 exclusively. Raspberry Pi Pico W support is paused (see [Supported platforms](#supported-platforms) below) but planned to return once the project's restructuring work lands
 
 ## Memory considerations
 
@@ -87,7 +87,7 @@ None of this is a bug to "just fix" — it's a direct, measured consequence of r
 | ESP32 | ✅ Tested — usable for small, single-purpose scripts only (see [Memory considerations](#memory-considerations)); not recommended for anything more composite |
 | ESP32-S3 (with PSRAM) | ✅ Tested — recommended for composite projects (display, multiple sensors, long-running sessions) |
 | Classic ESP32/WROVER (with PSRAM, `ESP32_PSRAM_REV3` target) | 🔜 Should work comparably to ESP32-S3+PSRAM — not yet tested by us |
-| Raspberry Pi Pico W | ⚠️ Runtime tested and working, but WiFi configuration currently blocked (see Quick Start note) |
+| Raspberry Pi Pico W | ❌ Not currently supported — including the ESP32-specific pin-configuration package in the runtime broke Pico builds. Planned to return once the project is restructured into a shared core plus per-platform pieces |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 
@@ -144,7 +144,7 @@ nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --a
 
 > On ESP32, you may be asked to hold the BOOT/FLASH button on the board during flashing.
 
-> **Raspberry Pi Pico W:** flashing the firmware and deploying the application both work, but WiFi network configuration via `nanoff --networkdeployment` currently hangs on this target — see [Known Limitations](CHANGELOG.md) below. Until this is resolved, ESP32 is the recommended target to follow this guide with.
+> **Raspberry Pi Pico W:** not currently supported. Including the ESP32-specific pin-configuration package in the runtime broke Pico builds — this will be resolved once the project is restructured into a shared core plus per-platform pieces (see the [Roadmap](#roadmap) below). ESP32 is the only target to follow this guide with for now.
 
 ### 1b. Flash the firmware + application (ESP32-S3 with Octal PSRAM)
 
@@ -212,7 +212,7 @@ Your device is now blinking an LED, controlled remotely from your PC. 🎉
 
 ```
 src/MogwaiNano/
-├── MogwaiNano/             # Device runtime (deployed to ESP32 / Pico W)
+├── MogwaiNano/             # Device runtime (deployed to ESP32 — Pico W support paused, see Roadmap)
 ├── MogwaiNanoStudio/       # Desktop companion app, console (editor, network client)
 └── MogwaiNanoStudioGui/    # Desktop companion app, GUI (Avalonia)
 ```
@@ -238,6 +238,7 @@ src/MogwaiNano/
 - [ ] BLE support
 - [x] `.mog` library system ("units") — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library)
 - [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the units system above on more capable boards
+- [ ] Restructure the runtime into a shared core plus per-platform pieces (project references + linked shared files across a per-target `.nfproj`), so platform-specific dependencies (like the ESP32 pin-configuration package currently baked into the single project) no longer block building for other targets — this is what will bring Raspberry Pi Pico W support back
 - [x] MOGWAI NANO Studio GUI, built on Avalonia — grew beyond the originally planned "monitoring only" scope into a genuinely capable companion: its own code editor, a REPL-style command line, live console/debug views, file management, and themes. VS Code + the MOGWAI extension remains a great way to write and edit code too — pick whichever fits your workflow
 
 ## About
