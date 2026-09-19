@@ -2093,10 +2093,8 @@ namespace MogwaiNano.Engine
 
             for (int i = 0; i < n.Value; i++)
             {
-                var result = code.Execute();
-
-                if (result.IsError)
-                    return result;
+                if (engine.HaltRequested)
+                    return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
 
                 if (engine.BreakRequested)
                 {
@@ -2106,6 +2104,11 @@ namespace MogwaiNano.Engine
 
                 if (engine.ExitRequested)
                     break;
+
+                var result = code.Execute();
+
+                if (result.IsError)
+                    return result;
             }
 
             return EvalResult.NoError;
@@ -2185,11 +2188,9 @@ namespace MogwaiNano.Engine
 
             while (true)
             {
-                var conditionResult = conditionCode.Execute();
-
-                if (conditionResult.IsError)
-                    return conditionResult;
-
+                if (engine.HaltRequested)
+                    return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+              
                 if (engine.BreakRequested)
                 {
                     engine.BreakRequested = false;
@@ -2198,6 +2199,11 @@ namespace MogwaiNano.Engine
 
                 if (engine.ExitRequested)
                     break;
+
+                var conditionResult = conditionCode.Execute();
+
+                if (conditionResult.IsError)
+                    return conditionResult;
 
                 var conditionValue = engine.StackPop() as MOGBoolean;
 
@@ -2211,15 +2217,6 @@ namespace MogwaiNano.Engine
 
                 if (result.IsError)
                     return result;
-
-                if (engine.BreakRequested)
-                {
-                    engine.BreakRequested = false;
-                    break;
-                }
-
-                if (engine.ExitRequested)
-                    break;
             }
 
             return EvalResult.NoError;
@@ -2248,6 +2245,9 @@ namespace MogwaiNano.Engine
 
                 for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += direction)
                 {
+                    if (engine.HaltRequested)
+                        return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
                     if (engine.BreakRequested)
                     {
                         engine.BreakRequested = false;
@@ -2301,6 +2301,9 @@ namespace MogwaiNano.Engine
 
                 for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += step.Value)
                 {
+                    if (engine.HaltRequested)
+                        return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
                     if (engine.BreakRequested)
                     {
                         engine.BreakRequested = false;
@@ -2344,8 +2347,11 @@ namespace MogwaiNano.Engine
             {
                 var result = code.Execute();
 
-                if (result.IsError)
+                if (result != EvalResult.NoError)
                     return result;
+
+                if (engine.HaltRequested)
+                    return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
 
                 if (engine.BreakRequested)
                 {
@@ -2385,6 +2391,9 @@ namespace MogwaiNano.Engine
 
                     foreach (var item in list.Items)
                     {
+                        if (engine.HaltRequested)
+                            return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
                         if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
@@ -2411,6 +2420,9 @@ namespace MogwaiNano.Engine
 
                     foreach (var item in data.Items)
                     {
+                        if (engine.HaltRequested)
+                            return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
                         if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
@@ -2437,6 +2449,9 @@ namespace MogwaiNano.Engine
 
                     foreach (var item in @string.Value)
                     {
+                        if (engine.HaltRequested)
+                            return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
                         if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
@@ -2533,6 +2548,9 @@ namespace MogwaiNano.Engine
 
                 while (stopWatch.Elapsed.TotalMilliseconds < duration.Value)
                 {
+                    if (engine.HaltRequested)
+                        return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
+
                     if (engine.BreakRequested || engine.ExitRequested) // || engine.ReturnRequested)
                     {
                         engine.BreakRequested = false;
@@ -6071,7 +6089,7 @@ namespace MogwaiNano.Engine
             if (OpenedPins.Contains(pinNumber))
             {
                 var pin = OpenedPins[pinNumber] as GpioPin;
-                OpenedPins.Remove(pin);
+                OpenedPins.Remove(pinNumber);
                 pin.ValueChanged -= GpioPin_ValueChanged;
                 pin.Dispose();
                 return true;
@@ -6112,6 +6130,7 @@ namespace MogwaiNano.Engine
                 var pin = OpenedPins[pinNumber] as GpioPin;
                 pin.ValueChanged -= GpioPin_ValueChanged;
                 pin.Dispose();
+                pin = null;
             }
 
             OpenedPins.Clear();
@@ -6139,7 +6158,7 @@ namespace MogwaiNano.Engine
 
             if (engine.OpenedPins.Contains(nPin))
             {
-                var pin = engine.   OpenedPins[nPin] as GpioPin;
+                var pin = engine.OpenedPins[nPin] as GpioPin;
                 pin.SetPinMode(mode);
             }
             else
