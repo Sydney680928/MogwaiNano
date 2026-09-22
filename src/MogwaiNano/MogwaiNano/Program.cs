@@ -306,6 +306,166 @@ namespace MogwaiNano
                     AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.PURGE", "ERROR", "Missing parameters"));
                 }       
             }
+            else if (message.Function == "FILE.LIST")
+            {
+                // P0 = path
+
+                if (message.Parameters.Length > 0)
+                {
+                    var path = message.Parameters[0];
+
+                    try
+                    {
+                        var files = Directory.GetFiles(path);
+                        var sb = new StringBuilder();
+
+                        foreach (var file in files)
+                        {
+                            if (sb.Length > 0)
+                                sb.Append("\n");
+
+                            sb.Append(file);
+                        }
+
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.LIST", "OK", sb.ToString()));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.LIST", "ERROR", ex.Message));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.LIST", "ERROR", "Missing parameters"));
+                }
+            }
+            else if (message.Function == "FILE.COPY")
+            {
+                // P0 = destination path
+                // P1 = content in base64
+
+                if (message.Parameters.Length == 2)
+                {
+                    var path = message.Parameters[0];
+
+                    try
+                    {
+                        var buffer = Convert.FromBase64String(message.Parameters[1]);
+                        File.WriteAllBytes(path, buffer);       
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.COPY", "OK"));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.COPY", "ERROR", ex.Message));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.COPY", "ERROR", "Bad parameters"));
+                }
+            }
+            else if (message.Function == "FILE.PURGE")
+            {
+                // P0 = path
+
+                if (message.Parameters.Length == 1)
+                {
+                    var path = message.Parameters[0];
+
+                    try
+                    {
+                        File.Delete(path);
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.PURGE", "OK"));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.PURGE", "ERROR", ex.Message));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.PURGE", "ERROR", "Bad parameters"));
+                }
+            }
+            else if (message.Function == "DIR.CREATE")
+            {
+                // P0 = path
+
+                if (message.Parameters.Length == 1)
+                {
+                    var path = message.Parameters[0];
+
+                    try
+                    {
+                        Directory.CreateDirectory(path);
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.CREATE", "OK"));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.CREATE", "ERROR", ex.Message));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.CREATE", "ERROR", "Bad parameters"));
+                }
+            }
+            else if (message.Function == "DIR.LIST")
+            {
+                // P0 = path
+
+                if (message.Parameters.Length > 0)
+                {
+                    var path = message.Parameters[0];
+
+                    try
+                    {
+                        var directories = Directory.GetDirectories(path);
+                        var sb = new StringBuilder();
+
+                        foreach (var directory in directories)
+                        {
+                            if (sb.Length > 0)
+                                sb.Append("\n");
+
+                            sb.Append(directory);
+                        }
+
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.LIST", "OK", sb.ToString()));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.LIST", "ERROR", ex.Message));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.LIST", "ERROR", "Missing parameters"));
+                }
+            }
+            else if (message.Function == "DIR.PURGE")
+            {
+                // P0 = path
+
+                if (message.Parameters.Length == 1)
+                {
+                    var path = message.Parameters[0];
+
+                    try
+                    {
+                        Directory.Delete(path);
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.PURGE", "OK"));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.PURGE", "ERROR", ex.Message));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.PURGE", "ERROR", "Bad parameters"));
+                }
+            }
         }
 
         private static bool ConnectToWifi()

@@ -53,6 +53,9 @@ namespace MogwaiNano.Engine
             _unabledToStartTaskError,
             _invalidOutsideOfATaskError,
 
+            _usingError,
+            _usingAlreadyExistsError,
+
             _fatalError,
 
             _gpioUnknownPinError,
@@ -127,6 +130,9 @@ namespace MogwaiNano.Engine
             _taskCreationError = RegisterError("MW.60", "task creation error");
             _unabledToStartTaskError = RegisterError("MW.61", "unable to start task error");
             _invalidOutsideOfATaskError = RegisterError("MW.62", "invalid outside of a task error");
+
+            _usingError = RegisterError("MW.80", "using error");
+            _usingAlreadyExistsError = RegisterError("MW.81", "using already exists error");
 
             _fatalError = RegisterError("MW.!!!", "fatal error");
 
@@ -220,6 +226,10 @@ namespace MogwaiNano.Engine
         public static Error UnabledToStartTaskError { get { EnsureInitialized(); return _unabledToStartTaskError; } }
 
         public static Error InvalidOutsideOfATaskError { get { EnsureInitialized(); return _invalidOutsideOfATaskError; } }
+
+        public static Error UsingError { get { EnsureInitialized(); return _usingError; } }
+
+        public static Error UsingAlreadyExistsError { get { EnsureInitialized(); return _usingAlreadyExistsError; } }
 
         public static Error FatalError { get { EnsureInitialized(); return _fatalError; } }
 

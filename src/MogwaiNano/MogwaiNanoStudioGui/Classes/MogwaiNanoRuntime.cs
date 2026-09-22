@@ -16,6 +16,7 @@ using MOGWAI.Engine;
 using MOGWAI.Objects;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -541,6 +542,191 @@ namespace MogwaiNanoStudioGui.Classes
 
             return EvalResult.NoError;
         }
+
+        public async Task<EvalResult> FileList(string path)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "FILE.LIST", path);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0)
+            {
+                if (response.Parameters[0] == "ERROR")
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.NegativeDeviceResponse, response.Parameters[1]);
+                }
+                else if (response.Parameters[0] == "OK")
+                {
+                    var fileList = new MOGList(_engine);
+                    var files = response.Parameters[1].Split('\n');
+
+                    foreach (var file in files)
+                        fileList.AddString(Path.GetFileName(file));    
+                    
+                    _engine.StackPush(fileList);
+
+                    return EvalResult.NoError;
+                }
+            }
+
+            return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");  
+        }
+
+        public async Task<EvalResult> FileCopy(string sourcePath, string destinationPath)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var buffer = new byte[0];
+
+            try
+            {
+                buffer = await File.ReadAllBytesAsync(sourcePath);
+            }
+            catch 
+            {
+                return EvalResult.Failure(_engine, Error.BadArgumentValueError, $"Failed to read source file");
+            }
+
+            var content64 = Convert.ToBase64String(buffer);
+            var message = new ServerMessage(SOURCE_NAME, "FILE.COPY",  destinationPath, content64);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0)
+            {
+                if (response.Parameters[0] == "ERROR")
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.NegativeDeviceResponse, response.Parameters[1]);
+                }
+                else if (response.Parameters[0] == "OK")
+                {
+                    return EvalResult.NoError;
+                }
+            }
+
+            return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");
+        }
+
+        public async Task<EvalResult> FilePurge(string path)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+            
+            var message = new ServerMessage(SOURCE_NAME, "FILE.PURGE", path);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0)
+            {
+                if (response.Parameters[0] == "ERROR")
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.NegativeDeviceResponse, response.Parameters[1]);
+                }
+                else if (response.Parameters[0] == "OK")
+                {
+                    return EvalResult.NoError;
+                }
+            }
+
+            return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");
+        }
+
+        public async Task<EvalResult> DirectoryCreate(string path)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "DIR.CREATE", path);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0)
+            {
+                if (response.Parameters[0] == "ERROR")
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.NegativeDeviceResponse, response.Parameters[1]);
+                }
+                else if (response.Parameters[0] == "OK")
+                {
+                    return EvalResult.NoError;
+                }
+            }
+
+            return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");
+        }
+
+        public async Task<EvalResult> DirectoryList(string path)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "DIR.LIST", path);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0)
+            {
+                if (response.Parameters[0] == "ERROR")
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.NegativeDeviceResponse, response.Parameters[1]);
+                }
+                else if (response.Parameters[0] == "OK")
+                {
+                    var dirList = new MOGList(_engine);
+                    var files = response.Parameters[1].Split('\n');
+
+                    foreach (var file in files)
+                        dirList.AddString(Path.GetFileName(file));
+
+                    _engine.StackPush(dirList);
+
+                    return EvalResult.NoError;
+                }
+            }
+
+            return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");
+        }
+
+        public async Task<EvalResult> DirectoryPurge(string path)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "DIR.PURGE", path);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (response.Parameters.Length > 0)
+            {
+                if (response.Parameters[0] == "ERROR")
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.NegativeDeviceResponse, response.Parameters[1]);
+                }
+                else if (response.Parameters[0] == "OK")
+                {
+                    return EvalResult.NoError;
+                }
+            }
+
+            return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");
+        }
+
 
         public Task<EvalResult> Select()
         {

@@ -27,6 +27,11 @@ namespace MogwaiNano.Objects
 
         public override EvalResult EngineEval()
         {
+            // This word is a primitive ?
+
+            if (Engine.IsPrimitive(Value))
+                return MogwaiNanoEngine.ExecutePrimitive(Engine, Value);
+
             // This word is a function ?
 
             var func = Engine.GetFunction(Value);
@@ -37,6 +42,8 @@ namespace MogwaiNano.Objects
             // This word is a var ?
 
             var value = Engine.VarRead(Value);
+
+            // ???
 
             if (value == null)
                 return EvalResult.Failure(Engine, Error.UnknownWordError, Value);

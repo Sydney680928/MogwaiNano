@@ -127,6 +127,14 @@ namespace MogwaiNanoStudioGui.Classes
             "nano.units",
             "nano.units.purge",
 
+            "nano.file.list", 
+            "nano.file.copy",
+            "nano.file.purge",
+
+            "nano.dir.create",
+            "nano.dir.list",
+            "nano.dir.purge",
+
             "mogwai.memory",
             "mogwai.reboot",
             "mogwai.frugalMode",
@@ -672,6 +680,96 @@ namespace MogwaiNanoStudioGui.Classes
                 {
                     var unitName = engine.StackPopName();
                     return await AppGlobal.NanoRuntime.PurgeUnitAsync(unitName.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.file.list")
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    var path = engine.StackPopString();
+                    return await AppGlobal.NanoRuntime.FileList(path.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.file.copy")
+            {
+                var s = engine.StackSign(2);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString) && s[1] == typeof(MOGString))
+                {                   
+                    var destination = engine.StackPopString();
+                    var source = engine.StackPopString();
+
+                    return await AppGlobal.NanoRuntime.FileCopy(source.Value, destination.Value);
+                }
+            }
+            else if (word == "nano.file.purge")
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    var path = engine.StackPopString();
+                    return await AppGlobal.NanoRuntime.FilePurge(path.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.dir.create")
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    var path = engine.StackPopString();
+                    return await AppGlobal.NanoRuntime.DirectoryCreate(path.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.dir.list")
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    var path = engine.StackPopString();
+                    return await AppGlobal.NanoRuntime.DirectoryList(path.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.dir.purge")
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    var path = engine.StackPopString();
+                    return await AppGlobal.NanoRuntime.DirectoryPurge(path.Value);
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);

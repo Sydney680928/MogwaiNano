@@ -29,5 +29,7 @@ namespace MogwaiNanoStudioGui.Classes
         public static Error DeviceIsNotRunningError { get; } = new Error("MW.5004", $"device is not running error", Error.ErrorType.User);
 
         public static Error BadDeviceResponse { get; } = new Error("MW.5005", $"bad device response error", Error.ErrorType.User);
+
+        public static Error NegativeDeviceResponse { get; } = new Error("MW.5006", $"negative device response error", Error.ErrorType.User);
     }
 }
