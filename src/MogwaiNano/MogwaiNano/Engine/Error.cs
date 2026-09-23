@@ -14,6 +14,7 @@
 
 using System;
 using System.Collections;
+using System.Diagnostics;
 
 namespace MogwaiNano.Engine
 {
@@ -175,6 +176,20 @@ namespace MogwaiNano.Engine
             var error = new Error(code, message);
             _errors.Add(code, error);
             return error;
+        }
+
+        public static void RegisterExternalError(Error error)
+        {
+            EnsureInitialized();
+
+            if (_errors.Contains(error.Code))
+            {
+                Debug.WriteLine($"Error code {error.Code} already registered. Ignoring external error registration.");
+                return;   // déjà enregistrée (par ce plugin ou un autre) — on ignore plutôt que planter
+            }
+
+            Debug.WriteLine($"Registering external error: {error.Code} - {error.Message}");
+            _errors[error.Code] = error;
         }
 
         public static Hashtable Errors { get { EnsureInitialized(); return _errors; } }

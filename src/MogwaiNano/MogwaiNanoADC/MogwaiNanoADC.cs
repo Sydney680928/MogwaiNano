@@ -1,27 +1,120 @@
 ﻿using MogwaiNano.Engine;
 using MogwaiNano.Objects;
 using System;
+using System.Collections;
 using System.Device.Adc;
-using static MogwaiNano.Engine.MogwaiNanoEngine;
+using System.Diagnostics;
+
+
 
 namespace MogwaiNanoADC
 {
     public class MogwaiNanoADC : MogwaiNano.Interfaces.IPlugin
     {
+        private static  AdcController _adcController = new();
+        private static Hashtable _adcChannels = new();
+
+        private static Error _adcAlreadyOpenedError;
+        private static Error _adcOpenError;
+        private static Error _adcUnknownNameError;
+
         public string Name => "ADC";
 
         public string Description => "MogwaiNano plugin that provides ADC functionality.";
 
-        public System.Collections.Hashtable Primitives { get; } = new();
+        public Hashtable Primitives { get; } = new();
+
+        public ArrayList Errors { get; } = new();
 
         public MogwaiNanoADC()
         {
-            Primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));
-            Primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
-            Primitives.Add("adc.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
-            Primitives.Add("adc.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
-            Primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));
+            Primitives.Add("adc2.open", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcOpen));
+            Primitives.Add("adc2.close", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcClose));
+            Primitives.Add("adc2.read", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcReadValue));
+            Primitives.Add("adc2.resolutionInBits", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
+            Primitives.Add("adc2.maxValue", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetMaxValue));
+            
+            _adcAlreadyOpenedError = new Error("ADC.1", "adc already opened error");
+            _adcOpenError = new Error("ADC.2", "adc open error");
+            _adcUnknownNameError = new Error("ADC.3", "adc unknown name error");
+
+            Errors.Add(_adcAlreadyOpenedError);
+            Errors.Add(_adcOpenError);
+            Errors.Add(_adcUnknownNameError);
         }
+
+        public void Initialize(MogwaiNanoEngine engine)
+        {
+            // Initialization code for the ADC plugin
+        }
+
+        public void CleanUp(int engineId)
+        {
+            // Cleanup ADC channels when the engine is reset or disposed
+
+            Debug.WriteLine($"CleanUp plugin {Name} for engine {engineId}");
+
+            var adcChannels = _adcChannels[engineId] as Hashtable;
+
+            if (adcChannels != null)
+            {
+                foreach (var key in adcChannels.Keys)
+                {
+                    if (adcChannels[key] is AdcChannel adcChannel)
+                    {
+                        adcChannel.Dispose();
+                        Debug.WriteLine($"CleanUp ADC channel '{key}'");
+                    }
+                }
+
+                _adcChannels.Remove(engineId);
+            }
+        }
+
+        private static AdcChannel GetChannel(MogwaiNanoEngine engine, string name)
+        {
+            if (_adcChannels.Contains(engine.EngineId))
+            {
+                var dic = _adcChannels[engine.EngineId] as Hashtable;
+               
+                if (dic.Contains(name))
+                    return dic[name] as AdcChannel;
+            }
+
+            return null;
+        }
+
+        private static void AddChannel(MogwaiNanoEngine engine, string name, AdcChannel channel)
+        {
+            Hashtable dic = null;
+
+            if (!_adcChannels.Contains(engine.EngineId))
+            {
+                dic = new Hashtable();
+                _adcChannels.Add(engine.EngineId, dic);
+            }
+            else
+            {
+                dic = _adcChannels[engine.EngineId] as Hashtable;
+            }
+
+            dic[name] = channel;
+            Debug.WriteLine($"'{name}' added to ADC channels for engine {engine.EngineId}");
+        }
+
+        private static void RemoveChannel(MogwaiNanoEngine engine, string name)
+        {         
+            if (_adcChannels.Contains(engine.EngineId))
+            {
+                var dic = _adcChannels[engine.EngineId] as Hashtable;
+
+                if (dic.Contains(name))
+                {
+                    dic.Remove(name);
+                    Debug.WriteLine(name + $"'{name}' removed from ADC channels for engine {engine.EngineId}");
+                }
+            }
+        }   
 
         private static EvalResult PrimitiveAdcOpen(MogwaiNanoEngine engine, string name)
         {
@@ -37,19 +130,21 @@ namespace MogwaiNanoADC
                 var channel = engine.StackPop() as MOGNumber;
                 var adcName = engine.StackPop() as MOGName;
 
-                if (engine.AdcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(engine, Error.AdcAlreadyOpenedError, name);
+                var adcChannel = GetChannel(engine, adcName.Value);
+
+                if (adcChannel != null)
+                    return EvalResult.Failure(engine, _adcAlreadyOpenedError, name);
 
                 int nChannel = (int)channel.Value;
 
                 try
                 {
-                    var adcChannel = engine.AdcController.OpenChannel(nChannel);
-                    engine.AdcChannels.Add(adcName.Value, adcChannel);
+                    adcChannel = _adcController.OpenChannel(nChannel);
+                    AddChannel(engine, adcName.Value, adcChannel);
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(engine, Error.AdcOpenError, name, $"failed to open ADC channel {nChannel}", ex.Message);
+                    return EvalResult.Failure(engine, _adcOpenError, name, $"failed to open ADC channel {nChannel}", ex.Message);
                 }
 
                 return EvalResult.NoError;
@@ -71,13 +166,14 @@ namespace MogwaiNanoADC
             {
                 var adcName = engine.StackPop() as MOGName;
 
-                if (!engine.AdcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(engine, Error.AdcUnknownNameError, name);
-
-                var adcChannel = engine.AdcChannels[adcName.Value] as AdcChannel;
+                var adcChannel = GetChannel(engine, adcName.Value);
+                    
+                if (adcChannel == null)
+                    return EvalResult.Failure(engine, _adcUnknownNameError, name);
+                
                 adcChannel.Dispose();
 
-                engine.AdcChannels.Remove(adcName.Value);
+                RemoveChannel(engine, adcName.Value);   
 
                 return EvalResult.NoError;
             }
@@ -97,13 +193,12 @@ namespace MogwaiNanoADC
             if (s[0] == typeof(MOGName))
             {
                 var adcName = engine.StackPop() as MOGName;
+                var adcChannel = GetChannel(engine, adcName.Value); 
 
-                if (!engine.AdcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(engine, Error.AdcUnknownNameError, name);
-
-                var adcChannel = engine.AdcChannels[adcName.Value] as AdcChannel;
+                if (adcChannel == null)
+                    return EvalResult.Failure(engine, _adcUnknownNameError, name);
+                
                 var value = adcChannel.ReadValue();
-
                 engine.StackPush(new MOGNumber(engine, value));
 
                 return EvalResult.NoError;
@@ -116,7 +211,7 @@ namespace MogwaiNanoADC
         {
             // adc.maxValue
 
-            var maxValue = engine.AdcController.MaxValue;
+            var maxValue = _adcController.MaxValue;
             engine.StackPush(new MOGNumber(engine, maxValue));
 
             return EvalResult.NoError;
@@ -126,7 +221,7 @@ namespace MogwaiNanoADC
         {
             // adc.resolutionInBits
 
-            var resolutionInBits = engine.AdcController.ResolutionInBits;
+            var resolutionInBits = _adcController.ResolutionInBits;
             engine.StackPush(new MOGNumber(engine, resolutionInBits));
 
             return EvalResult.NoError;

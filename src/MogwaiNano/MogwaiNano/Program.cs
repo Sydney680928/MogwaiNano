@@ -52,6 +52,16 @@ namespace MogwaiNano
                 Debug.WriteLine($"Unabled to create units folder !");              
             }
 
+            try
+            {
+                Directory.CreateDirectory(@"I:\mogwai\usings");
+                Debug.WriteLine($"Usings folder OK.");
+            }
+            catch
+            {
+                Debug.WriteLine($"Unabled to create usings folder !");
+            }
+
             if (ConnectToWifi())
             {
                 AppGlobal.TcpServer.MessageReceived += TcpServer_MessageReceived;

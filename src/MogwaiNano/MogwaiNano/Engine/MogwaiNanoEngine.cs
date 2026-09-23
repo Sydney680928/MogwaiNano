@@ -37,6 +37,8 @@ namespace MogwaiNano.Engine
     {
         private const int IDLE_EVERY_N_ITERATIONS = 5;
 
+        private static int _engineIdCounter = 0;
+
         private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
 
         private static ArrayList _assemblies = new();   
@@ -47,7 +49,6 @@ namespace MogwaiNano.Engine
         public static Hashtable Primitives = new(150);
         
         public static Hashtable Usings { get; private set; } = new(2);
-
 
         private ArrayList _stacks = new();
         private MOGStack _currentStack = new();
@@ -85,6 +86,8 @@ namespace MogwaiNano.Engine
         public readonly MOGType TypeNull;
         public readonly MOGType TypeReference;
         public readonly MOGType TypeAny;
+
+        public int EngineId { get; init; }
 
         public string Name { get; init; }
 
@@ -182,6 +185,8 @@ namespace MogwaiNano.Engine
 
         public MogwaiNanoEngine(string name, MogwaiNanoEngine motherEngine = null)
         {
+            EngineId = Interlocked.Increment(ref _engineIdCounter);
+
             Name = name;
             TaskResult = new MOGNull(this);
 
@@ -248,6 +253,11 @@ namespace MogwaiNano.Engine
         ~MogwaiNanoEngine()
         {
             Debug.WriteLine($"MogwaiNanoEngine '{Name}' is being finalized.");
+
+            foreach (var plugin in Usings.Values)
+            {
+                (plugin as IPlugin)?.CleanUp(EngineId);
+            }
 
             if (_runThread != null)
             {
@@ -678,9 +688,22 @@ namespace MogwaiNano.Engine
             return true;
         }
 
+        private void CleanupUsings()
+        {
+            foreach (var key in Usings.Keys)
+            {
+                var plugin = Usings[key] as IPlugin;
+
+                if (plugin != null)
+                    plugin.CleanUp(EngineId);
+            }
+        }
+
         public void Reset(bool keepAlive = false)
         {
             CurrentEvalObject = null;
+
+            CleanupUsings();
 
             CleanupTasks();
 
@@ -6410,7 +6433,7 @@ namespace MogwaiNano.Engine
 
                 // Step 1, get manifest file from using name
 
-                var usingPath = $"I:\\using.{usingName}";
+                var usingPath = $"I:\\mogwai\\usings\\{usingName}";
                 var manifestFile = Path.Combine(usingPath, "manifest.txt");
                 var manifestEntries = new ArrayList();
 
@@ -6484,6 +6507,8 @@ namespace MogwaiNano.Engine
                             {
                                 var plugin = (IPlugin)instance;
 
+                                // Chargement des primitives du plugin dans l'interpréteur
+
                                 foreach (var primitive in plugin.Primitives.Keys)
                                 {
                                     if (!Primitives.Contains(primitive))
@@ -6498,6 +6523,15 @@ namespace MogwaiNano.Engine
                                         Debug.WriteLine($"PRIMITIVE ALREADY EXISTS : {primitive} from plugin '{plugin.Name}'");
                                     }
                                 }
+
+                                // Chargement des erreurs du plugin dans l'interpréteur
+
+                                foreach (Error error in plugin.Errors)
+                                    Error.RegisterExternalError(error);
+
+                                // Initialisation du plugin
+
+                                plugin.Initialize(this);    
 
                                 Usings[usingName] = plugin;
 
