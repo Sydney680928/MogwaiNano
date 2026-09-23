@@ -19,9 +19,8 @@ using nanoFramework.Runtime.Native;
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net.NetworkInformation;
-using System.Reflection;
 using System.Text;
+using System.Net.NetworkInformation;    
 using System.Threading;
 using GC = nanoFramework.Runtime.Native.GC;
 
@@ -45,11 +44,11 @@ namespace MogwaiNano
             try
             {
                 Directory.CreateDirectory(@"I:\mogwai\units");
-                Debug.WriteLine($"Units folder OK.");  
+                Debug.WriteLine($"Units folder OK.");
             }
             catch
             {
-                Debug.WriteLine($"Unabled to create units folder !");              
+                Debug.WriteLine($"Unabled to create units folder !");
             }
 
             try
@@ -193,7 +192,7 @@ namespace MogwaiNano
             {
                 var memory = GC.Run(false);
 
-                var primitivesBuilder = new StringBuilder();    
+                var primitivesBuilder = new StringBuilder();
 
                 foreach (string primitive in MogwaiNanoEngine.Primitives.Keys)
                 {
@@ -313,7 +312,7 @@ namespace MogwaiNano
             {
                 if (message.Parameters.Length > 0 && message.Parameters[0] != null)
                 {
-                    var filename = Path.Combine(@"I:\mogwai\units",  message.Parameters[0]);
+                    var filename = Path.Combine(@"I:\mogwai\units", message.Parameters[0]);
 
                     if (File.Exists(filename))
                     {
@@ -336,7 +335,7 @@ namespace MogwaiNano
                 else
                 {
                     AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "UNITS.PURGE", "ERROR", "Missing parameters"));
-                }       
+                }
             }
             else if (message.Function == "FILE.LIST")
             {
@@ -383,7 +382,7 @@ namespace MogwaiNano
                     try
                     {
                         var buffer = Convert.FromBase64String(message.Parameters[1]);
-                        File.WriteAllBytes(path, buffer);       
+                        File.WriteAllBytes(path, buffer);
                         AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "FILE.COPY", "OK"));
                     }
                     catch (Exception ex)
@@ -450,6 +449,9 @@ namespace MogwaiNano
                 {
                     var path = message.Parameters[0];
 
+                    if (!path.EndsWith("\\"))
+                        path += "\\";
+
                     try
                     {
                         var directories = Directory.GetDirectories(path);
@@ -460,7 +462,7 @@ namespace MogwaiNano
                             if (sb.Length > 0)
                                 sb.Append("\n");
 
-                            sb.Append(directory);
+                            sb.Append(Path.GetFileName(directory));
                         }
 
                         AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.LIST", "OK", sb.ToString()));
@@ -512,7 +514,7 @@ namespace MogwaiNano
             {
                 Debug.WriteLine();
                 Debug.WriteLine("No WiFi configuration found or connection failed.");
-                
+
                 return false;
             }
             else

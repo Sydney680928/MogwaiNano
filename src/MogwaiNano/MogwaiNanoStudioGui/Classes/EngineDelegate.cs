@@ -135,6 +135,10 @@ namespace MogwaiNanoStudioGui.Classes
             "nano.dir.list",
             "nano.dir.purge",
 
+            "nano.usings.install",
+            "nano.usings",  
+            "nano.usings.purge",
+
             "mogwai.memory",
             "mogwai.reboot",
             "mogwai.frugalMode",
@@ -774,6 +778,79 @@ namespace MogwaiNanoStudioGui.Classes
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
             }
+            else if (word == "nano.usings.install")
+            {
+                // 'usingName' "directory source" nano.usings.install
+
+                var s = engine.StackSign(2);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString) && s[1] == typeof(MOGName))
+                {
+                    // Copy all files from the specified directory to the NANO device's "usings" directory provided by the usingName argument. The source directory must exist and contain files to copy.
+                    // The usingName argument is used to create a subdirectory on the NANO device where the files will be copied.
+
+                    var directorySource = engine.StackPopString();
+                    var usingName = engine.StackPopName();
+
+                    var destinationPath = $"I:\\mogwai\\usings\\{usingName.Value}";
+
+                    try
+                    {
+                        var r = await AppGlobal.NanoRuntime.DirectoryCreate(destinationPath);
+
+                        if (r.IsError)
+                            return r;
+
+                        var files = Directory.GetFiles(directorySource.Value);
+
+                        foreach (var file in files)
+                        {
+                            var destinationFile = Path.Combine(destinationPath, Path.GetFileName(file));
+                            r = await AppGlobal.NanoRuntime.FileCopy(file, destinationFile);
+
+                            if (r.IsError)
+                                return r;
+
+                            await Task.Delay(100);
+                        }
+
+                        return EvalResult.NoError;
+
+                    }
+                    catch (Exception ex)
+                    {
+                        return EvalResult.Failure(engine, Error.FileOperationError, word, ex.Message);
+                    }
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.usings")
+            {
+                return await AppGlobal.NanoRuntime.GetUnits();
+            }
+            else if (word == "nano.usings.purge")
+            {
+                // 'unit' nano.units.purge
+
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGName))
+                {
+                    var unitName = engine.StackPopName();
+                    return await AppGlobal.NanoRuntime.PurgeUnitAsync(unitName.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+
+
 
             return EvalResult.NoExternalFunction;
         }
