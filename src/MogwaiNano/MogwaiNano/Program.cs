@@ -500,6 +500,64 @@ namespace MogwaiNano
                     AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DIR.PURGE", "ERROR", "Bad parameters"));
                 }
             }
+            else if (message.Function == "USINGS.LIST")
+            {
+                try
+                {
+                    var usings = AppGlobal.MogwaiNanoEngine.InstalledUsings;
+
+                    var sb = new StringBuilder();
+
+                    for (int i = 0; i < usings.Length; i++)
+                    {
+                        if (sb.Length > 0)
+                            sb.Append("\n");
+
+                        sb.Append(usings[i]);
+                    }
+
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.LIST", "OK", sb.ToString()));
+                }
+                catch (Exception ex)
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.LIST", "ERROR", ex.Message));
+                }
+            }
+            else if (message.Function == "USINGS.PURGE")
+            {
+                if (message.Parameters.Length > 0 && message.Parameters[0] != null)
+                {
+                    var rootUsing = Path.Combine(@"I:\mogwai\usings", message.Parameters[0]);
+
+                    if (Directory.Exists(rootUsing))
+                    {
+                        try
+                        {
+                            var files = Directory.GetFiles(rootUsing);
+                            
+                            foreach (var file in files)                         
+                                File.Delete(file);
+
+                            Directory.Delete(rootUsing);    
+
+                            AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.PURGE", "OK"));
+                        }
+                        catch (Exception ex)
+                        {
+                            AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.PURGE", "ERROR", ex.Message));
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.PURGE", "ERROR", "Using not found"));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.PURGE", "ERROR", "Missing parameters"));
+                }
+            }
         }
 
         private static bool ConnectToWifi()

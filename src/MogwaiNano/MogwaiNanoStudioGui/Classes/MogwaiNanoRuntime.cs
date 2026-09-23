@@ -751,6 +751,58 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");
         }
 
+        public async Task<EvalResult> GetUsings()
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "USINGS.LIST");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response != null && response.Parameters != null && response.Parameters[0] != null)
+            {
+                if (response.Parameters[0] == "OK")
+                {
+                    var usingsList = response.Parameters[1].Split('\n');
+                    var mogList = new MOGList(_engine);
+
+                    foreach (var unit in usingsList)
+                    {
+                        if (!string.IsNullOrWhiteSpace(unit))
+                            mogList.AddName(unit);
+                    }
+
+                    _engine.StackPush(mogList);
+
+                    return EvalResult.NoError;
+                }
+                else
+                {
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Failed to retrieve usings list from device.");
+                }
+            }
+            else
+            {
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+            }
+        }
+
+        public async Task<EvalResult> PurgeUsingsAsync(string unitName)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var message = new ServerMessage(SOURCE_NAME, "USINGS.PURGE", unitName);
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            var result = response.Parameters[0] ?? "!";
+            _engine.StackPushBoolean(result == "OK");
+
+            return EvalResult.NoError;
+        }
 
         public Task<EvalResult> Select()
         {

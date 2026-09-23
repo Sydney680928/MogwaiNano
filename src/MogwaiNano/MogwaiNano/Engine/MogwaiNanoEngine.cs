@@ -779,6 +779,32 @@ namespace MogwaiNano.Engine
             }
         }
 
+        public string[] InstalledUsings
+        {
+            get
+            {
+                try
+                {
+                    var usingsFolder = @"I:\mogwai\usings\";
+                    var usingsDirectories = Directory.GetDirectories(usingsFolder);
+
+                    var usingsNames = new string[usingsDirectories.Length];
+
+                    for (int i = 0; i < usingsDirectories.Length; i++)
+                    {
+                        var directoryName = Path.GetFileName(usingsDirectories[i]);
+                        usingsNames[i] = directoryName;
+                    }
+
+                    return usingsNames;
+                }
+                catch
+                {
+                    return new string[0];
+                }
+            }
+        }
+
         #region PRIMITIVES
 
         private static EvalResult PrimitivePlus(MogwaiNanoEngine engine, string name)

@@ -830,11 +830,11 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else if (word == "nano.usings")
             {
-                return await AppGlobal.NanoRuntime.GetUnits();
+                return await AppGlobal.NanoRuntime.GetUsings();
             }
             else if (word == "nano.usings.purge")
             {
-                // 'unit' nano.units.purge
+                // 'using' nano.usings.purge
 
                 var s = engine.StackSign(1);
 
@@ -844,13 +844,11 @@ namespace MogwaiNanoStudioGui.Classes
                 if (s[0] == typeof(MOGName))
                 {
                     var unitName = engine.StackPopName();
-                    return await AppGlobal.NanoRuntime.PurgeUnitAsync(unitName.Value);
+                    return await AppGlobal.NanoRuntime.PurgeUsingsAsync(unitName.Value);
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
             }
-
-
 
             return EvalResult.NoExternalFunction;
         }
