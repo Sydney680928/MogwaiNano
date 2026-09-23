@@ -183,6 +183,16 @@ namespace MogwaiNano
             {
                 var memory = GC.Run(false);
 
+                var primitivesBuilder = new StringBuilder();    
+
+                foreach (string primitive in MogwaiNanoEngine.Primitives.Keys)
+                {
+                    if (primitivesBuilder.Length > 0)
+                        primitivesBuilder.Append('\n');
+
+                    primitivesBuilder.Append(primitive);
+                }
+
                 var skillsBuilder = new StringBuilder();
 
                 foreach (var skill in MogwaiNanoEngine.Skills)
@@ -203,6 +213,16 @@ namespace MogwaiNano
                     unitsBuilder.Append(unit);
                 }
 
+                var usingsBuilder = new StringBuilder();
+
+                foreach (string usingName in MogwaiNanoEngine.Usings.Keys)
+                {
+                    if (usingsBuilder.Length > 0)
+                        usingsBuilder.Append('\n');
+
+                    usingsBuilder.Append(usingName);
+                }
+
                 AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(
                         AppGlobal.NanoParameters.Name,
                         "INFO.GET",
@@ -217,7 +237,9 @@ namespace MogwaiNano
                         memory.ToString(),
                         skillsBuilder.ToString(),
                         AppGlobal.MogwaiNanoEngine.FrugalMode.ToString(),
-                        unitsBuilder.ToString()
+                        unitsBuilder.ToString(),
+                        primitivesBuilder.ToString(),
+                        usingsBuilder.ToString()
                     ));
             }
             else if (message.Function == "LAST.RESULT.GET")

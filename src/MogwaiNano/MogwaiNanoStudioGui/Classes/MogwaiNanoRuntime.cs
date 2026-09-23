@@ -418,7 +418,7 @@ namespace MogwaiNanoStudioGui.Classes
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
 
-            if (response.Parameters == null || response.Parameters.Length < 11)
+            if (response.Parameters == null || response.Parameters.Length < 13)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid info response from device.");
 
             if (int.TryParse(response.Parameters[8], out int memory))
@@ -460,6 +460,30 @@ namespace MogwaiNanoStudioGui.Classes
                 }
 
                 record.SetItem("units", unitsList);
+
+                var primitivesList = new MOGList(_engine);
+
+                if (!string.IsNullOrEmpty(response.Parameters[12]))
+                {
+                    var primitives = response.Parameters[12].Split('\n');
+
+                    foreach (var primitive in primitives)
+                        primitivesList.AddName(primitive);
+                }
+
+                record.SetItem("primitives", primitivesList);
+
+                var usingsList = new MOGList(_engine);
+
+                if (!string.IsNullOrEmpty(response.Parameters[13]))
+                {
+                    var usings = response.Parameters[13].Split('\n');
+
+                    foreach (var @using in usings)
+                        usingsList.AddName(@using);
+                }
+
+                record.SetItem("usings", usingsList);
 
                 record.SetBoolean("frugalMode", response.Parameters[10] == "True");
 

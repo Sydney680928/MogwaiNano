@@ -39,13 +39,15 @@ namespace MogwaiNano.Engine
 
         private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
 
-        private static ArrayList _assemblies = new();
-        private static Hashtable _usings = new(2);
+        private static ArrayList _assemblies = new();   
         private static readonly object AssemblyLoadLock = new();
 
         public delegate EvalResult PrimitiveDelegate(MogwaiNanoEngine engine, string name);
 
         public static Hashtable Primitives = new(150);
+        
+        public static Hashtable Usings { get; private set; } = new(2);
+
 
         private ArrayList _stacks = new();
         private MOGStack _currentStack = new();
@@ -2937,6 +2939,13 @@ namespace MogwaiNano.Engine
             var memory = GC.Run(false);
             record.SetItem("memory", new MOGNumber(engine, memory));
 
+            var primitives = new MOGList(engine);
+
+            foreach (string key in Primitives.Keys)
+                primitives.AddItem(new MOGName(engine, key));  
+            
+            record.SetItem("primitives", primitives);
+
             var skills = new MOGList(engine);
 
             foreach (var skill in _skills)
@@ -2950,6 +2959,13 @@ namespace MogwaiNano.Engine
                 units.AddItem(new MOGString(engine, unit));
 
             record.SetItem("units", units);
+
+            var usings = new MOGList(engine);
+
+            foreach (string usingName in Usings.Keys)
+                usings.AddItem(new MOGName(engine, usingName));
+
+            record.SetItem("usings", usings);   
 
             record.SetItem("frugalMode", new MOGBoolean(engine, engine.FrugalMode));
 
@@ -6385,7 +6401,7 @@ namespace MogwaiNano.Engine
         {
             lock (AssemblyLoadLock)
             {
-                if (_usings.Contains(usingName))
+                if (Usings.Contains(usingName))
                 {
                     // using déjà chargé, pas besoin de plus
 
@@ -6480,7 +6496,7 @@ namespace MogwaiNano.Engine
                                     }
                                 }
 
-                                _usings[usingName] = plugin;
+                                Usings[usingName] = plugin;
 
                                 return EvalResult.NoError;
                             }
