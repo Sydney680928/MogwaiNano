@@ -639,7 +639,8 @@ namespace MogwaiNanoStudioGui.Classes
                     }
                     catch (Exception ex)
                     {
-                        return EvalResult.Failure(engine, Error.FileOperationError, word, ex.Message);
+                        engine.StackPushBoolean(false);
+                        return EvalResult.NoError;
                     }
 
                     if (!string.IsNullOrEmpty(code))
@@ -652,16 +653,21 @@ namespace MogwaiNanoStudioGui.Classes
                         {
                             function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
                         }
-                        catch (Exception ex)
+                        catch
                         {
-                            return EvalResult.Failure(engine, Error.ParseError, word, ex.Message);
+                            engine.StackPushBoolean(false);
+                            return EvalResult.NoError;
                         }
 
-                        return await AppGlobal.NanoRuntime.InstallUnitAsync(unitName, function.ToStringCode());
+                        var r = await AppGlobal.NanoRuntime.InstallUnitAsync(unitName, function.ToStringCode());
+
+                        engine.StackPushBoolean(r.IsSuccess);
+                        return EvalResult.NoError;
                     }
                     else
                     {
-                        return EvalResult.Failure(engine, Error.BadArgumentValueError, word, "empty code provided");
+                        engine.StackPushBoolean(false);
+                        return EvalResult.NoError;
                     }
                 }
 
@@ -802,7 +808,10 @@ namespace MogwaiNanoStudioGui.Classes
                         var r = await AppGlobal.NanoRuntime.DirectoryCreate(destinationPath);
 
                         if (r.IsError)
-                            return r;
+                        {
+                            engine.StackPushBoolean(false);
+                            return EvalResult.NoError;
+                        }
 
                         var files = Directory.GetFiles(directorySource.Value);
 
@@ -812,11 +821,15 @@ namespace MogwaiNanoStudioGui.Classes
                             r = await AppGlobal.NanoRuntime.FileCopy(file, destinationFile);
 
                             if (r.IsError)
-                                return r;
+                            {
+                                engine.StackPushBoolean(false);
+                                return EvalResult.NoError;
+                            }
 
                             await Task.Delay(100);
                         }
 
+                        engine.StackPushBoolean(true);
                         return EvalResult.NoError;
 
                     }
