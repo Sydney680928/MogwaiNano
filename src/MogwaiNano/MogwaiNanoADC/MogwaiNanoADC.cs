@@ -8,19 +8,19 @@ namespace MogwaiNanoADC
 {
     public class MogwaiNanoADC : MogwaiNano.Interfaces.IPlugin
     {
-        public string Name => "MogwaiNano ADC";
+        public string Name => "ADC";
 
-        public string Description => "A plugin for MogwaiNano that provides ADC functionality.";
+        public string Description => "MogwaiNano plugin that provides ADC functionality.";
 
         public System.Collections.Hashtable Primitives { get; } = new();
 
         public MogwaiNanoADC()
         {
-            Primitives.Add("adc2.open", new PrimitiveDelegate(PrimitiveAdcOpen));
-            Primitives.Add("adc2.close", new PrimitiveDelegate(PrimitiveAdcClose));
-            Primitives.Add("adc2.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
-            Primitives.Add("adc2.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
-            Primitives.Add("adc2.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));
+            Primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));
+            Primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
+            Primitives.Add("adc.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
+            Primitives.Add("adc.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
+            Primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));
         }
 
         private static EvalResult PrimitiveAdcOpen(MogwaiNanoEngine engine, string name)

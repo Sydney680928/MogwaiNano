@@ -6410,7 +6410,7 @@ namespace MogwaiNano.Engine
 
                 // Step 1, get manifest file from using name
 
-                var usingPath = Path.Combine(@"I:\mogwai\usings", usingName);
+                var usingPath = $"I:\\using.{usingName}";
                 var manifestFile = Path.Combine(usingPath, "manifest.txt");
                 var manifestEntries = new ArrayList();
 
@@ -6421,7 +6421,6 @@ namespace MogwaiNano.Engine
 
                 try
                 {
-
                     var text = File.ReadAllText(manifestFile);
                     lines = text.Split('\n');
                 }
@@ -6493,6 +6492,10 @@ namespace MogwaiNano.Engine
                                         Primitives.Add(primitive, @delegate);
 
                                         Debug.WriteLine($"ADD PRIMITIVE : {primitive} from plugin '{plugin.Name}'");
+                                    }
+                                    else
+                                    {
+                                        Debug.WriteLine($"PRIMITIVE ALREADY EXISTS : {primitive} from plugin '{plugin.Name}'");
                                     }
                                 }
 
