@@ -224,7 +224,7 @@ namespace MogwaiNano
 
                 var usingsBuilder = new StringBuilder();
 
-                foreach (string usingName in MogwaiNanoEngine.Usings.Keys)
+                foreach (string usingName in AppGlobal.MogwaiNanoEngine.InstalledUsings)
                 {
                     if (usingsBuilder.Length > 0)
                         usingsBuilder.Append('\n');

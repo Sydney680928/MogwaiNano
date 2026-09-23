@@ -55,7 +55,6 @@ namespace MogwaiNano.Engine
             _invalidOutsideOfATaskError,
 
             _usingError,
-            _usingAlreadyExistsError,
 
             _fatalError,
 
@@ -133,7 +132,6 @@ namespace MogwaiNano.Engine
             _invalidOutsideOfATaskError = RegisterError("MW.62", "invalid outside of a task error");
 
             _usingError = RegisterError("MW.80", "using error");
-            _usingAlreadyExistsError = RegisterError("MW.81", "using already exists error");
 
             _fatalError = RegisterError("MW.!!!", "fatal error");
 
@@ -243,8 +241,6 @@ namespace MogwaiNano.Engine
         public static Error InvalidOutsideOfATaskError { get { EnsureInitialized(); return _invalidOutsideOfATaskError; } }
 
         public static Error UsingError { get { EnsureInitialized(); return _usingError; } }
-
-        public static Error UsingAlreadyExistsError { get { EnsureInitialized(); return _usingAlreadyExistsError; } }
 
         public static Error FatalError { get { EnsureInitialized(); return _fatalError; } }
 

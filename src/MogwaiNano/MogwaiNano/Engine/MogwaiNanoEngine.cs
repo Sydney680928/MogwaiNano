@@ -3011,7 +3011,7 @@ namespace MogwaiNano.Engine
 
             var usings = new MOGList(engine);
 
-            foreach (string usingName in Usings.Keys)
+            foreach (string usingName in engine.InstalledUsings)
                 usings.AddItem(new MOGName(engine, usingName));
 
             record.SetItem("usings", usings);   

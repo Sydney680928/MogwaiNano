@@ -26,6 +26,29 @@ A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device'
 | `nano.units.purge` | `'unit' nano.units.purge` → `.boolean` | Removes a stored unit. Pushes `true` on success, `false` otherwise |
 | `nano.units` | `nano.units` → `.list` | Returns the names of all units currently stored on the device |
 
+## Usings (dynamically loaded libraries)
+
+**MOGWAI NANO Studio GUI only.** A *using* is a compiled plugin library — unlike a unit (source code, parsed and run on demand), a using ships as pre-compiled `.pe` files, loaded into the running CLR via the device-side `mogwai.using` primitive. Installing a using only places its files on flash; it doesn't load it — a script still needs to call `mogwai.using` for its primitives to become usable, and once loaded, a using can never be unloaded (only a reboot clears it — see `mogwai.using` in the [NANO Primitives Reference](nano-primitives.md)).
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `nano.usings.install` | `"name" "folder" nano.usings.install` → `.boolean` | Copies every file from a local folder (a `manifest.txt` plus the using's `.pe` files) onto the device's flash, under `I:\mogwai\usings\<name>` — ready for a script to `mogwai.using` it. Pushes `true`/`false` rather than raising an error, so it fits directly into scripting logic (`if (... nano.usings.install) then { ... }`) without a separate failure case to handle |
+| `nano.usings.purge` | `'name' nano.usings.purge` → `.boolean` | Removes an installed using from the device's flash. Since a loaded using can never be unloaded from memory, purging one already in use has no effect until the next reboot — it only prevents a *future* `mogwai.using` on that name from succeeding. Same `true`/`false` convention as `nano.usings.install` |
+| `nano.usings` | `nano.usings` → `.list` | Returns the names of all usings currently *installed* on the device's flash — not the same as *loaded*: an installed using only becomes active once `mogwai.using` is called on it |
+
+## File & directory management
+
+**MOGWAI NANO Studio GUI only.** General-purpose access to the device's internal flash storage (`I:\`) — used internally by `nano.usings.install`/`nano.usings.purge`, but just as usable directly for any other purpose.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `nano.dir.list` | `"path" nano.dir.list` → `.list` | Returns the names of the subdirectories directly inside `path` (e.g. `"I:\mogwai" nano.dir.list` → `("usings" "units")`) |
+| `nano.dir.create` | `"path" nano.dir.create` | Creates a directory, including any missing parent directories along the way |
+| `nano.dir.purge` | `"path" nano.dir.purge` | Removes a directory |
+| `nano.file.list` | `"path" nano.file.list` → `.list` | Returns the names of the files directly inside `path` |
+| `nano.file.copy` | `"localPath" "devicePath" nano.file.copy` | Copies a file from the PC's local disk to the connected device's flash storage — the same underlying mechanism `nano.units.install` and `nano.usings.install` build on |
+| `nano.file.purge` | `"path" nano.file.purge` | Removes a file |
+
 ## Discovery
 
 | Primitive | Signature | Description |
@@ -50,7 +73,7 @@ A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device'
 | `nano.state` | `nano.state` → `.name` | Queries the connected device's current execution state (`IDLE`/`RUNNING`) |
 | `nano.isRunning` | `nano.isRunning` → `.boolean` | Tests whether a program is currently running on the device |
 | `nano.memory` | `nano.memory` → `.number` | Free RAM on the device, in bytes (`GC.Run(false)` result — non-blocking, doesn't force a collection) |
-| `nano.info` | `nano.info` → `.record` | Remote equivalent of the device-side `mogwai.info`, returning the same record (system version, IP, device name, platform, session, free memory, target, MOGWAI NANO version, OEM build details, a `skills:` list, and a `units:` list of stored unit names) without needing a `nano.run` round-trip |
+| `nano.info` | `nano.info` → `.record` | Remote equivalent of the device-side `mogwai.info`, returning the same record (system version, IP, device name, platform, session, free memory, target, MOGWAI NANO version, OEM build details, a `skills:` list, a `units:` list of stored unit names, a `usings:` list of library names currently installed on flash — not necessarily loaded, see `mogwai.using` — and a `primitives:` list of every primitive name currently usable at that exact instant) without needing a `nano.run` round-trip |
 | `nano.lastResult` | `nano.lastResult` → `.string` | Returns the full result message from the last program run on the device — whichever way it ended, successfully or not. On a program that fails without producing any output of its own, this is the way to find out why: it reports the underlying error rather than leaving you with a silent failure |
 | `nano.session` | `nano.session` → `.string` | Returns the connected device's session identifier directly, as a string — the same value found in the `session` field of `nano.scan`/`nano.info` results, without needing a full scan or info call |
 | `nano.name` | `nano.name` → `.string` | Reads the connected device's name |
