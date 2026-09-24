@@ -84,7 +84,7 @@ limitations under the License.
                 <MenuItem x:Name="MemoryMenuItem" Header="Free memory (nano.memory)" Click="OnNanoMemoryClick"/>
                 <MenuItem x:Name="StateMenuItem" Header="State (nano.state)" Click="OnNanoStateClick"/>
                 <Separator/>
-                <MenuItem Header="_Usings..." Click="OnUsingsClick" IsEnabled="False"/>
+                <MenuItem Header="_Usings..." Click="OnUsingsClick" IsEnabled="True"/>
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="_Font..." Click="OnFontClick"/>

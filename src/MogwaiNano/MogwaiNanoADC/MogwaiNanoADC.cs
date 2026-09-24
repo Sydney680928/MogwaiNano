@@ -36,11 +36,11 @@ namespace MogwaiNanoADC
             _adcController = new();
             _adcChannels = new();
 
-            Primitives.Add("adc.open", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcOpen));
-            Primitives.Add("adc.close", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcClose));
-            Primitives.Add("adc.read", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcReadValue));
-            Primitives.Add("adc.resolutionInBits", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
-            Primitives.Add("adc.maxValue", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetMaxValue));
+            Primitives.Add("adc2.open", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcOpen));
+            Primitives.Add("adc2.close", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcClose));
+            Primitives.Add("adc2.read", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcReadValue));
+            Primitives.Add("adc2.resolutionInBits", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
+            Primitives.Add("adc2.maxValue", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetMaxValue));
 
             _adcAlreadyOpenedError = new Error("ADC.1", "adc already opened error");
             _adcOpenError = new Error("ADC.2", "adc open error");
