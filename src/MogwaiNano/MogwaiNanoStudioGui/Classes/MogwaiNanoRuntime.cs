@@ -804,6 +804,49 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.NoError;
         }
 
+        public async Task<EvalResult> InstallUsingAsync(string usingName, string directorySource)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var destinationPath = $"I:\\mogwai\\usings\\{usingName}";
+
+            try
+            {
+                var r = await DirectoryCreate(destinationPath);
+
+                if (r.IsError)
+                {
+                    _engine.StackPushBoolean(false);
+                    return EvalResult.NoError;
+                }
+
+                var files = Directory.GetFiles(directorySource);
+
+                foreach (var file in files)
+                {
+                    var destinationFile = Path.Combine(destinationPath, Path.GetFileName(file));
+                    r = await FileCopy(file, destinationFile);
+
+                    if (r.IsError)
+                    {
+                        _engine.StackPushBoolean(false);
+                        return EvalResult.NoError;
+                    }
+
+                    await Task.Delay(100);
+                }
+
+                _engine.StackPushBoolean(true);
+            }
+            catch
+            {
+                _engine.StackPushBoolean(false);
+            }
+
+            return EvalResult.NoError;
+        }
+
         public Task<EvalResult> Select()
         {
             var list = AppGlobal.NanoClient.Scan(_engine);

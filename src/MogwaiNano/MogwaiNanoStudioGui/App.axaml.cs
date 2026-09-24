@@ -15,6 +15,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using MogwaiNanoStudioGui.Classes;
 
 namespace MogwaiNanoStudioGui;
 
@@ -27,6 +28,8 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        UsingsManager.EnsureExtracted();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow();

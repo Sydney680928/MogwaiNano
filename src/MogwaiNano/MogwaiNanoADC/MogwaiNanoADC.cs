@@ -11,8 +11,8 @@ namespace MogwaiNanoADC
 {
     public class MogwaiNanoADC : MogwaiNano.Interfaces.IPlugin
     {
-        private static  AdcController _adcController = new();
-        private static Hashtable _adcChannels = new();
+        private static AdcController _adcController;
+        private static Hashtable _adcChannels;
 
         private static Error _adcAlreadyOpenedError;
         private static Error _adcOpenError;
@@ -28,12 +28,20 @@ namespace MogwaiNanoADC
 
         public MogwaiNanoADC()
         {
-            Primitives.Add("adc2.open", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcOpen));
-            Primitives.Add("adc2.close", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcClose));
-            Primitives.Add("adc2.read", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcReadValue));
-            Primitives.Add("adc2.resolutionInBits", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
-            Primitives.Add("adc2.maxValue", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetMaxValue));
             
+        }
+
+        public void Initialize(MogwaiNanoEngine engine)
+        {
+            _adcController = new();
+            _adcChannels = new();
+
+            Primitives.Add("adc.open", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcOpen));
+            Primitives.Add("adc.close", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcClose));
+            Primitives.Add("adc.read", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcReadValue));
+            Primitives.Add("adc.resolutionInBits", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
+            Primitives.Add("adc.maxValue", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetMaxValue));
+
             _adcAlreadyOpenedError = new Error("ADC.1", "adc already opened error");
             _adcOpenError = new Error("ADC.2", "adc open error");
             _adcUnknownNameError = new Error("ADC.3", "adc unknown name error");
@@ -43,31 +51,29 @@ namespace MogwaiNanoADC
             Errors.Add(_adcUnknownNameError);
         }
 
-        public void Initialize(MogwaiNanoEngine engine)
-        {
-            // Initialization code for the ADC plugin
-        }
-
         public void CleanUp(int engineId)
         {
             // Cleanup ADC channels when the engine is reset or disposed
 
             Debug.WriteLine($"CleanUp plugin {Name} for engine {engineId}");
 
-            var adcChannels = _adcChannels[engineId] as Hashtable;
-
-            if (adcChannels != null)
+            if (_adcChannels.Contains(engineId))
             {
-                foreach (var key in adcChannels.Keys)
-                {
-                    if (adcChannels[key] is AdcChannel adcChannel)
-                    {
-                        adcChannel.Dispose();
-                        Debug.WriteLine($"CleanUp ADC channel '{key}'");
-                    }
-                }
+                var adcChannels = _adcChannels[engineId] as Hashtable;
 
-                _adcChannels.Remove(engineId);
+                if (adcChannels != null)
+                {
+                    foreach (var key in adcChannels.Keys)
+                    {
+                        if (adcChannels[key] is AdcChannel adcChannel)
+                        {
+                            adcChannel.Dispose();
+                            Debug.WriteLine($"CleanUp ADC channel '{key}'");
+                        }
+                    }
+
+                    _adcChannels.Remove(engineId);
+                }
             }
         }
 

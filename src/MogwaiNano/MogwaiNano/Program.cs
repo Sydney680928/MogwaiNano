@@ -36,6 +36,8 @@ namespace MogwaiNano
             Debug.WriteLine($"Version {MogwaiNanoEngine.Version}");
             Debug.WriteLine("(c) 2026 Stéphane Sibué");
 
+            AppGlobal.Initialize();
+
             AppGlobal.NanoParameters = NanoParameters.Load(AppGlobal.PARAMETERS_FILE);
 
             Debug.WriteLine($"Device name: {AppGlobal.NanoParameters.Name}");

@@ -6532,11 +6532,13 @@ namespace MogwaiNano.Engine
                             var f = Path.Combine(usingPath, filename);
                             var rawAssembly = File.ReadAllBytes(f);
 
+                            GC.Run(true);
+
                             lastLoadedAssembly = Assembly.Load(rawAssembly);
 
                             _assemblies.Add(assemblyName);
 
-                            Thread.Sleep(50);
+                            Thread.Sleep(1000);
                         }
                         catch (Exception ex)
                         {
@@ -6571,6 +6573,15 @@ namespace MogwaiNano.Engine
                             {
                                 var plugin = (IPlugin)instance;
 
+                                try
+                                {
+                                    plugin.Initialize(this);
+                                }
+                                catch (Exception ex)
+                                {
+                                    return EvalResult.Failure(this, Error.UsingError, primitiveName, $"plugin '{plugin.Name}' initialization failed", ex.Message);
+                                }
+
                                 // Chargement des primitives du plugin dans l'interpréteur
 
                                 foreach (var primitive in plugin.Primitives.Keys)
@@ -6592,10 +6603,6 @@ namespace MogwaiNano.Engine
 
                                 foreach (Error error in plugin.Errors)
                                     Error.RegisterExternalError(error);
-
-                                // Initialisation du plugin
-
-                                plugin.Initialize(this);    
 
                                 Usings[usingName] = plugin;
 

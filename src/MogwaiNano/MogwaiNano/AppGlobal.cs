@@ -31,20 +31,23 @@ namespace MogwaiNano
 
         public const string AUTORUN_FILE = @"I:\autorun.mog";
 
-        public static MogwaiNanoEngine MogwaiNanoEngine { get; } = new MogwaiNanoEngine("RootMogwaiNanoEngine");
-
-        public static Random RandomGenerator { get; } = new();
-
+        public static MogwaiNanoEngine MogwaiNanoEngine { get; set; }
+        public static Random RandomGenerator { get; set; }
         public static SerialPort ComPort { get; set; }
-
-        public static UdpServer UdpServer { get; } = new();
-
-        public static TcpServer TcpServer { get; } = new();
-
-        public static int Session { get; } = RandomGenerator.Next(100000);
-
-        public static NanoParameters NanoParameters { get; set; } = new NanoParameters();
-
+        public static UdpServer UdpServer { get; set; }
+        public static TcpServer TcpServer { get; set; }
+        public static int Session { get; set; }
+        public static NanoParameters NanoParameters { get; set; }
         public static string IpAddress { get; set; } = "?.?.?.?";
+
+        public static void Initialize()
+        {
+            RandomGenerator = new Random();
+            Session = RandomGenerator.Next(100000);
+            UdpServer = new UdpServer();
+            TcpServer = new TcpServer();
+            NanoParameters = new NanoParameters();
+            MogwaiNanoEngine = new MogwaiNanoEngine("RootMogwaiNanoEngine");
+        }
     }
 }
