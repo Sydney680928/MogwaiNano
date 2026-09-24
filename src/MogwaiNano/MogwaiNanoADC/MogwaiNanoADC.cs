@@ -111,7 +111,7 @@ namespace MogwaiNanoADC
                 if (dic.Contains(name))
                 {
                     dic.Remove(name);
-                    Debug.WriteLine(name + $"'{name}' removed from ADC channels for engine {engine.EngineId}");
+                    Debug.WriteLine($"'{name}' removed from ADC channels for engine {engine.EngineId}");
                 }
             }
         }   

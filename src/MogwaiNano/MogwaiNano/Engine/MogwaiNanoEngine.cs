@@ -186,6 +186,7 @@ namespace MogwaiNano.Engine
         public MogwaiNanoEngine(string name, MogwaiNanoEngine motherEngine = null)
         {
             EngineId = Interlocked.Increment(ref _engineIdCounter);
+            Debug.WriteLine($"Engine Name={name} / ID={EngineId}");
 
             Name = name;
             TaskResult = new MOGNull(this);
@@ -394,6 +395,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("task.join", new PrimitiveDelegate(PrimitiveTaskJoin));
 
             Primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
+            Primitives.Add("debug.vs.write", new PrimitiveDelegate(PrimitiveVsDebugWrite));
             Primitives.Add("debug.clear", new PrimitiveDelegate(PrimitiveDebugClear));
 
             Primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));
@@ -1196,6 +1198,42 @@ namespace MogwaiNano.Engine
                 {
                     return engine.Delegate.DebugMessage(engine, n0.ToString());
                 }
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveVsDebugWrite(MogwaiNanoEngine engine, string name)
+        {
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            var n0 = engine.StackPop();
+
+            if (n0 is MOGRef @ref)
+            {
+                var value = engine.VarRead(@ref.Value, false);
+
+                if (value == null)
+                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
+
+                engine.StackPush(value);
+
+                var r = PrimitiveVsDebugWrite(engine, name);
+
+                if (r.IsError)
+                    return r;
+
+                return EvalResult.NoError;
+            }
+
+            if (n0 is MOGString @string)
+            {
+                Debug.WriteLine(@string.Value);
+            }
+            else
+            {
+                Debug.WriteLine(n0.ToString());
             }
 
             return EvalResult.NoError;
