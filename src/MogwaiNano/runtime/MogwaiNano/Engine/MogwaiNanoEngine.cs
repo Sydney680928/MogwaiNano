@@ -6527,6 +6527,8 @@ namespace MogwaiNano.Engine
                     {
                         // L'assembly n'est pas encore chargé, on la charge
 
+                        Debug.WriteLine($"LOAD ASSEMBLY : {filename}");
+
                         try
                         {
                             var f = Path.Combine(usingPath, filename);
@@ -6544,6 +6546,10 @@ namespace MogwaiNano.Engine
                         {
                             return EvalResult.Failure(this, Error.UsingError, primitiveName, ex.Message);
                         }
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"ASSEMBLY ALREADY LOADED : {filename}");
                     }
 
                     if (i == lines.Length - 1)
@@ -6571,6 +6577,8 @@ namespace MogwaiNano.Engine
 
                             if (typeof(IPlugin).IsInstanceOfType(instance))
                             {
+                                Debug.WriteLine($"PLUGIN FOUND : {type.FullName}");
+
                                 var plugin = (IPlugin)instance;
 
                                 try
@@ -6584,25 +6592,31 @@ namespace MogwaiNano.Engine
 
                                 // Chargement des primitives du plugin dans l'interpréteur
 
-                                foreach (var primitive in plugin.Primitives.Keys)
+                                if (plugin.Primitives != null)
                                 {
-                                    if (!Primitives.Contains(primitive))
+                                    foreach (var primitive in plugin.Primitives.Keys)
                                     {
-                                        var @delegate = plugin.Primitives[primitive] as PrimitiveDelegate;
-                                        Primitives.Add(primitive, @delegate);
+                                        if (!Primitives.Contains(primitive))
+                                        {
+                                            var @delegate = plugin.Primitives[primitive] as PrimitiveDelegate;
+                                            Primitives.Add(primitive, @delegate);
 
-                                        Debug.WriteLine($"ADD PRIMITIVE : {primitive} from plugin '{plugin.Name}'");
-                                    }
-                                    else
-                                    {
-                                        Debug.WriteLine($"PRIMITIVE ALREADY EXISTS : {primitive} from plugin '{plugin.Name}'");
+                                            Debug.WriteLine($"ADD PRIMITIVE : {primitive} from plugin '{plugin.Name}'");
+                                        }
+                                        else
+                                        {
+                                            Debug.WriteLine($"PRIMITIVE ALREADY EXISTS : {primitive} from plugin '{plugin.Name}'");
+                                        }
                                     }
                                 }
 
                                 // Chargement des erreurs du plugin dans l'interpréteur
 
-                                foreach (Error error in plugin.Errors)
-                                    Error.RegisterExternalError(error);
+                                if (plugin.Errors != null)
+                                {
+                                    foreach (Error error in plugin.Errors)
+                                        Error.RegisterExternalError(error);
+                                }
 
                                 Usings[usingName] = plugin;
 
