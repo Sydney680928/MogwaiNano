@@ -15,6 +15,8 @@ namespace TestMogwaiNanoADC
             var engine = new MogwaiNanoEngine("TEST ADC");
             var plugin = new MogwaiNanoADC.MogwaiNanoADC();
 
+            plugin.Initialize(engine);
+
             foreach (var key in plugin.Primitives.Keys)
             {
                 var value = plugin.Primitives[key] as MogwaiNanoEngine.PrimitiveDelegate;
