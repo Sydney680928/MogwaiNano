@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\usings.zip" />
+    <EmbeddedResource Include="Resources\units.zip" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">

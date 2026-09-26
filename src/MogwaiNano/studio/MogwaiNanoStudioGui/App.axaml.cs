@@ -29,6 +29,7 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         UsingsManager.EnsureExtracted();
+        UnitsManager.EnsureExtracted();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

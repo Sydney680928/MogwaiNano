@@ -1099,6 +1099,8 @@ public partial class MainWindow : Window
 
     private async void OnNanoStateClick(object? sender, RoutedEventArgs e) => await ExecuteMogwaiCommand("nano.state ?d");
 
+    private async void OnUnitsClick(object? sender, RoutedEventArgs e) => await new UnitsWindow().ShowDialog(this);
+
     private async void OnUsingsClick(object? sender, RoutedEventArgs e) => await new UsingsWindow().ShowDialog(this);
 
     // --- Studio mode (VS Code extension) ---

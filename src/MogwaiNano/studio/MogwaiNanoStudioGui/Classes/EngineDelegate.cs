@@ -21,7 +21,6 @@ using System;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
-using Avalonia;
 
 namespace MogwaiNanoStudioGui.Classes
 {
@@ -802,7 +801,42 @@ namespace MogwaiNanoStudioGui.Classes
                     var directorySource = engine.StackPopString();
                     var usingName = engine.StackPopName();
 
-                    return await AppGlobal.NanoRuntime.InstallUsingAsync(usingName.Value, directorySource.Value);
+                    var destinationPath = $"I:\\mogwai\\usings\\{usingName.Value}";
+
+                    try
+                    {
+                        var r = await AppGlobal.NanoRuntime.DirectoryCreate(destinationPath);
+
+                        if (r.IsError)
+                        {
+                            engine.StackPushBoolean(false);
+                            return EvalResult.NoError;
+                        }
+
+                        var files = Directory.GetFiles(directorySource.Value);
+
+                        foreach (var file in files)
+                        {
+                            var destinationFile = Path.Combine(destinationPath, Path.GetFileName(file));
+                            r = await AppGlobal.NanoRuntime.FileCopy(file, destinationFile);
+
+                            if (r.IsError)
+                            {
+                                engine.StackPushBoolean(false);
+                                return EvalResult.NoError;
+                            }
+
+                            await Task.Delay(100);
+                        }
+
+                        engine.StackPushBoolean(true);
+                        return EvalResult.NoError;
+
+                    }
+                    catch (Exception ex)
+                    {
+                        return EvalResult.Failure(engine, Error.FileOperationError, word, ex.Message);
+                    }
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
