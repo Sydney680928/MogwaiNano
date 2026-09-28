@@ -4,17 +4,21 @@ This tutorial assumes you already know the basics of MOGWAI itself — the RPN s
 
 Here, we focus on what's specific to NANO: flashing a device, connecting to it, and driving real hardware.
 
+> Every example below uses **MOGWAI NANO Studio GUI**. The earlier console-based Studio is no longer maintained as of the 0.6 release.
+
 ## 1. Flash and configure your device
 
 Follow the [Quick Start](../README.md#quick-start) in the main README to flash `MogwaiNano.bin` and configure WiFi. Once done, power-cycle the device — it will boot straight into MOGWAI NANO and start listening for connections.
 
 ## 2. Start MOGWAI NANO Studio
 
-Launch `MogwaiNanoStudio.exe`. You get a regular MOGWAI console.
+Launch the app. Its window is your workspace for the rest of this guide: a code editor on top, and two live output tabs below it — **Console MOGWAI** (output from code running locally, on your PC) and **Console NANO** (output coming from the connected device).
+
+![MOGWAI NANO Studio GUI's main window, with the editor and its two console tabs](images/studio-main-window.png)
 
 > ### Where does your code actually run?
 >
-> This is the single most important thing to understand before going further: **everything you type in MOGWAI NANO Studio — at the console prompt, or in the editor — runs on your PC**, using the full desktop MOGWAI engine. Typing `code` doesn't mean "code" on the device. It means "code" on your computer, right here, right now.
+> This is the single most important thing to understand before going further: **everything you type in the editor runs on your PC**, using the full desktop MOGWAI engine. Typing `code` doesn't mean "code" on the device. It means "code" on your computer, right here, right now.
 >
 > The **only** way to get code running on a device is to:
 > 1. Connect to it (`nano.connect`, `nano.user.select`, etc.)
@@ -27,28 +31,23 @@ Launch `MogwaiNanoStudio.exe`. You get a regular MOGWAI console.
 >
 > Everything outside a `nano.run` block — variables, loops, `if`/`then`, file I/O, even other `nano.*` primitives like `nano.scan` or `nano.user.select` — is regular MOGWAI running locally on your machine. It's a full scripting language in its own right, and you'll use it to *orchestrate* what happens on the device (deciding which one to connect to, what to send, when, and what to do with the result) — not to run things on the device itself. Only the contents of a `nano.run` block ever leave your PC.
 
-### A more comfortable way to write code: `edit`
+### Writing and running code
 
-Typing multi-line programs directly at the console prompt gets old fast. The `edit` command opens a full-screen editor for a much more comfortable workflow:
-
-```
-edit
-```
-
-Inside the editor:
+Type your code straight into the editor. A few shortcuts you'll use constantly:
 
 | Shortcut | Action |
 |---|---|
-| `F5` | Run the current code, then return to a clean console showing the result |
+| `F5` | Run the current code |
+| `Shift+F5` | Stop the currently running program |
 | `Ctrl+N` | New file |
 | `Ctrl+O` | Open a file |
-| `Ctrl+W` | Save |
-| `Ctrl+A` | Save as |
-| `Ctrl+Q` | Quit the editor |
+| `Ctrl+S` | Save |
+| `Ctrl+Shift+S` | Save as |
+| `Ctrl+F` | Find in the editor |
 
-`F5` is the workflow you'll use constantly: it closes the editor, runs your code (locally, or on a device if it contains a `nano.run` block), shows you the result, and — once you press any key — brings you right back to the editor with your code still there, ready for the next tweak. If you try to quit or open another file with unsaved changes, you'll be prompted to save first.
+`F5` runs whatever's in the editor — locally, or on a device if it contains a `nano.run` block. Local output (`?`, `??`, `debug.write` called outside a `nano.run` block) appears in the **Console MOGWAI** tab; anything printed *on the device* appears automatically in **Console NANO** — no separate step needed to watch it, unlike the old console Studio's `nano.user.view`, which no longer exists.
 
-This is how every example in this guide was actually written and tested — write the block in `edit`, hit `F5`, watch it run, adjust, repeat.
+This is how every example in this guide was actually written and tested — write the block in the editor, hit `F5`, watch the result in the console tabs, adjust, repeat.
 
 ## 3. Find your device
 
@@ -59,15 +58,11 @@ nano.user.select -> 'device'
 if (device ->type .record ==) then { device->ip: nano.connect ? }
 ```
 
-`nano.user.select` runs a network scan on its own, then shows you every device that responded — name, platform, and IP — and lets you pick one:
+`nano.user.select` runs a network scan on its own, then opens a dialog listing every device that responded — name, platform, and IP — for you to pick from:
 
-```
-0: DEVICE1              - 192.168.1.75 - ESP32_REV3
-1: DEVICE2              - 192.168.1.80 - ESP32_REV3
-Select device number (enter only = abort): 0
-```
+![The device-selection dialog, listing responding devices for you to click on](images/scan-devices-dialog.png)
 
-If you pick one, its scan record (device name, version, session, IP, platform, target, OEM, firmware version) is pushed onto the stack. If nothing responds, or you just press Enter to abort, `null` is pushed instead.
+If you pick one, its scan record (device name, version, session, IP, platform, target, OEM, firmware version) is pushed onto the stack. If nothing responds, or you close the dialog without picking one, `null` is pushed instead.
 
 The example checks the type of what's on top of the stack (`.record`) rather than just testing for null — MOGWAI type names are dot-prefixed literals (`.record`, `.string`, `.number`...) that compare directly against `->type`. This guarantees the code that follows really has a proper record with an `ip:` key to work with, rather than just "not null" — a device record could theoretically be null for other reasons than a failed selection, so checking the exact expected type is the more robust habit to build.
 
@@ -106,37 +101,17 @@ Everything you want to execute *on the device* goes inside a code block, passed 
 { "Hello from the device!" ? } nano.run
 ```
 
-Behind the scenes, MOGWAI NANO Studio desugars this block into canonical RPN and sends it over the network. `nano.run` only waits long enough to confirm the program has actually started on the device — it does **not** wait for it to finish, and it does **not** show any output. By default, console output (`?`/`console.println`, `??`/`console.print`) and `debug.write` messages coming from the device are silently discarded, whether the program was launched via `nano.run` or is running as a stored autorun program.
+Behind the scenes, MOGWAI NANO Studio desugars this block into canonical RPN and sends it over the network. `nano.run` only waits long enough to confirm the program has actually started on the device — it does **not** wait for it to finish.
 
-To actually watch a device's live output, use `nano.user.view`:
-
-```
-{ 1000 wait 1 10 for 'i' do { i ? 100 wait } } nano.run nano.user.view
-```
+Whatever the device prints — `?`, `??`, `debug.write` — appears on its own in the **Console NANO** tab, as it happens, for as long as MOGWAI NANO Studio stays connected. There's no separate step to attach or watch: it's always live.
 
 ```
-──── Start view mode (press CTRL-C to exit) ─────────────
-1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-MOGWAI NANO
-OK
-execution time 00:00:02.2900000
-──── Exit view mode ──────────────────────────────────
-OK
-execution time 00:00:04.3724066
+{ 1 10 for 'i' do { i ? 100 wait } } nano.run
 ```
 
-`nano.user.view` attaches to the currently running program and streams its console/debug output to your screen in real time. Press `Ctrl+C` to detach and return to the prompt — the program keeps running on the device regardless, `nano.user.view` only affects whether you're watching it or not.
+![Console NANO tab showing the numbers 1 through 10 printed live as the device counts](images/console-nano-counting.png)
 
-Notice the `1000 wait` at the very start of the program: attaching `nano.user.view` right after `nano.run` still takes a brief moment over the network, so a short initial delay gives it time to attach before the program starts printing — otherwise you could miss the first few lines.
+This applies the same way whether the program was launched with `nano.run` or is running as a stored autorun program — the moment MOGWAI NANO Studio is connected, its output shows up.
 
 ## 5. Blink an LED
 
@@ -155,7 +130,7 @@ Wire an LED (with a current-limiting resistor, ~220Ω for a red LED on 3.3V) bet
 } nano.run
 ```
 
-The LED should now be blinking, entirely controlled by code running on the device. `Ctrl+C` here would only interrupt your local MOGWAI script on the PC — since this example's `nano.run` call has already returned, there's nothing local left running to interrupt. To actually stop the program running *on the device*, use `nano.halt`:
+The LED should now be blinking, entirely controlled by code running on the device. Notice that `F5` has already returned control to you — this example's `nano.run` call only starts the program and comes right back, it doesn't keep the editor "busy" watching it. To stop the program running *on the device*, use `nano.halt`:
 
 ```
 nano.halt
@@ -203,10 +178,9 @@ Timers run independently of your main program, on their own schedule:
 
     forever do { 250 wait }
 } nano.run
-nano.user.view
 ```
 
-Every 5 seconds, `"still alive"` is printed — interleaved with whatever else the program is doing — regardless of what the main `forever do` loop is up to. As with any device output, you need `nano.user.view` running to actually see it; `Ctrl+C` to detach whenever you like, the timer keeps firing on the device either way.
+Every 5 seconds, `"still alive"` is printed to Console NANO — interleaved with whatever else the program is doing — regardless of what the main `forever do` loop is up to. The timer keeps firing on the device whether or not MOGWAI NANO Studio is connected to watch it; reconnecting later simply resumes seeing its output.
 
 ## 8. Talk to an I2C device
 
@@ -224,7 +198,6 @@ I2C devices are opened with a name, a bus number, and a 7-bit address — the na
 
     'RTC' i2c.close
 } nano.run
-nano.user.view
 ```
 
 This writes `0` to the RTC's seconds register, waits 5 seconds, then reads that same register back. RTC chips store time values in **BCD** (binary-coded decimal) rather than plain binary — `bcd->` converts a BCD-encoded number to a regular one (the opposite direction, `->bcd`, exists too). Without it, you'd see the raw encoded byte rather than a readable number; here, the output is `5`.
@@ -322,15 +295,14 @@ This is a lightweight, non-blocking query (it doesn't force a garbage collection
 If your program is running *on the device* itself (typically as a stored autorun program, with no Studio connection to fall back on), `mogwai.info` gives you everything in a single call — a record with the device's system version, IP, name, platform, session, free memory, target, MOGWAI NANO version, OEM build details, and the device's skills:
 
 ```
-{ 1000 wait mogwai.info ? } nano.run
-nano.user.view
+{ mogwai.info ? } nano.run
 ```
 
 ```
 [system: "1.17.0.334" ip: "192.168.1.75" name: "DEVICE1" platform: "ESP32" session: "39122" memory: 49872 target: "ESP32_REV3" mogwai: "0.2.0.0" oem: "MinSizeRel build, chip rev. >= 3, without support for PSRAM" skills: ("GPIO" "I2C")]
 ```
 
-As with the earlier `nano.user.view` example, the `1000 wait` gives the view mode time to fully attach before the program prints anything — skip it and you risk missing the very first output. Without `nano.user.view` at all, nothing from `?`/`??` is displayed, `mogwai.info` included.
+This shows up in the Console NANO tab the moment the device prints it — no extra step needed.
 
 ## 12. Reboot cleanly
 
@@ -342,8 +314,6 @@ If your program needs to reboot the device itself (for example, after applying a
     mogwai.reboot
 } nano.run
 ```
-
-(as always, `"Rebooting, bye!"` would only be visible if you had `nano.user.view` attached)
 
 If you need to force a reboot or halt from MOGWAI NANO Studio *without* running any device-side code — for example, if a device seems stuck — use `nano.reboot` or `nano.halt` instead. These act immediately and bypass `MOGWAI.onReboot` entirely.
 
@@ -391,7 +361,6 @@ if (nano.isConnected not) then
 }
 
 {
-    1000 wait
     1 10 for 'i' do
     {
         i ?
@@ -402,16 +371,15 @@ if (nano.isConnected not) then
 guard
 {
     nano.run
-    nano.user.view
 }
 else
 {
     "" ?
-    "Unable to run or view !" ?
+    "Unable to run !" ?
 }
 ```
 
-This is entirely regular MOGWAI code — `if`/`then`/`else`, `mogwai.exit` for early exit on failure, `guard`/`else` to catch a failure in `nano.run`/`nano.user.view` itself (for example, if the device drops off the network right as the script tries to run something) — orchestrating the connection and the discovery UI on your PC, with only the small inner block ever actually running on the device. A good pattern to reuse and adapt as your own scripts grow.
+This is entirely regular MOGWAI code — `if`/`then`/`else`, `mogwai.exit` for early exit on failure, `guard`/`else` to catch a failure in `nano.run` itself (for example, if the device drops off the network right as the script tries to run something) — orchestrating the connection and the discovery UI on your PC, with only the small inner block ever actually running on the device. Its output shows up in Console NANO on its own, without needing anything else. A good pattern to reuse and adapt as your own scripts grow.
 
 ### The shortcut version
 
