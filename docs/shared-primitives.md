@@ -53,6 +53,7 @@ This page only covers what's **common** to both. For NANO-specific primitives (`
 | `STO` (canonical; write `->`) | Store a value into a variable — write `50 -> 'A'`, not `50 'A' STO` |
 | `get` | Read from a `MOGList` (by index) or `MOGRecord` (by key) |
 | `set` | Write into a `MOGList` (by index) or `MOGRecord` (by key), creating the key if needed |
+| `keys` | Returns the keys of a `MOGRecord` as a `MOGList` — useful for iterating over a record whose keys aren't known in advance |
 | `sub` | Extracts a part of a `MOGString`, `MOGList`, `MOGData` or `.binary` value by start position and extent — e.g. `"ABCDE" 1 1 sub` pushes `"B"`, `(1 2 3 4 5) 1 1 sub` pushes `(2)`. An extent of `0` means "to the end" rather than "zero elements": `"ABCDE" 2 0 sub` pushes `"CDE"` |
 
 ## Conversions

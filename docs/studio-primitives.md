@@ -2,7 +2,7 @@
 
 These are the extended primitives exposed by **MOGWAI NANO Studio** — the desktop companion application. They're regular MOGWAI host functions, available anywhere in the desktop MOGWAI engine when run from Studio, and let you discover, connect to, and orchestrate a MOGWAI NANO device from your PC.
 
-This page only covers Studio's own `nano.*` primitives. For everything that actually runs *on* the device (sent via `nano.run`) — canonical language, hardware primitives (`gpio.*`, `i2c.*`, `ssd1306.*`), timers, events — see the [NANO Primitives Reference](nano-primitives.md).
+This page only covers Studio's own `nano.*` primitives. For everything that actually runs *on* the device (sent via `nano.run`) — canonical language, hardware primitives (`gpio.*`, `i2c.*`, `ssd1306.*`), timers, events — see the [Device Primitives Reference](device-primitives.md).
 
 > **Naming convention:** primitives that interact directly with the console (user input or on-screen display) are prefixed with `user` — `nano.user.select`, `nano.user.connect`, `nano.user.view`. Primitives that only exchange data with the device, with no console interaction of their own, don't carry that prefix (`nano.connect`, `nano.scan`, `nano.run`, etc.).
 
@@ -28,7 +28,7 @@ A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device'
 
 ## Usings (dynamically loaded libraries)
 
-**MOGWAI NANO Studio GUI only.** A *using* is a compiled plugin library — unlike a unit (source code, parsed and run on demand), a using ships as pre-compiled `.pe` files, loaded into the running CLR via the device-side `mogwai.using` primitive. Installing a using only places its files on flash; it doesn't load it — a script still needs to call `mogwai.using` for its primitives to become usable, and once loaded, a using can never be unloaded (only a reboot clears it — see `mogwai.using` in the [NANO Primitives Reference](nano-primitives.md)).
+**MOGWAI NANO Studio GUI only.** A *using* is a compiled plugin library — unlike a unit (source code, parsed and run on demand), a using ships as pre-compiled `.pe` files, loaded into the running CLR via the device-side `mogwai.using` primitive. Installing a using only places its files on flash; it doesn't load it — a script still needs to call `mogwai.using` for its primitives to become usable, and once loaded, a using can never be unloaded (only a reboot clears it — see `mogwai.using` in the [Device Primitives Reference](device-primitives.md)).
 
 | Primitive | Signature | Description |
 |---|---|---|

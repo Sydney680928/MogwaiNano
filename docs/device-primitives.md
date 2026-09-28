@@ -119,6 +119,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 |---|---|---|---|
 | `get` | 🔗 | `list index get` / `record key: get` | Reads from a `MOGList` (by index) or `MOGRecord` (by key). Sugared as `record->key:` on the desktop MOGWAI engine — this shorthand is desugared into `record key: get` by MOGWAI NANO Studio's parser before anything is sent to the device; the device runtime only ever receives and understands the canonical form |
 | `set` | 🔗 | `value list index set` / `value record key: set` | Writes into a `MOGList` (by index) or `MOGRecord` (by key), creating the key if needed. Sugared as `value record<-key:` on the desktop MOGWAI engine, desugared the same way as `->key:` above before reaching the device |
+| `keys` | 🔗 | `record keys` → `.list` | Returns the keys of a `MOGRecord` as a `MOGList` — useful for iterating over a record whose keys aren't known in advance |
 | `size` | 🔗 | `v size` → `.number` | Length of a `MOGList`, `MOGRecord`, `MOGString` or `MOGData` |
 
 ---

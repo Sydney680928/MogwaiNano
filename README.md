@@ -9,7 +9,7 @@
 
 **Give your ESP32 a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
-> **Target hardware: boards with real memory headroom.** MOGWAI NANO is built and tested primarily for microcontrollers with several megabytes of RAM available — an ESP32-S3 with PSRAM being our validated reference platform (a classic ESP32/WROVER with PSRAM, flashed with nanoFramework's `ESP32_PSRAM_REV3` target, should work comparably too, though we haven't tested that combination ourselves yet). A plain ESP32 (~40KB free RAM, no PSRAM) works for the simplest single-purpose scripts, but quickly runs into real, confirmed limits the moment a project combines more than one or two things — and some newer features (like [tasks](docs/nano-primitives.md#5-tasks)) simply aren't practical on it at all. If you're picking hardware for this project, start with a PSRAM-equipped board rather than the cheapest ESP32 you can find. See [Memory considerations](#memory-considerations) below for the full picture.
+> **Target hardware: boards with real memory headroom.** MOGWAI NANO is built and tested primarily for microcontrollers with several megabytes of RAM available — an ESP32-S3 with PSRAM being our validated reference platform (a classic ESP32/WROVER with PSRAM, flashed with nanoFramework's `ESP32_PSRAM_REV3` target, should work comparably too, though we haven't tested that combination ourselves yet). A plain ESP32 (~40KB free RAM, no PSRAM) works for the simplest single-purpose scripts, but quickly runs into real, confirmed limits the moment a project combines more than one or two things — and some newer features (like [tasks](docs/device-primitives.md#5-tasks)) simply aren't practical on it at all. If you're picking hardware for this project, start with a PSRAM-equipped board rather than the cheapest ESP32 you can find. See [Memory considerations](#memory-considerations) below for the full picture.
 
 > If MOGWAI NANO looks useful to you, a ⭐ helps others discover it — thank you!
 
@@ -220,7 +220,7 @@ src/MogwaiNano/
 ## Documentation
 
 - [Getting started guide](docs/getting-started.md) — step-by-step NANO tutorial (connect, GPIO, timers, events)
-- [NANO primitives reference](docs/nano-primitives.md) — complete, exhaustive reference for every primitive in the device runtime, marking which are shared with desktop MOGWAI and which are NANO-only
+- [Device primitives reference](docs/device-primitives.md) — complete, exhaustive reference for every primitive in the device runtime, marking which are shared with desktop MOGWAI and which are NANO-only
 - [Studio primitives reference](docs/studio-primitives.md) — the full `nano.*` command set exposed by MOGWAI NANO Studio (connection, discovery, running code, device state, autorun)
 - [ESP32 DeviceFunction values reference](docs/esp32-device-function-values.md) — the complete lookup table needed to use `device.setPinFunction` (SPI, I2C, serial, PWM, ADC, I2S, SDMMC)
 - [Network protocol](docs/) *(coming soon)*

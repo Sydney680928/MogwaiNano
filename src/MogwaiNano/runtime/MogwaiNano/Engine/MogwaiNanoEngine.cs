@@ -327,6 +327,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("size", new PrimitiveDelegate(PrimitiveSize));
             Primitives.Add("purge", new PrimitiveDelegate(PrimitivePurge));
             Primitives.Add("exists", new PrimitiveDelegate(PrimitiveExists));
+            Primitives.Add("keys", new PrimitiveDelegate(PrimitiveKeys));
 
             Primitives.Add("DI", new PrimitiveDelegate(PrimitiveDI));
             Primitives.Add("EI", new PrimitiveDelegate(PrimitiveEI));
@@ -1784,6 +1785,33 @@ namespace MogwaiNano.Engine
                 var exists = engine.VarExists(varName.Value);
 
                 engine.StackPush(new MOGBoolean(engine, exists));
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveKeys(MogwaiNanoEngine engine, string name)
+        {
+            // record keys
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGRecord))
+            {
+                var record = engine.StackPop() as MOGRecord;
+                var keys = record.Keys;
+
+                var list = new MOGList(engine);
+
+                foreach (string key in keys)
+                    list.AddItem(new MOGKey(engine, key));
+
+                engine.StackPush(list);
 
                 return EvalResult.NoError;
             }
