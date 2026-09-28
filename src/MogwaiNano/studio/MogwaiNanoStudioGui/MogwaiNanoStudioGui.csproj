@@ -22,13 +22,12 @@
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Resources\usings.zip" />
-    <EmbeddedResource Include="Resources\units.zip" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
     <PackageReference Include="Avalonia.Diagnostics" Version="11.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Resources\" />
   </ItemGroup>
 
 </Project>
