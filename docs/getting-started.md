@@ -14,7 +14,7 @@ Follow the [Quick Start](../README.md#quick-start) in the main README to flash `
 
 Launch the app. Its window is your workspace for the rest of this guide: a code editor on top, and two live output tabs below it — **Console MOGWAI** (output from code running locally, on your PC) and **Console NANO** (output coming from the connected device).
 
-![MOGWAI NANO Studio GUI's main window, with the editor and its two console tabs](images/studio-main-window.png)
+![MOGWAI NANO Studio GUI's main window, with the editor and its two console tabs](../images/studio-main-window.png)
 
 > ### Where does your code actually run?
 >
@@ -62,7 +62,7 @@ if (device ->type .record ==) then { device->ip: nano.connect ? }
 
 `nano.user.select` runs a network scan on its own, then opens a dialog listing every device that responded — name, platform, and IP — for you to pick from:
 
-![The device-selection dialog, listing responding devices for you to click on](images/scan-devices-dialog.png)
+![The device-selection dialog, listing responding devices for you to click on](../images/scan-devices-dialog.png)
 
 If you pick one, its scan record (device name, version, session, IP, platform, target, OEM, firmware version) is pushed onto the stack. If nothing responds, or you close the dialog without picking one, `null` is pushed instead.
 
@@ -111,7 +111,7 @@ Whatever the device prints — `?`, `??`, `debug.write` — appears on its own i
 { 1 10 for 'i' do { i ? 100 wait } } nano.run
 ```
 
-![Console NANO tab showing the numbers 1 through 10 printed live as the device counts](images/console-nano-counting.png)
+![Console NANO tab showing the numbers 1 through 10 printed live as the device counts](../images/console-nano-counting.png)
 
 This applies the same way whether the program was launched with `nano.run` or is running as a stored autorun program — the moment MOGWAI NANO Studio is connected, its output shows up.
 
