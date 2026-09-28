@@ -1203,11 +1203,23 @@ public partial class MainWindow : Window
     // '?d' rather than '?': formats records/lists nicely (nano.info returns
     // one), rather than '?''s raw display.
 
-    private async void OnNanoInfoClick(object? sender, RoutedEventArgs e) => await ExecuteMogwaiCommand("nano.info ?d");
+    private async void OnNanoInfoClick(object? sender, RoutedEventArgs e)
+    {
+        OutputTabControl.SelectedItem = ConsoleMogwaiTab;
+        await ExecuteMogwaiCommand("nano.info ?d");
+    }
 
-    private async void OnNanoMemoryClick(object? sender, RoutedEventArgs e) => await ExecuteMogwaiCommand("nano.memory ?d");
+    private async void OnNanoMemoryClick(object? sender, RoutedEventArgs e)
+    {
+        OutputTabControl.SelectedItem = ConsoleMogwaiTab;
+        await ExecuteMogwaiCommand("nano.memory ?d");
+    }
 
-    private async void OnNanoStateClick(object? sender, RoutedEventArgs e) => await ExecuteMogwaiCommand("nano.state ?d");
+    private async void OnNanoStateClick(object? sender, RoutedEventArgs e)
+    {
+        OutputTabControl.SelectedItem = ConsoleMogwaiTab;
+        await ExecuteMogwaiCommand("nano.state ?d");
+    }
 
     private async void OnUnitsClick(object? sender, RoutedEventArgs e) => await new UnitsWindow().ShowDialog(this);
 
