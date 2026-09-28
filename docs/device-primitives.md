@@ -324,10 +324,10 @@ task 'TSK2' do
 | `?` / `console.println` | 🔗 | `v ?` | Prints the top of stack, with a newline |
 | `??` / `console.print` | 🔗 | `v ??` | Prints the top of stack, no newline |
 | `?d` | 🔗 | `v ?d` | Displays an object in a clear, detailed form that depends on its type. Already available in the desktop MOGWAI engine, where it behaves the same way — see the [Shared Primitives Reference](shared-primitives.md) for the output format |
-| `debug.write` | ⚙️ | `v debug.write` | Writes a debug message — on a connected NANO device, streamed back to MOGWAI NANO Studio in real time via `nano.user.view` |
+| `debug.write` | ⚙️ | `v debug.write` | Writes a debug message — on a connected NANO device, streamed back to MOGWAI NANO Studio in real time |
 | `debug.vs.write` | ⚙️ | `v debug.vs.write` | Like `debug.write`, but writes through `Debug.WriteLine` — into the debugger's output window (Visual Studio) — instead of over the network channel to a connected Studio. Meant for testing the runtime, or a plugin, in isolation, from a test project with no Studio connected |
-| `console.clear` | ⚙️ | `console.clear` | Sends `CONSOLE.CLEAR` to a connected Studio, clearing its Console NANO output. Currently only understood by the Avalonia Studio — has no effect on the CLI Studio |
-| `debug.clear` | ⚙️ | `debug.clear` | Sends `DEBUG.CLEAR` to a connected Studio, clearing its Debug NANO output. Same Avalonia-only scope as `console.clear` above |
+| `console.clear` | ⚙️ | `console.clear` | Sends `CONSOLE.CLEAR` to a connected Studio, clearing its Console NANO output |
+| `debug.clear` | ⚙️ | `debug.clear` | Sends `DEBUG.CLEAR` to a connected Studio, clearing its Debug NANO output |
 
 `?`, `??` and `debug.write` accept a `MOGRef` (`&variable`) and dereference it automatically before printing.
 

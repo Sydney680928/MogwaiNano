@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mogwai.info`/`nano.info` — three new keys in the returned record: `keepAlive:` (`true`/`false`, the current mode), `usings:` (the names of the libraries installed on the device's flash — installed, not necessarily loaded) and `primitives:` (every primitive usable at that exact instant — the list grows as `mogwai.using` calls succeed, since a loaded library's primitives merge into it)
 ### Fixed
 
+### Removed
+
+- **The console-based MOGWAI NANO Studio** (`MogwaiNanoStudio`, the Terminal.Gui app) — no longer maintained as of this release. Maintaining feature parity across two Studios wasn't sustainable for a one-person project, and every primitive added since the 0.5 release had already gone GUI-only in practice. **MOGWAI NANO Studio GUI is now the only supported way to talk to a device from a PC.** The `nano.user.view` primitive, specific to the console Studio's prompt-sharing model, is removed along with it — MOGWAI NANO Studio GUI's Console NANO tab already shows a device's live output continuously, with nothing to attach
+
 ## [0.5.0] - 2026-09-17
 
 ### Added

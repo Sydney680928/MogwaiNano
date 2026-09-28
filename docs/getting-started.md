@@ -49,6 +49,8 @@ Type your code straight into the editor. A few shortcuts you'll use constantly:
 
 This is how every example in this guide was actually written and tested — write the block in the editor, hit `F5`, watch the result in the console tabs, adjust, repeat.
 
+The Console NANO tab also has its own input line at the bottom. Anything typed there and sent is run on the device exactly as if you'd wrapped it in `{ ... } nano.run` and hit `F5` in the editor — a quicker way to try a single line on the device without leaving the console tab, especially handy together with keepAlive mode (see the [Device Primitives Reference](device-primitives.md)), where variables and functions carry over from one command to the next. If no device is connected yet, sending a command there triggers the connection dialog automatically — no need to connect first and switch tabs.
+
 ## 3. Find your device
 
 You don't need to know your device's IP address. Ask `nano.user.select` to discover it on the network:
@@ -130,7 +132,7 @@ Wire an LED (with a current-limiting resistor, ~220Ω for a red LED on 3.3V) bet
 } nano.run
 ```
 
-The LED should now be blinking, entirely controlled by code running on the device. Notice that `F5` has already returned control to you — this example's `nano.run` call only starts the program and comes right back, it doesn't keep the editor "busy" watching it. To stop the program running *on the device*, use `nano.halt`:
+The LED should now be blinking, entirely controlled by code running on the device. Notice that `F5` has already returned control to you — this example's `nano.run` call only starts the program and comes right back, it doesn't keep the editor "busy" watching it. To stop the program running *on the device*, use `nano.halt` — also available as **Device > Halt running program** in the menu, with no keyboard shortcut of its own:
 
 ```
 nano.halt
@@ -145,7 +147,7 @@ Wire a push button between another GPIO pin (say, pin 4) and GND, using the devi
     4 gpio.setMode.inputPullUp
     5 gpio.setMode.output
 
-    to 'onButtonChange' do
+    onEvent 'GPIO_PIN_CHANGED' do
     {
         if (eventData pin: get 4 ==) then
         {
@@ -154,8 +156,6 @@ Wire a push button between another GPIO pin (say, pin 4) and GND, using the devi
             else { 5 gpio.write.low }
         }
     }
-
-    onEvent 'GPIO_PIN_CHANGED' do { onButtonChange }
 
     forever do { }
 } nano.run
@@ -171,9 +171,7 @@ Timers run independently of your main program, on their own schedule:
 
 ```
 {
-    to 'heartbeat' do { "still alive" ? }
-
-    timer 'T1' every 5000 do { heartbeat }
+    timer 'T1' every 5000 do { "still alive" ? }
     'T1' timer.start
 
     forever do { 250 wait }
@@ -315,7 +313,7 @@ If your program needs to reboot the device itself (for example, after applying a
 } nano.run
 ```
 
-If you need to force a reboot or halt from MOGWAI NANO Studio *without* running any device-side code — for example, if a device seems stuck — use `nano.reboot` or `nano.halt` instead. These act immediately and bypass `MOGWAI.onReboot` entirely.
+If you need to force a reboot or halt from MOGWAI NANO Studio *without* running any device-side code — for example, if a device seems stuck — use `nano.reboot` or `nano.halt` instead, or their menu equivalents, **Device > Reboot** and **Device > Halt running program** (neither has a keyboard shortcut). These act immediately and bypass `MOGWAI.onReboot` entirely.
 
 This is particularly useful when connecting to a device that's already busy — for example, one running a stored autorun program from the moment it booted. `nano.state` would report `RUNNING`, and `nano.run` would refuse to start anything new (raising an error) until that program stops. `nano.halt` stops it immediately, bringing the device back to `IDLE` and ready for your next `nano.run`:
 
@@ -389,7 +387,15 @@ Everything in the connection block above — scan, list, select, connect — is 
 if (nano.isConnected not) then { nano.user.connect }
 ```
 
-Same guided experience, same `true`/`false` outcome as `nano.connect`, one line instead of the block spelled out above. Now that you've seen what it does under the hood, use whichever fits your script better.
+Same guided experience, same `true`/`false` outcome as `nano.connect`, one line instead of the block spelled out above.
+
+That `if (nano.isConnected not) then { ... }` wrapper is common enough that it has its own shortcut too: `nano.user.connect?` does exactly that — connects only if there isn't already a connection, pushing `true` right away with no scan and no dialog if there is one. The line above becomes:
+
+```
+nano.user.connect?
+```
+
+A good habit to lead a script with: it's safe to call at the top of anything, whether or not a device happens to already be connected. Now that you've seen what it does under the hood, use whichever of the three fits your script better.
 
 ## What's next
 
