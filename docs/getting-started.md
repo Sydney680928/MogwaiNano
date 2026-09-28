@@ -106,7 +106,7 @@ Everything you want to execute *on the device* goes inside a code block, passed 
 { "Hello from the device!" ? } nano.run
 ```
 
-Behind the scenes, MOGWAI NANO Studio desugars this block into canonical RPN and sends it over the network. `nano.run` only waits long enough to confirm the program has actually started on the device — it does **not** wait for it to finish, and it does **not** show any output. By default, console output (`?`/`console.print`) and `debug.write` messages coming from the device are silently discarded, whether the program was launched via `nano.run` or is running as a stored autorun program.
+Behind the scenes, MOGWAI NANO Studio desugars this block into canonical RPN and sends it over the network. `nano.run` only waits long enough to confirm the program has actually started on the device — it does **not** wait for it to finish, and it does **not** show any output. By default, console output (`?`/`console.println`, `??`/`console.print`) and `debug.write` messages coming from the device are silently discarded, whether the program was launched via `nano.run` or is running as a stored autorun program.
 
 To actually watch a device's live output, use `nano.user.view`:
 
@@ -330,7 +330,7 @@ nano.user.view
 [system: "1.17.0.334" ip: "192.168.1.75" name: "DEVICE1" platform: "ESP32" session: "39122" memory: 49872 target: "ESP32_REV3" mogwai: "0.2.0.0" oem: "MinSizeRel build, chip rev. >= 3, without support for PSRAM" skills: ("GPIO" "I2C")]
 ```
 
-As with the earlier `nano.user.view` example, the `1000 wait` gives the view mode time to fully attach before the program prints anything — skip it and you risk missing the very first output. Without `nano.user.view` at all, nothing from `?`/`console.print` is displayed, `mogwai.info` included.
+As with the earlier `nano.user.view` example, the `1000 wait` gives the view mode time to fully attach before the program prints anything — skip it and you risk missing the very first output. Without `nano.user.view` at all, nothing from `?`/`??` is displayed, `mogwai.info` included.
 
 ## 12. Reboot cleanly
 

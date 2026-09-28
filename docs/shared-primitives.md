@@ -2,7 +2,7 @@
 
 MOGWAI NANO's canonical RPN language is a strict subset of the desktop MOGWAI language — every primitive listed here behaves identically whether the code runs on your PC (in MOGWAI or MOGWAI NANO Studio) or on a device via `nano.run`.
 
-This page only covers what's **common** to both. For NANO-specific primitives (`gpio.*`, `i2c.*`, `timer.*`, event handling, `nano.*` host functions in MOGWAI NANO Studio), see the [CHANGELOG](../CHANGELOG.md) and the [Getting Started guide](getting-started.md).
+This page only covers what's **common** to both. For NANO-specific primitives (`gpio.*`, `i2c.*`, `timer.*`, event handling, `nano.*` host functions in MOGWAI NANO Studio), see the [Device Primitives Reference](device-primitives.md) (what runs on the device), the [Studio Primitives Reference](studio-primitives.md) (the `nano.*` functions) and the [Getting Started guide](getting-started.md).
 
 > **Reminder:** the forms below written in ALL CAPS (`IF`, `WHILE`, `FOR`...) are the private, canonical primitives — generated automatically by desugaring. As a developer, you write the sugared form (`if...then...else`, `while...do`, `for...do`...); you never type the canonical form directly. Both are shown here so you can recognize canonical code if you ever inspect it (for example via `nano.autorun.get`).
 
@@ -125,7 +125,7 @@ When a subscribed event fires, its data is delivered through an automatically-in
 | `DI` | Disable interrupts — pending timer/event callbacks are queued but not delivered |
 | `EI` | Re-enable interrupts — queued callbacks are delivered |
 
-`DI`/`EI` calls are reentrant (counter-based), so nested critical sections are safe. Every program run starts with interrupts enabled, regardless of the state left by a previous run.
+`DI`/`EI` calls are reentrant (counter-based), so nested critical sections are safe. A normal program run starts with interrupts enabled, regardless of the state left by a previous run. The one exception is a device in keepAlive mode (see `mogwai.keepAlive` in the [Device Primitives Reference](device-primitives.md)), where the interrupt state is preserved from one run to the next: a `DI` can then deliberately span several runs — and one left without its `EI` stays in effect until an `EI` or a `mogwai.reset`.
 
 ## Skills
 
@@ -156,8 +156,61 @@ On NANO, flags are volatile — reset on every new program run, not persisted ac
 
 | Primitive | Description |
 |---|---|
-| `?` / `console.print` | Print the top of stack |
+| `?` / `console.println` | Print the top of stack, followed by a newline |
+| `??` / `console.print` | Print the top of stack, without a newline |
 | `debug.write` | Write a debug message — on a connected NANO device, this is streamed back to MOGWAI NANO Studio in real time |
+| `?d` | Displays an object in a clear, detailed form that depends on its type — records, lists and `MOGData` each get their own layout, any other type is shown as `?` would (see below) |
+
+### `?d` — detailed display
+
+`?d` displays an object according to its type:
+
+| Type | Display |
+|---|---|
+| `MOGRecord` | One key per line, with the values aligned in a column. Long values are truncated with `...` |
+| `MOGList` | One element per line, each prefixed by its zero-padded index. Every element is listed, however long the list is |
+| `MOGData` | A hex dump: an 8-digit hexadecimal offset, up to 16 bytes in hexadecimal, then the same bytes read as text between `\|` characters — bytes with no printable form are replaced by a `.`. A shorter last row is padded so the columns stay aligned |
+| Any other type | Displayed exactly as `?` would |
+
+**A record** — an excerpt of the desktop engine's `mogwai.info` record (the device-side record has its own keys — see the [Device Primitives Reference](device-primitives.md)):
+
+```
+> mogwai.info ?d
+
+name:                "MOGWAI NANO"
+version:             "8.16.0.0"
+primitives:          ('extract' 'path.files' 'path.usings' 'purge' '->e...
+externalKeywords:    ()
+skills:              ('NANO')
+debug:               true
+keepAlive:           true
+isTask:              false
+```
+
+**A list** — the first entries of `mogwai.info hostKeywords: get ?d`:
+
+```
+> mogwai.info hostKeywords: get ?d
+
+000 : '?s'
+001 : 'run'
+002 : 'nano.run'
+003 : 'nano.connect'
+004 : 'nano.disconnect'
+005 : 'nano.isConnected'
+```
+
+**Data** — the first 511 bytes of an HTTP response body (`http.get` is a desktop-only primitive); the first rows, then the last, partial one:
+
+```
+> [http.get uri: "https://www.google.fr"] response: get 0 511 sub ?d
+
+00000000  3C 21 64 6F 63 74 79 70 65 20 68 74 6D 6C 3E 3C  | <!doctype html><  |
+00000010  68 74 6D 6C 20 69 74 65 6D 73 63 6F 70 65 3D 22  | html itemscope="  |
+00000020  22 20 69 74 65 6D 74 79 70 65 3D 22 68 74 74 70  | " itemtype="http  |
+...
+000001F0  38 2C 31 31 38 38 33 2C 36 33 31 33 2C 39 38     | 8,11883,6313,98   |
+```
 
 ## System primitives
 

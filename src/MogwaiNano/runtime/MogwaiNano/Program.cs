@@ -250,7 +250,8 @@ namespace MogwaiNano
                         AppGlobal.MogwaiNanoEngine.FrugalMode.ToString(),
                         unitsBuilder.ToString(),
                         primitivesBuilder.ToString(),
-                        usingsBuilder.ToString()
+                        usingsBuilder.ToString(),
+                        AppGlobal.MogwaiNanoEngine.KeepAlive ? "ON" : "OFF"
                     ));
             }
             else if (message.Function == "LAST.RESULT.GET")
@@ -558,6 +559,30 @@ namespace MogwaiNano
                 else
                 {
                     AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.PURGE", "ERROR", "Missing parameters"));
+                }
+            }
+            else if (message.Function == "KEEPALIVE.SET")
+            {
+                if (message.Parameters.Length > 0 && message.Parameters[0] != null)
+                {
+                    if (message.Parameters[0] == "ON")
+                    {
+                        AppGlobal.MogwaiNanoEngine.KeepAlive = true;
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "KEEPALIVE.SET", "OK"));
+                    }
+                    else if (message.Parameters[0] == "OFF")
+                    {
+                        AppGlobal.MogwaiNanoEngine.KeepAlive = true;
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "KEEPALIVE.SET", "OK"));
+                    }
+                    else
+                    {
+                        AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "KEEPALIVE.SET", "ERROR", "Invalid parameter"));
+                    }
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "KEEPALIVE.SET", "ERROR", "Missing parameters"));
                 }
             }
         }

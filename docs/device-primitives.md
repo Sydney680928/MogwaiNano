@@ -323,11 +323,13 @@ task 'TSK2' do
 |---|---|---|---|
 | `?` / `console.println` | 🔗 | `v ?` | Prints the top of stack, with a newline |
 | `??` / `console.print` | 🔗 | `v ??` | Prints the top of stack, no newline |
+| `?d` | 🔗 | `v ?d` | Displays an object in a clear, detailed form that depends on its type. Already available in the desktop MOGWAI engine, where it behaves the same way — see the [Shared Primitives Reference](shared-primitives.md) for the output format |
 | `debug.write` | ⚙️ | `v debug.write` | Writes a debug message — on a connected NANO device, streamed back to MOGWAI NANO Studio in real time via `nano.user.view` |
+| `debug.vs.write` | ⚙️ | `v debug.vs.write` | Like `debug.write`, but writes through `Debug.WriteLine` — into the debugger's output window (Visual Studio) — instead of over the network channel to a connected Studio. Meant for testing the runtime, or a plugin, in isolation, from a test project with no Studio connected |
 | `console.clear` | ⚙️ | `console.clear` | Sends `CONSOLE.CLEAR` to a connected Studio, clearing its Console NANO output. Currently only understood by the Avalonia Studio — has no effect on the CLI Studio |
 | `debug.clear` | ⚙️ | `debug.clear` | Sends `DEBUG.CLEAR` to a connected Studio, clearing its Debug NANO output. Same Avalonia-only scope as `console.clear` above |
 
-All three accept a `MOGRef` (`&variable`) and dereference it automatically before printing.
+`?`, `??` and `debug.write` accept a `MOGRef` (`&variable`) and dereference it automatically before printing.
 
 ---
 
@@ -340,13 +342,15 @@ All ⚙️ **NANO-only** (though most have a conceptual desktop equivalent).
 | `mogwai.halt` | `mogwai.halt` | Stops the current program immediately, raising `MW.2` (`HaltEncounteredError`) — the mechanism by which a script halts itself voluntarily |
 | `mogwai.exit` | `mogwai.exit` | Stops the current program immediately, from anywhere, with no error — a clean exit rather than `mogwai.halt`'s voluntary-halt error |
 | `mogwai.memory` | `forceCollect mogwai.memory` → `.number` | Returns free RAM in bytes. `true` forces a garbage collection before measuring; `false` returns the current figure without forcing one |
-| `mogwai.reset` | `mogwai.reset` | Resets engine state (stack, variables, timers, etc.) |
+| `mogwai.reset` | `mogwai.reset` | Fully resets the engine state: stack, global variables, functions, timers, events, tasks, stopwatches, opened pins and I2C/SPI/PWM/ADC/SSD1306 resources, what loaded usings keep for the engine, frugal mode and interrupt state. It does so even in keepAlive mode — see `mogwai.keepAlive` |
 | `mogwai.reboot` | `mogwai.reboot` | Reboots the device. Runs `MOGWAI.onReboot` first if defined (unlike the Studio-side `nano.reboot`, which bypasses it), waits 1 second, then reboots |
-| `mogwai.info` | `mogwai.info` → `.record` | Returns a record with `name`, `mogwai` (NANO runtime version), `ip`, `session`, `platform`, `target`, `oem`, `system`, `memory` (free RAM, non-forcing), `skills` (list), `units` (list of stored unit names), `usings` (list of library names currently *installed* on flash — not necessarily loaded, see `mogwai.using`), `primitives` (list of every primitive name currently usable, at this exact instant — grows as `mogwai.using` calls succeed, since a loaded library's primitives merge into this same list), and `frugalMode` (current mode) |
+| `mogwai.info` | `mogwai.info` → `.record` | Returns a record with `name`, `mogwai` (NANO runtime version), `ip`, `session`, `platform`, `target`, `oem`, `system`, `memory` (free RAM, non-forcing), `skills` (list), `units` (list of stored unit names), `usings` (list of library names currently *installed* on flash — not necessarily loaded, see `mogwai.using`), `primitives` (list of every primitive name currently usable, at this exact instant — grows as `mogwai.using` calls succeed, since a loaded library's primitives merge into this same list), `frugalMode` (current mode), and `keepAlive` (`true`/`false` — see `mogwai.keepAlive`) |
 | `mogwai.frugalMode` | `enabled mogwai.frugalMode` | Enables (`true`) or disables (`false`) frugal mode for subsequent execution |
+| `mogwai.keepAlive` | `enabled mogwai.keepAlive` | Enables (`true`) or disables (`false`) keepAlive mode, a REPL-style mode where state carries over from one run to the next instead of every run starting from a clean slate. **Preserved between runs:** global variables, declared functions, the stack, stopwatches, frugal mode, the interrupt state (`DI`/`EI`), the GPIO pins and the I2C/SPI/PWM/ADC/SSD1306 resources opened by earlier runs, and whatever loaded usings keep on the engine's behalf (for instance the channels they opened) — the libraries themselves stay loaded in either mode. **Not preserved:** tasks, timers and events. Since the interrupt state is preserved too, a `DI` can deliberately span several runs (handy to test a timing-sensitive sequence step by step) — and one left without its `EI` keeps callbacks from being delivered until an `EI` or a `mogwai.reset`. Off by default — it must be turned on explicitly. It takes effect from the next run, not the current one, and `mogwai.halt`/`nano.halt` don't change how it works: everything that is preserved stays preserved. `mogwai.reset` still performs a full reset in this mode — the way to start over from a clean slate without switching keepAlive off. Studio-side counterpart: `nano.keepAlive` (Studio GUI only) |
 | `mogwai.sendMessage` | `"message" mogwai.sendMessage` | Sends an arbitrary string to Studio (device → Studio direction) — the counterpart to the Studio-side `nano.send` (Studio → device) |
 | `mogwai.units` | `mogwai.units` → `.list` | Returns the names of all units currently stored on the device, from within a running program |
 | `mogwai.units.run` | `'unit' mogwai.units.run` | Executes a stored unit's code — typically used to load the functions it declares (e.g. a RTC helper library) into the current program's context, once, near the start of a script |
+| `mogwai.using` | `'name' mogwai.using` | Loads the library (*using*) installed on the device's flash under `I:\mogwai\usings\<name>`: its `.pe` files, in the order listed by its `manifest.txt` (the last one being the plugin itself), then registers the primitives and error codes it exposes — usable from then on, by every program, for the rest of the device's uptime. A library is loaded at most once: calling `mogwai.using` again for a name already loaded is a harmless no-op. Failures (manifest missing or unreadable, a file that fails to load...) raise `MW.80`. A loaded library can never be unloaded — only a reboot clears it. Libraries are installed from the Studio with `nano.usings.install` (Studio GUI only) |
 | `mogwai.isTask` | `mogwai.isTask` → `.boolean` | Tests whether the currently running program is a task's own engine (started via `task.start`/`TASK.START`) rather than the top-level program |
 
 ### Lifecycle hooks
@@ -411,6 +415,7 @@ All ⚙️ **NANO-only.** Channels identified by a user-chosen name, like I2C/PW
 | `spi.open` | `'name' bus csPin frequency mode spi.open` | Opens a named SPI channel. `bus` must be `1` or `2` (like I2C, exactly two SPI buses exist). `csPin` is any GPIO — chip-select toggling is handled automatically by the driver, no manual write needed. `frequency` in Hz. `mode` is `0`-`3` (standard SPI CPOL/CPHA combinations). Refuses to reopen an already-used name. Unlike I2C, **no default pin mapping exists on either bus** — `device.setPinFunction` is mandatory for MOSI/MISO/SCK before every `spi.open`, no exceptions |
 | `spi.close` | `'name' spi.close` | Closes the channel and releases the resource |
 | `spi.write` | `'name' data spi.write` | Sends a `MOGData` buffer of any length in a single transaction |
+| `spi.read` | `'name' length spi.read` → `.data` | Reads `length` bytes from the device and pushes them as a `MOGData`. `length` must be between `0` and `4096`, otherwise `MW.22` is raised; `MW.554` is raised if the read itself fails. Like `spi.write`, each call is its own transaction (the driver handles chip-select around it): for a protocol that has to write and read within the same transaction, use `spi.transfer` |
 | `spi.transfer` | `'name' data spi.transfer` → `.data` | Full-duplex: sends a buffer and returns a same-length `MOGData` of whatever was clocked back in simultaneously. Needed for chips whose protocol requires reading and writing within the same continuous transaction — for example, reading a register on an MFRC522 RFID reader, where the requested register's value only comes back one byte after it was addressed |
 | `spi.minClockFrequency` | `bus spi.minClockFrequency` → `.number` | Queries the minimum clock frequency (Hz) supported by a bus, directly by bus number — no channel needs to be open first |
 | `spi.maxClockFrequency` | `bus spi.maxClockFrequency` → `.number` | Same as above, for the maximum supported frequency. No fixed number is documented here since it varies by target — query it at runtime instead |
@@ -436,7 +441,21 @@ All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, followi
 
 ---
 
-## 14. SSD1306 OLED display
+## 14. ADC
+
+All ⚙️ **NANO-only.** Analog-to-digital conversion. Channels are identified by a user-chosen name, following the same pattern as I2C, SPI and PWM.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `adc.open` | `'name' channel adc.open` | Opens ADC channel number `channel` under the given name. Raises `MW.540` if the name is already in use, `MW.541` if the channel can't be opened |
+| `adc.read` | `'name' adc.read` → `.number` | Reads the channel's current raw value — to be interpreted against `adc.maxValue` (and `adc.resolutionInBits`). Raises `MW.542` if the name is unknown |
+| `adc.close` | `'name' adc.close` | Releases the named channel. Raises `MW.542` if the name is unknown |
+| `adc.maxValue` | `adc.maxValue` → `.number` | The highest raw value the ADC can return. Takes no argument |
+| `adc.resolutionInBits` | `adc.resolutionInBits` → `.number` | The ADC's resolution, in bits. Takes no argument |
+
+---
+
+## 15. SSD1306 OLED display
 
 All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `nanoFramework.Iot.Device.Ssd13xx` binding, built after dense per-pixel drawing in pure RPN proved impractically slow. Fixed to 128x64 resolution over I2C Fast Mode; only one display instance is supported at a time (no naming).
 
@@ -459,7 +478,7 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ---
 
-## 15. Device-level platform access
+## 16. Device-level platform access
 
 ⚙️ **NANO-only.**
 
@@ -479,8 +498,14 @@ MOGWAI uses structured `MW.xx` error codes.
 | `MW.10`–`MW.24` | Argument/stack errors |
 | `MW.30`–`MW.32` | Math/conversion |
 | `MW.40`–`MW.50` | Name/word resolution |
+| `MW.60`–`MW.62` | Tasks |
+| `MW.80`–`MW.81` | Libraries loaded with `mogwai.using` |
 | `MW.500`–`MW.509` | GPIO |
 | `MW.510`–`MW.519` | I2C |
 | `MW.520`–`MW.529` | SSD1306 |
 | `MW.530`–`MW.539` | PWM |
+| `MW.540`–`MW.549` | ADC |
+| `MW.550`–`MW.559` | SPI |
+| `MW.580`–`MW.581` | Units |
+| `MW.590` | Platform not supported |
 | `MW.!!!` | Fatal |

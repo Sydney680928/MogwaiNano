@@ -51,6 +51,11 @@ public partial class MainWindow : Window
     private readonly List<string> _commandHistory = new();
     private int _commandHistoryIndex = -1;
 
+    // Same idea for the Console NANO command line — kept separate from the
+    // one above, since these are device commands, not desktop MOGWAI ones
+    private readonly List<string> _nanoCommandHistory = new();
+    private int _nanoCommandHistoryIndex = -1;
+
     // Persisted UI settings (splitter position, etc.)
     private readonly StudioSettings _settings;
 
@@ -762,6 +767,103 @@ public partial class MainWindow : Window
         await RunMogwaiCode(command, isRepl: true);
     }
 
+    // --- Command line (Console NANO) ---
+    // Sends whatever is typed straight to the device, as if wrapped in
+    // { ... } nano.run — much handier than typing that wrapper by hand every
+    // time. Most useful once the device is in keepAlive mode, where global
+    // variables and functions survive from one run to the next, REPL-style.
+
+    private async void OnNanoCommandInputKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            var command = NanoCommandInput.Text ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(command))
+                return;
+
+            _nanoCommandHistory.Add(command);
+            _nanoCommandHistoryIndex = _nanoCommandHistory.Count;
+
+            NanoCommandInput.Text = string.Empty;
+            await ExecuteNanoCommand(command);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Up)
+        {
+            if (_nanoCommandHistory.Count == 0)
+                return;
+
+            _nanoCommandHistoryIndex = Math.Max(0, _nanoCommandHistoryIndex - 1);
+            SetNanoCommandInputFromHistory();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down)
+        {
+            if (_nanoCommandHistory.Count == 0)
+                return;
+
+            _nanoCommandHistoryIndex = Math.Min(_nanoCommandHistory.Count, _nanoCommandHistoryIndex + 1);
+            SetNanoCommandInputFromHistory();
+            e.Handled = true;
+        }
+    }
+
+    private void SetNanoCommandInputFromHistory()
+    {
+        NanoCommandInput.Text = _nanoCommandHistoryIndex < _nanoCommandHistory.Count
+            ? _nanoCommandHistory[_nanoCommandHistoryIndex]
+            : string.Empty;
+
+        NanoCommandInput.CaretIndex = NanoCommandInput.Text?.Length ?? 0;
+    }
+
+    // Echoes the command in Console NANO, then sends it to the device.
+    // Same conversion nano.run itself applies to a script file: parse the
+    // sugared source, then take its canonical (desugared) form — the only
+    // form the device's own interpreter understands. The device's output
+    // and final result then arrive on their own through the usual events,
+    // written to this same console; only failures to even *start* the
+    // program (parse error, not connected, device busy...) are reported here.
+    private async Task ExecuteNanoCommand(string command)
+    {
+        // A blank line first, so each command stands apart from whatever
+        // came before it — except at the very top of an empty console
+        if (!string.IsNullOrEmpty(ConsoleNanoOutput.Text))
+            WriteNanoConsoleLine(string.Empty);
+
+        WriteNanoConsoleLine($"> {command}");
+
+        // No device connected: offer the connection dialog rather than just
+        // failing. If it's declined (or the connection fails), the typed
+        // command goes back into the input so nothing is lost.
+        if (!AppGlobal.NanoClient.IsConnected && !await ConnectToDeviceAsync())
+        {
+            WriteNanoConsoleLine("Not connected to a device — command not sent.");
+            NanoCommandInput.Text = command;
+            NanoCommandInput.CaretIndex = command.Length;
+            return;
+        }
+
+        string canonicalCode;
+
+        try
+        {
+            var function = new MOGWAI.Objects.MOGFunction(AppGlobal.MogwaiEngine, command, 0, null);
+            canonicalCode = function.ToStringCode();
+        }
+        catch (Exception ex)
+        {
+            WriteNanoConsoleLine(ex.Message);
+            return;
+        }
+
+        var result = await AppGlobal.NanoRuntime.RunAsync(canonicalCode);
+
+        if (result.IsError)
+            WriteNanoConsoleLine(result.ToString() ?? string.Empty);
+    }
+
     // --- Editor: run its whole content as a MOGWAI script ---
 
     private async void OnRunEditorClick(object? sender, RoutedEventArgs e)
@@ -1039,13 +1141,19 @@ public partial class MainWindow : Window
         StateMenuItem.IsEnabled = connected;
     }
 
-    private async void OnConnectClick(object? sender, RoutedEventArgs e)
+    private async void OnConnectClick(object? sender, RoutedEventArgs e) => await ConnectToDeviceAsync();
+
+    // Shows the device-scan dialog, then connects to the chosen device —
+    // shared by Device > Connect... and by the Console NANO command line
+    // (which offers it when a command is sent with no device connected).
+    // Returns true only if a connection was actually established.
+    private async Task<bool> ConnectToDeviceAsync()
     {
         var dialog = new ScanDevicesWindow();
         await dialog.ShowDialog(this);
 
         if (dialog.SelectedDevice is null)
-            return; // canceled, or no device selected
+            return false; // canceled, or no device selected
 
         var device = dialog.SelectedDevice;
         StatusText.Text = $"Connecting to {device.Name}...";
@@ -1059,11 +1167,13 @@ public partial class MainWindow : Window
             StatusDot.Fill = Brushes.LimeGreen;
             StatusText.Text = $"{device.Name} · {device.IpAddress}";
             UpdateDeviceMenuState(true);
+            return true;
         }
         catch (Exception ex)
         {
             StatusDot.Fill = Brushes.Gray;
             StatusText.Text = $"Connection failed: {ex.Message}";
+            return false;
         }
         finally
         {

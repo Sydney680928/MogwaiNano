@@ -418,7 +418,7 @@ namespace MogwaiNanoStudioGui.Classes
             if (response == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
 
-            if (response.Parameters == null || response.Parameters.Length < 13)
+            if (response.Parameters == null || response.Parameters.Length < 15)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid info response from device.");
 
             if (int.TryParse(response.Parameters[8], out int memory))
@@ -486,6 +486,8 @@ namespace MogwaiNanoStudioGui.Classes
                 record.SetItem("usings", usingsList);
 
                 record.SetBoolean("frugalMode", response.Parameters[10] == "True");
+
+                record.SetBoolean("keepAlive", response.Parameters[14] == "ON");
 
                 _engine.StackPush(record);
 
@@ -843,6 +845,23 @@ namespace MogwaiNanoStudioGui.Classes
             {
                 _engine.StackPushBoolean(false);
             }
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> SetKeepAliveAsync(string word, bool value)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var message = new ServerMessage(SOURCE_NAME, "KEEPALIVE.SET", value ? "ON" : "OFF");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+
+            var result = response.Parameters[0] ?? "!";
+            _engine.StackPushBoolean(result == "OK");
 
             return EvalResult.NoError;
         }

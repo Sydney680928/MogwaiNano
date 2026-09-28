@@ -205,13 +205,26 @@ limitations under the License.
                 </TabItem>
 
                 <TabItem x:Name="ConsoleNanoTab" Header="Console NANO" FontSize="{Binding #MainMenu.FontSize}">
-                    <TextBox x:Name="ConsoleNanoOutput"
-                             IsReadOnly="True"
-                             AcceptsReturn="True"
-                             FontFamily="Consolas,Cascadia Code,monospace"
-                             FontSize="12"
-                             TextWrapping="NoWrap"
-                             BorderThickness="0"/>
+                    <DockPanel>
+                        <TextBox x:Name="NanoCommandInput"
+                                 DockPanel.Dock="Bottom"
+                                 Watermark="Type device code and press Enter (sent via nano.run) — use ? to print a value — Up/Down for history"
+                                 FontFamily="Consolas,Cascadia Code,monospace"
+                                 FontSize="13"
+                                 Height="80"
+                                 TextWrapping="Wrap"
+                                 VerticalContentAlignment="Top"
+                                 Padding="8,10"
+                                 Margin="0,6,0,12"
+                                 KeyDown="OnNanoCommandInputKeyDown"/>
+                        <TextBox x:Name="ConsoleNanoOutput"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 FontFamily="Consolas,Cascadia Code,monospace"
+                                 FontSize="12"
+                                 TextWrapping="NoWrap"
+                                 BorderThickness="0"/>
+                    </DockPanel>
                 </TabItem>
 
                 <TabItem x:Name="DebugNanoTab" Header="Debug NANO" FontSize="{Binding #MainMenu.FontSize}">

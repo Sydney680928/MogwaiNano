@@ -27,6 +27,7 @@ using System.Device.Spi;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using static Iot.Device.Ssd13xx.Ssd13xx;
 using GC = nanoFramework.Runtime.Native.GC;
@@ -120,6 +121,8 @@ namespace MogwaiNano.Engine
         public Ssd1306 Ssd1306 { get; set; }
 
         public Hashtable Tasks { get; } = new(2);
+
+        public bool KeepAlive { get; set; } = false;
 
         public Error LastError
         {
@@ -267,7 +270,7 @@ namespace MogwaiNano.Engine
                 _runThread = null;
             }
 
-            Reset();
+            Reset(false);
         }
 
         public ArrayList Parse(string code) => _parser.Parse(code);
@@ -356,6 +359,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("console.print", new PrimitiveDelegate(PrimitiveConsolePrint));
             Primitives.Add("??", new PrimitiveDelegate(PrimitiveConsolePrint));
             Primitives.Add("console.clear", new PrimitiveDelegate(PrimitiveConsoleClear));
+            Primitives.Add("?d", new PrimitiveDelegate(PrimitiveConsoleDump));
 
             Primitives.Add("->format", new PrimitiveDelegate(PrimitiveToFormat));
             Primitives.Add("sub", new PrimitiveDelegate(PrimitiveSub));
@@ -415,6 +419,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("mogwai.units.run", new PrimitiveDelegate(PrimitiveRunUnit));
             Primitives.Add("mogwai.isTask", new PrimitiveDelegate(PrimitiveIsTask));
             Primitives.Add("mogwai.using", new PrimitiveDelegate(PrimitiveMogwaiUsing));
+            Primitives.Add("mogwai.keepAlive", new PrimitiveDelegate(PrimitiveMogwaiKeepAlive));
 
             Primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
             Primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
@@ -555,7 +560,7 @@ namespace MogwaiNano.Engine
             {
                 IsRunning = true;
 
-                Reset();
+                Reset(KeepAlive);
 
                 // _debugMode = debugMode
 
@@ -672,7 +677,7 @@ namespace MogwaiNano.Engine
             }
             finally
             {
-                Reset();
+                Reset(KeepAlive);
                 GC.Run(true);
                 IsRunning = false;
             }
@@ -702,54 +707,137 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public void Reset(bool keepAlive = false)
+        private static string BeginOfString(string s, int size)
+        {
+            if (s.Length > size)
+                return s.Substring(0, size) + "...";
+
+            return s;
+        }
+        
+        private static string ObjectVisualization(MOGObject obj)
+        {
+            var sb = new StringBuilder();
+
+            if (obj is MOGList list)
+            {
+                if (list.Items.Count > 0)
+                {
+                    var s = (int)Math.Ceiling(Math.Log10(list.Items.Count));
+                    var f = $"D{s}";
+
+                    for (int i = 0; i < list.Items.Count; i++)
+                    {
+                        sb.Append(i.ToString(f));
+                        sb.Append(" ");
+                        sb.AppendLine(BeginOfString(list.GetItem(i)?.ToString() ?? "", 50));
+                    }
+                }
+            }
+            else if (obj is MOGRecord record)
+            {
+                int keymax = 10;
+                foreach (string key in record.Keys)
+                    if (key.Length > keymax) keymax = key.Length;
+
+                foreach (string key in record.Keys)
+                {
+                    sb.Append(key);
+                    sb.Append(":");
+                    for (int i = key.Length; i < keymax + 4; i++) sb.Append(" ");
+                    sb.AppendLine(BeginOfString(record.GetItem(key).ToString() ?? "", 50));
+                }
+            }
+            else if (obj is MOGData data)
+            {
+                for (int i = 0; i < data.Items.Length; i += 16)
+                {
+                    sb.Append(i.ToString("X8"));
+                    sb.Append("  ");
+
+                    for (int j = i; j < i + 16; j++)
+                    {
+                        var v = j < data.Items.Length ? ((int)data.Items[j]).ToString("X2") : "  ";
+                        sb.Append(v);
+                        sb.Append(" ");
+                    }
+
+                    sb.Append(" | ");
+
+                    for (int j = i; j < i + 16; j++)
+                    {
+                        var c = " ";
+
+                        if (j < data.Items.Length)
+                        {
+                            var v = data.Items[j];
+
+                            if (v < 32)
+                            {
+                                c = ".";
+                            }
+                            else
+                            {
+                                var bytes = new byte[] { v, 0 };
+                                c = BitConverter.ToChar(bytes, 0).ToString();
+                            }
+                        }
+
+                        sb.Append(c);
+                    }
+
+                    sb.AppendLine("  |");
+                }
+            }
+            else
+            {
+                sb.AppendLine(obj.ToString());
+            }
+
+            return sb.ToString();
+        }
+
+        public void Reset(bool keepAlive)
         {
             CurrentEvalObject = null;
 
-            CleanupUsings();
-
+            CleanupTimers();
+            CleanupEvents();
+            CleanupWaitingFireObjects();
             CleanupTasks();
 
-            CleanupStopwatchs();
-
-            CleanupTimers();
-
-            CleanupEvents();
-
-            CleanupWaitingFireObjects();
-
-            CleanupOpenPins();
-
-            CleanupI2cDevices();
-
-            CleanupSpiDevices();
-
-            CleanupPwmChannels();
-
-            CleanupAdcChannels();
-
-            if (Ssd1306 != null)
+            if (!keepAlive)
             {
-                Ssd1306.Dispose();
-                Ssd1306 = null;
-            }
+                CleanupUsings();
+                CleanupStopwatchs();
+                CleanupOpenPins();
+                CleanupI2cDevices();
+                CleanupSpiDevices();
+                CleanupPwmChannels();
+                CleanupAdcChannels();
 
-            _stacks.Clear();
-            _currentStack = new MOGStack();
-            _stacks.Add(_currentStack);
+                if (Ssd1306 != null)
+                {
+                    Ssd1306.Dispose();
+                    Ssd1306 = null;
+                }
 
-            var glb = _varsContext[0] as VarContext;
-            glb.Clear();
+                _stacks.Clear();
+                _currentStack = new MOGStack();
+                _stacks.Add(_currentStack);
 
-            Functions.Clear();
+                var glb = _varsContext[0] as VarContext;
+                glb.Clear();
 
-            DisableInterrupts = false;
+                Functions.Clear();
+
+                DisableInterrupts = false;
+                FrugalMode = false;
+            }         
 
             HaltRequested = false;
             BreakRequested = false;
             ExitRequested = false;
-
-            FrugalMode = false;
         }
 
         public void Halt() => HaltRequested = true;
@@ -808,6 +896,7 @@ namespace MogwaiNano.Engine
             }
         }
 
+        
         #region PRIMITIVES
 
         private static EvalResult PrimitivePlus(MogwaiNanoEngine engine, string name)
@@ -1291,6 +1380,19 @@ namespace MogwaiNano.Engine
         {
             if (engine.Delegate != null)
                 return engine.Delegate.ConsoleClearScreen(engine);
+
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveConsoleDump(MogwaiNanoEngine engine, string name)
+        {
+            if (engine.StackSize == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            var item = engine.StackPop();
+
+            if (engine.Delegate != null)
+                return engine.Delegate.ConsolePrintLn(engine, ObjectVisualization(item));
 
             return EvalResult.NoError;
         }
@@ -2980,7 +3082,7 @@ namespace MogwaiNano.Engine
 
         private static EvalResult PrimitiveMogwaiReset(MogwaiNanoEngine engine, string name)
         {
-            engine.Reset();
+            engine.Reset(false);
             return EvalResult.NoError;
         }
 
@@ -3018,6 +3120,24 @@ namespace MogwaiNano.Engine
             }
 
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveMogwaiKeepAlive(MogwaiNanoEngine engine, string name)
+        {
+            // true mogwai.keepAlive
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+            
+            if (s[0] != typeof(MOGBoolean))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var b = engine.StackPop() as MOGBoolean;
+            engine.KeepAlive = b.Value;
+            
+            return EvalResult.NoError;
         }
 
         private static EvalResult PrimitiveGetMemory(MogwaiNanoEngine engine, string name)
@@ -3083,6 +3203,8 @@ namespace MogwaiNano.Engine
             record.SetItem("usings", usings);   
 
             record.SetItem("frugalMode", new MOGBoolean(engine, engine.FrugalMode));
+
+            record.SetItem("keepAlive", new MOGBoolean(engine, engine.KeepAlive));
 
             engine.StackPush(record);
 

@@ -139,11 +139,14 @@ namespace MogwaiNanoStudioGui.Classes
             "nano.usings",  
             "nano.usings.purge",
 
+            "nano.keepAlive",
+
             "mogwai.memory",
             "mogwai.reboot",
             "mogwai.frugalMode",
             "mogwai.units",
             "mogwai.units.run",
+            "mogwai.keepAlive",
 
             "bcd->",
             "->bcd",
@@ -204,11 +207,13 @@ namespace MogwaiNanoStudioGui.Classes
             "stopwatch.stop",
             "stopwatch.reset",
             "stopwatch.elapsed",
-            "stopwatch.reset",
+            "stopwatch.restart",
             "stopwatch.isRunning",
             "stopwatch.purge",
 
-            "device.setPinFunction"
+            "device.setPinFunction",
+            
+            "debug.vs.write"
 
             ];
 
@@ -717,7 +722,7 @@ namespace MogwaiNanoStudioGui.Classes
                     return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
 
                 if (s[0] == typeof(MOGString) && s[1] == typeof(MOGString))
-                {                   
+                {
                     var destination = engine.StackPopString();
                     var source = engine.StackPopString();
 
@@ -861,6 +866,25 @@ namespace MogwaiNanoStudioGui.Classes
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.keepAlive")
+            {
+                // true nano.keepAlive
+
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGBoolean))
+                {
+                    if (!AppGlobal.NanoClient.IsConnected)
+                        return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+                    var keepAlive = engine.StackPopBoolean();
+
+                    return await AppGlobal.NanoRuntime.SetKeepAliveAsync(word, keepAlive.Value);                    
+                }
             }
 
             return EvalResult.NoExternalFunction;
