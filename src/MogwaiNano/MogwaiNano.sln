@@ -25,7 +25,7 @@ Project("{11A8DD76-328B-46DF-9F39-F559912D0360}") = "MogwaiNanoESP32", "usings\E
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PWM", "PWM", "{CCDDA1C2-DF8D-4068-A7B3-639B4D0D0B0E}"
 EndProject
-Project("{11A8DD76-328B-46DF-9F39-F559912D0360}") = "MogwaiNanoPWM", "MogwaiNanoPWM\MogwaiNanoPWM.nfproj", "{32C76718-4F6E-4056-AB4F-93E08D93BE44}"
+Project("{11A8DD76-328B-46DF-9F39-F559912D0360}") = "MogwaiNanoPWM", "usings\PWM\MogwaiNanoPWM\MogwaiNanoPWM.nfproj", "{32C76718-4F6E-4056-AB4F-93E08D93BE44}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

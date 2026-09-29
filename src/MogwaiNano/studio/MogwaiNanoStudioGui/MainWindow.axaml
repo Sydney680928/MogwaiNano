@@ -133,6 +133,7 @@ limitations under the License.
                      TextWrapping="NoWrap"
                      BorderThickness="0"
                      Margin="8,8,8,8"
+					 Watermark="Code editor"
                      Foreground="{DynamicResource EditorTextBrush}"/>
 
             <Border x:Name="FindBar"

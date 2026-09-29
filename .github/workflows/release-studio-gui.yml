@@ -44,7 +44,7 @@ jobs:
 
       - name: Publish MOGWAI NANO Studio GUI (${{ matrix.rid }})
         run: >
-          dotnet publish src/MogwaiNano/MogwaiNanoStudioGui/MogwaiNanoStudioGui.csproj
+          dotnet publish src/MogwaiNano/studio/MogwaiNanoStudioGui/MogwaiNanoStudioGui.csproj
           --configuration Release
           --runtime ${{ matrix.rid }}
           --self-contained true

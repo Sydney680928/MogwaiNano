@@ -49,6 +49,8 @@ namespace MogwaiNano.Objects
             // age = 57 (number)
             // "Hello {! name} you are {! age}" ---> "Hello Stéphane you are 57"
 
+            Value = UnescapeString(Engine, Value);
+
             var items = ParseStringFormat();
 
             if (items != null)
@@ -162,6 +164,88 @@ namespace MogwaiNano.Objects
             }
 
             return items;
+        }
+
+        private static string UnescapeString(MogwaiNanoEngine engine, string input)
+        {
+            if (input.IndexOf('\\') < 0)
+                return input;
+
+            var sb = new StringBuilder(input.Length);
+            int i = 0;
+            int len = input.Length;
+
+            while (i < len)
+            {
+                char c = input[i];
+
+                if (c == '\\')
+                {
+                    if (i + 1 >= len)
+                    {
+                        // backslash en fin de string sans caractère suivant
+
+                        return input;
+                    }
+
+                    char next = input[i + 1];
+
+                    switch (next)
+                    {
+                        case 'r':
+                            sb.Append('\r');
+                            break;
+
+                        case 'n':
+                            sb.Append('\n');
+                            break;
+
+                        case 't':
+                            sb.Append('\t');
+                            break;
+
+                        case 'b':
+                            sb.Append('\b');
+                            break;
+
+                        case 'f':
+                            sb.Append('\f');
+                            break;
+
+                        case 'v':
+                            sb.Append('\v');
+                            break;
+
+                        case 'a':
+                            sb.Append('\a');
+                            break;
+
+                        case '0':
+                            sb.Append('\0');
+                            break;
+
+                        case '\\':
+                            sb.Append('\\');
+                            break;
+
+                        case '"':
+                            sb.Append('"');
+                            break;
+
+                        default:
+                            return input;
+                    }
+
+                    i += 2; // on consomme \ ET le caractère échappé, jamais réexaminés
+                }
+                else
+                {
+                    sb.Append(c);
+                    i++;
+                }
+            }
+
+            return sb.ToString();
         }
 
         public override string ToString()

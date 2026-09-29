@@ -89,6 +89,8 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 
 **Auto-eval on records and lists:** a `MOGRecord`/`MOGList` literal prefixed with `!` evaluates its dynamic elements immediately at construction, without a separate `eval` call — `[! x: 10 y: A]` is equivalent to `[x: 10 y: A] eval`, and the same `!` prefix works identically on lists: `(! 1 2 3 A)` is equivalent to `(1 2 3 A) eval`. This is the same `!` marker already used for auto-evaluating code blocks (`{! ... }`), now extended uniformly to all three collection/block types.
 
+**Escape sequences:** on `eval`, a `MOGString` also has its backslash escape sequences resolved: `\r`, `\n`, `\t`, `\b`, `\f`, `\v`, `\a`, `\0`, `\\` and `\"` — `"Bonjour \"MOGWAI\"" eval` produces `Bonjour "MOGWAI"`. This is the one place NANO's `eval` doesn't quite match the desktop engine: the desktop reports a malformed escape sequence as a proper error; nanoFramework has no tuple type to carry that same two-part result, so NANO's `eval` falls back to returning the string exactly as given — backslashes and all — rather than raising an error. This applies to a stray trailing `\` (nothing left to escape) as well as to any unrecognized escape character; either one leaves the *entire* string untouched, not just the offending part.
+
 ### Variable extraction
 
 | Primitive | Origin | Signature | Description |
