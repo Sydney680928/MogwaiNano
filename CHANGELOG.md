@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+### Removed
+
+## [0.6.0] - 2026-09-29
+
+### Added
+
 - **`mogwai.using`** — dynamically loads a plugin library into the running engine: `'ADC' mogwai.using`. Loads the named library's compiled `.pe` files (itself plus any dependencies, in order, per a manifest stored alongside them on the device's flash) into the CLR, then registers the primitives and error codes it exposes, making them usable from any script for the rest of the device's uptime. Raises `MW.80` (`UsingError`) on failure (manifest missing/unreadable, a `.pe` failing to load, etc.). A library is loaded at most once: calling `mogwai.using` again for an already-loaded name is a safe no-op, whether called from the mother engine or any task — loaded libraries and their primitives are global to the whole device, not scoped to whichever engine loaded them. There's deliberately no way to unload a library once loaded (the underlying nanoFramework CLR has no such mechanism at all) — only a reboot clears it
 - `keys` — pushes a `MOGList` of the keys of a record (`record keys`), the natural complement to `get`/`set` for iterating over a record whose keys aren't known in advance. Shared with the desktop MOGWAI engine, so it behaves identically in a script sent to a device via `nano.run` and in a Studio-side script
 - **`mogwai.keepAlive`** — turns keepAlive mode on or off: `true mogwai.keepAlive`. A REPL-style mode for the device's engine: instead of every run starting from a clean slate, state carries over from one run to the next. Preserved between runs: global variables, declared functions, the stack, stopwatches, frugal mode, the interrupt state (`DI`/`EI`), the GPIO pins and the I2C/SPI/PWM/ADC/SSD1306 resources opened by earlier runs, and whatever loaded usings keep on the engine's behalf (for instance the channels they opened) — the libraries themselves stay loaded in either mode. Not preserved: tasks, timers and events. Since the interrupt state is preserved too, a `DI` can deliberately span several runs — and one left without its `EI` keeps callbacks from being delivered until an `EI` or a `mogwai.reset`. Off by default — it has to be turned on explicitly. It takes effect from the next run, not the current one, and `mogwai.halt`/`nano.halt` don't change how it works: everything that is preserved stays preserved. `mogwai.reset` still performs a full reset in this mode — the way to start over from a clean slate without switching keepAlive off. The Studio-side counterpart is `nano.keepAlive` (below), and the current mode is reported by the new `keepAlive:` key of `mogwai.info`/`nano.info`
@@ -263,7 +273,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.3.0
