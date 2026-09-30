@@ -11,12 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
-- **`device.setPinFunction` renamed to `esp32.setPinFunction`** — the name now says plainly what was already true: this primitive only ever worked on ESP32 (it wraps `nanoFramework.Hardware.Esp32`'s IO_MUX/GPIO Matrix configuration), and has no equivalent yet on Pico W. `device.setPinFunction` no longer exists — any script using it needs updating to the new name
-- **The device runtime is now built and released as two separate targets** — `MogwaiNanoEsp32` and `MogwaiNanoPicoW` — sharing all of their platform-independent code through a common `MogwaiNanoCore` library, rather than one project referencing ESP32-specific packages directly. Each release now attaches two firmware binaries, `MogwaiNanoEsp32-<version>.bin` and `MogwaiNanoPicoW-<version>.bin`, with the version — taken from the release's own tag, the same source `mogwai-nano-studio-gui-<version>-<platform>` archives already used — right in the filename, so the two can never be confused with one another or with an older release's binary. Pico W support is new as of this release; it does not yet have its own equivalent of `esp32.setPinFunction`
-
 ### Fixed
 
 ### Removed
+
+## [0.7.0] - 2026-09-30
+
+### Updated
+
+- **`device.setPinFunction` renamed to `esp32.setPinFunction`** — the name now says plainly what was already true: this primitive only ever worked on ESP32 (it wraps `nanoFramework.Hardware.Esp32`'s IO_MUX/GPIO Matrix configuration), and has no equivalent yet on Pico W. `device.setPinFunction` no longer exists — any script using it needs updating to the new name
+- **The device runtime is now built and released as two separate targets** — `MogwaiNanoEsp32` and `MogwaiNanoPicoW` — sharing all of their platform-independent code through a common `MogwaiNanoCore` library, rather than one project referencing ESP32-specific packages directly. Each release now attaches two firmware binaries, `MogwaiNanoEsp32-<version>.bin` and `MogwaiNanoPicoW-<version>.bin`, with the version — taken from the release's own tag, the same source `mogwai-nano-studio-gui-<version>-<platform>` archives already used — right in the filename, so the two can never be confused with one another or with an older release's binary. Pico W support is new as of this release; it does not yet have its own equivalent of `esp32.setPinFunction`
 
 ## [0.6.0] - 2026-09-29
 
@@ -276,7 +280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.4.0
