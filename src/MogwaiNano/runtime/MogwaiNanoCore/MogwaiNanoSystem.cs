@@ -1,40 +1,27 @@
-// Copyright 2026 Stéphane Sibué
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using MogwaiNano.Engine;
-using MogwaiNano.Objects;
-using nanoFramework.Networking;
+ï»¿using nanoFramework.Networking;
 using nanoFramework.Runtime.Native;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.NetworkInformation;
 using System.Text;
-using System.Net.NetworkInformation;    
 using System.Threading;
+using MogwaiNano;
+using MogwaiNano.Engine;
+using MogwaiNano.Objects;
 using GC = nanoFramework.Runtime.Native.GC;
 
-namespace MogwaiNano
+namespace MogwaiNanoCore
 {
-    public class Program
+    public class MogwaiNanoSystem
     {
-        public static void Main()
+        public static void Start()
         {
             Power.OnRebootEvent += Power_OnRebootEvent;
 
             Debug.WriteLine("MOGWAI NANO");
             Debug.WriteLine($"Version {MogwaiNanoEngine.Version}");
-            Debug.WriteLine("(c) 2026 Stéphane Sibué");
+            Debug.WriteLine("(c) 2026 StÃ©phane SibuÃ©");
 
             AppGlobal.Initialize();
 
@@ -109,7 +96,7 @@ namespace MogwaiNano
             }
             else if (message.Function == "AUTORUN.SET")
             {
-                // On stocke le code dans I:\autorun.mogwai pour qu'il soit exécuté au démarrage
+                // On stocke le code dans I:\autorun.mogwai pour qu'il soit exÃ©cutÃ© au dÃ©marrage
 
                 var code = message.Parameters[0];
                 File.WriteAllText(AppGlobal.AUTORUN_FILE, code);
@@ -537,11 +524,11 @@ namespace MogwaiNano
                         try
                         {
                             var files = Directory.GetFiles(rootUsing);
-                            
-                            foreach (var file in files)                         
+
+                            foreach (var file in files)
                                 File.Delete(file);
 
-                            Directory.Delete(rootUsing);    
+                            Directory.Delete(rootUsing);
 
                             AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "USINGS.PURGE", "OK"));
                         }

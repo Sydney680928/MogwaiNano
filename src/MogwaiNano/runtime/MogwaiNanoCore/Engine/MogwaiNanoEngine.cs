@@ -295,6 +295,20 @@ namespace MogwaiNano.Engine
             return p(engine, name);
         }
 
+        public static void RegisterPrimitive(string name, PrimitiveDelegate primitive, bool allowReplacePrimitive = false)
+        {
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentException("Primitive name cannot be null or empty.", nameof(name));
+
+            if (primitive == null)
+                throw new ArgumentNullException(nameof(primitive), "Primitive delegate cannot be null.");
+
+            if (!allowReplacePrimitive && Primitives.Contains(name))
+                throw new InvalidOperationException($"A primitive with the name '{name}' is already registered.");
+
+            Primitives[name] = primitive;
+        }
+
         private static void RegisterPrimitives()
         {
             Primitives.Add("->type", new PrimitiveDelegate(PrimitiveGetType));
@@ -470,8 +484,6 @@ namespace MogwaiNano.Engine
             Primitives.Add("spi.transfer", new PrimitiveDelegate(PrimitiveSpiTransfer));
             Primitives.Add("spi.minClockFrequency", new PrimitiveDelegate(PrimitiveSpiMinClockFrequency));
             Primitives.Add("spi.maxClockFrequency", new PrimitiveDelegate(PrimitiveSpiMaxClockFrequency));
-
-            Primitives.Add("device.setPinFunction", new PrimitiveDelegate(PrimitiveDeviceSetPinFunction));
 
             Primitives.Add("stopwatch.create", new PrimitiveDelegate(PrimitiveStopwatchCreate));
             Primitives.Add("stopwatch.start", new PrimitiveDelegate(PrimitiveStopwatchStart));
@@ -5948,50 +5960,7 @@ namespace MogwaiNano.Engine
         }
 
         #endregion
-
-        #region DEVICE
-
-        private static EvalResult PrimitiveDeviceSetPinFunction(MogwaiNanoEngine engine, string name)
-        {
-            // pin setvalue device.setPin
-
-            var s = engine.StackSign(2);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
-            {
-                var setValue = engine.StackPop() as MOGNumber;
-                var pin = engine.StackPop() as MOGNumber;
-
-                if (pin.Value < 0)
-                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
-
-                if (SystemInfo.Platform == "ESP32")
-                {
-                    try
-                    {
-                        nanoFramework.Hardware.Esp32.Configuration.SetPinFunction((int)pin.Value, (nanoFramework.Hardware.Esp32.DeviceFunction)(int)setValue.Value);
-                    }
-                    catch (Exception ex)
-                    {
-                        return EvalResult.Failure(engine, Error.PlatformNotSupportedError, name, ex.Message);
-                    }
-
-                    return EvalResult.NoError;
-                }
-                else
-                {
-                    return EvalResult.Failure(engine, Error.PlatformNotSupportedError, name);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        #endregion
-
+               
         #endregion
 
         #region STACK

@@ -34,7 +34,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MogwaiNanoADC\MogwaiNanoADC.nfproj" />
-    <ProjectReference Include="..\..\..\runtime\MogwaiNano\MogwaiNano.nfproj" />
   </ItemGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets')" />
   <ProjectExtensions>

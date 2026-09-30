@@ -8,32 +8,29 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectTypeGuids>{11A8DD76-328B-46DF-9F39-F559912D0360};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-    <ProjectGuid>737a5ac4-59ac-4c63-b2a6-b95de48f68c5</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <ProjectGuid>32df1c22-e9cb-45cb-8128-df3594aa4c89</ProjectGuid>
+    <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <FileAlignment>512</FileAlignment>
-    <RootNamespace>MogwaiNanoADC</RootNamespace>
-    <AssemblyName>MogwaiNanoADC</AssemblyName>
+    <RootNamespace>MogwaiNanoPicoW</RootNamespace>
+    <AssemblyName>MogwaiNanoPicoW</AssemblyName>
     <TargetFrameworkVersion>v1.0</TargetFrameworkVersion>
   </PropertyGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.props" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.props')" />
   <ItemGroup>
-    <Compile Include="MogwaiNanoADC.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib">
-      <HintPath>..\..\..\packages\nanoFramework.CoreLibrary.1.17.11\lib\mscorlib.dll</HintPath>
-    </Reference>
-    <Reference Include="nanoFramework.System.Collections">
-      <HintPath>..\..\..\packages\nanoFramework.System.Collections.1.5.75\lib\nanoFramework.System.Collections.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Device.Adc">
-      <HintPath>..\..\..\packages\nanoFramework.System.Device.Adc.1.1.24\lib\System.Device.Adc.dll</HintPath>
+      <HintPath>..\..\packages\nanoFramework.CoreLibrary.1.17.11\lib\mscorlib.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MogwaiNanoCore\MogwaiNanoCore.nfproj" />
   </ItemGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets')" />
   <ProjectExtensions>

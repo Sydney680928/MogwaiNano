@@ -27,10 +27,27 @@ jobs:
       - name: Restore packages
         run: nuget restore src/MogwaiNano/MogwaiNano.sln
 
-      - name: Build MogwaiNano device runtime (Release)
-        run: msbuild src/MogwaiNano/runtime/MogwaiNano/MogwaiNano.nfproj -p:Configuration=Release -t:Rebuild
+      - name: Build MogwaiNano ESP32 (Release)
+        run: msbuild src/MogwaiNano/runtime/MogwaiNanoEsp32/MogwaiNanoEsp32.nfproj -p:Configuration=Release -t:Rebuild
 
-      - name: Attach binary to release
+      - name: Build MogwaiNano Pico W (Release)
+        run: msbuild src/MogwaiNano/runtime/MogwaiNanoPicoW/MogwaiNanoPicoW.nfproj -p:Configuration=Release -t:Rebuild
+
+      # Version comes from the GitHub release tag itself — same source as
+      # release-studio-gui.yml — not from AssemblyInfo.cs, so there's
+      # nothing to remember to update in the project before cutting a
+      # release. Copies (rather than renames) each .bin so the original
+      # build output is left untouched.
+      - name: Prepare versioned binaries
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.release.tag_name }}"
+          New-Item -ItemType Directory -Force -Path "release-artifacts" | Out-Null
+
+          Copy-Item "src/MogwaiNano/runtime/MogwaiNanoEsp32/bin/Release/MogwaiNanoEsp32.bin" "release-artifacts/MogwaiNanoEsp32-$version.bin"
+          Copy-Item "src/MogwaiNano/runtime/MogwaiNanoPicoW/bin/Release/MogwaiNanoPicoW.bin" "release-artifacts/MogwaiNanoPicoW-$version.bin"
+
+      - name: Attach binaries to release
         uses: softprops/action-gh-release@v2
         with:
-          files: src/MogwaiNano/runtime/MogwaiNano/bin/Release/MogwaiNano.bin
+          files: release-artifacts/*.bin
