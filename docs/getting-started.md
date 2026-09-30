@@ -5,6 +5,8 @@ This tutorial assumes you already know the basics of MOGWAI itself — the RPN s
 Here, we focus on what's specific to NANO: flashing a device, connecting to it, and driving real hardware.
 
 > Every example below uses **MOGWAI NANO Studio GUI**. The earlier console-based Studio is no longer maintained as of the 0.6 release.
+>
+> This guide also assumes an **ESP32** device throughout — every step after flashing depends on a working network connection to talk to the device. Raspberry Pi Pico 2 W support exists as of 0.7 (see the [README](../README.md#supported-platforms)), but WiFi doesn't currently connect on it, so none of this guide is usable with a Pico 2 W yet.
 
 ## 1. Flash and configure your device
 

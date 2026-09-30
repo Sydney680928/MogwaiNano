@@ -63,7 +63,7 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
 - **Network protocol** — UDP discovery + reliable TCP communication, with automatic disconnection detection and clean recovery
 - **Persistent autorun** — store code to run automatically on every boot, for standalone production deployments
-- **ESP32-focused** — the current build targets ESP32 exclusively. Raspberry Pi Pico W support is paused (see [Supported platforms](#supported-platforms) below) but planned to return once the project's restructuring work lands
+- **ESP32 and Raspberry Pi Pico 2 W** — the runtime is built on a shared core plus per-platform pieces, with ESP32 fully usable end-to-end today; Pico 2 W boots and runs the same runtime, but isn't yet usable with a Studio — see [Supported platforms](#supported-platforms) below
 
 ## Memory considerations
 
@@ -87,7 +87,7 @@ None of this is a bug to "just fix" — it's a direct, measured consequence of r
 | ESP32 | ✅ Tested — usable for small, single-purpose scripts only (see [Memory considerations](#memory-considerations)); not recommended for anything more composite |
 | ESP32-S3 (with PSRAM) | ✅ Tested — recommended for composite projects (display, multiple sensors, long-running sessions) |
 | Classic ESP32/WROVER (with PSRAM, `ESP32_PSRAM_REV3` target) | 🔜 Should work comparably to ESP32-S3+PSRAM — not yet tested by us |
-| Raspberry Pi Pico W | ❌ Not currently supported — including the ESP32-specific pin-configuration package in the runtime broke Pico builds. Planned to return once the project is restructured into a shared core plus per-platform pieces |
+| Raspberry Pi Pico 2 W (`PICO2_RP2350_W`, RP2350) | ⚠️ Boots and runs the shared runtime, deploys successfully — but WiFi doesn't currently connect (see note in [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below), so it can't yet talk to a Studio. Not usable end-to-end yet. The original Pico W (RP2040) hasn't been tried |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 
@@ -103,16 +103,17 @@ MOGWAI NANO Studio is the graphical companion app that talks to a device from yo
 
 Every [release](https://github.com/Sydney680928/MogwaiNano/releases) attaches everything below — same version number across the board, since the whole ecosystem ships together:
 
-- **`MogwaiNano.bin`** — the device firmware/application. This is the file used in [Quick start](#quick-start) below, deployed with `nanoff --deploy --image MogwaiNano.bin`.
+- **`MogwaiNanoEsp32-<version>.bin`** — the device firmware/application for ESP32. This is the file used in [Quick start](#quick-start) below, deployed with `nanoff --deploy --image MogwaiNanoEsp32-<version>.bin`.
+- **`MogwaiNanoPicoW-<version>.bin`** — the same runtime, built for Raspberry Pi Pico 2 W. Deploys successfully (see [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below), but isn't yet usable end-to-end — WiFi doesn't currently connect.
 - **`mogwai-nano-studio-gui-<version>-<platform>.zip`/`.tar.gz`** — the Studio, self-contained, one archive per platform (`win-x64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`). Pick the one matching your PC, extract, and run — no install, no .NET runtime required.
 
-You only need the firmware if you're setting up a new device, and only the Studio archive matching your platform — you don't need every file in a release, just the ones matching your situation.
+You only need one of the two firmware binaries — whichever matches your device — and only the Studio archive matching your platform. You don't need every file in a release, just the ones matching your situation.
 
 ## Quick start
 
 ### 1. Flash the firmware + application
 
-Download the latest `MogwaiNano.bin` from the [Releases](../../releases) page, then:
+Download the latest `MogwaiNanoEsp32-<version>.bin` from the [Releases](../../releases) page, then:
 
 ```bash
 # Install the nanoFramework flashing tool
@@ -129,7 +130,7 @@ nanoff --target ESP32_REV3 --serialport COMx --masserase --update
 #    consistently reliable with this power cycle in between.
 
 # 3. Deploy the application
-nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --address 0x1E0000
+nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNanoEsp32-<version>.bin --address 0x1E0000
 ```
 
 > **Why two separate commands, and why `--address` is required:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation is unreliable and consistently fails to match the device's actual partition layout — confirmed across three different boards, regardless of firmware version. Always pass `--address 0x1E0000` explicitly when deploying. It also needs to be in its own command, separate from `--update`: combining `--update` and `--deploy --address` in a single invocation causes `--address` to be silently ignored.
@@ -140,7 +141,7 @@ nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNano.bin --a
 
 > On ESP32, you may be asked to hold the BOOT/FLASH button on the board during flashing.
 
-> **Raspberry Pi Pico W:** not currently supported. Including the ESP32-specific pin-configuration package in the runtime broke Pico builds — this will be resolved once the project is restructured into a shared core plus per-platform pieces (see the [Roadmap](#roadmap) below). ESP32 is the only target to follow this guide with for now.
+> **Raspberry Pi Pico W:** the original (RP2040) hasn't been tried. For the Pico 2 W (RP2350), see [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below — it deploys, but isn't usable end-to-end yet.
 
 ### 1b. Flash the firmware + application (ESP32-S3 with Octal PSRAM)
 
@@ -159,10 +160,24 @@ nanoff --target ESP32_S3_OCTAL --serialport COMx --masserase --update
 
 # 3. Deploy the application — unlike ESP32_REV3 above, no explicit
 # --address is needed here; confirmed across 4 different S3 boards
-nanoff --target ESP32_S3_OCTAL --serialport COMx --deploy --image MogwaiNano.bin
+nanoff --target ESP32_S3_OCTAL --serialport COMx --deploy --image MogwaiNanoEsp32-<version>.bin
 ```
 
 > **Known S3 quirk:** flashing can take noticeably longer than on a classic ESP32 — several minutes rather than seconds is normal, not a sign of a hung process. Let it run.
+
+### 1c. Flash the firmware + application (Raspberry Pi Pico 2 W)
+
+> **This target doesn't work end-to-end yet.** The steps below deploy successfully, but WiFi doesn't currently connect — the device boots and runs the runtime, but can't reach a Studio over the network, so there's no way to actually use it for anything yet. Configuring WiFi through Visual Studio's Device Explorer consistently freezes VS at the validation step; injecting a WiFi configuration programmatically instead does store the configuration (it's confirmed present on the device afterward), but the connection then fails anyway, with nothing pointing to whether that's a wrong configuration or a real connectivity problem. ESP32 devices on the same network connect without any issue. Documented here as a known limitation, not a guide to a working setup — we'll update this once it's resolved.
+
+Confirmed working, for the Pico 2 W (`PICO2_RP2350_W`) specifically — the original Pico W (RP2040) hasn't been tried:
+
+```bash
+# 1. Flash the firmware
+nanoff --platform rpi_pico --target PICO2_RP2350_W --update
+
+# 2. Deploy the application
+nanoff --target PICO2_RP2350_W --serialport COMx --deploy --image MogwaiNanoPicoW-<version>.bin
+```
 
 ### 2. Configure WiFi
 
@@ -208,8 +223,13 @@ Your device is now blinking an LED, controlled remotely from your PC. 🎉
 
 ```
 src/MogwaiNano/
-├── MogwaiNano/             # Device runtime (deployed to ESP32 — Pico W support paused, see Roadmap)
-└── MogwaiNanoStudioGui/    # Desktop companion app, GUI (Avalonia)
+├── runtime/
+│   ├── MogwaiNanoCore/     # Platform-independent device runtime — engine, language, hardware primitives
+│   ├── MogwaiNanoEsp32/    # ESP32 target: references Core + ESP32-specific pin configuration
+│   └── MogwaiNanoPicoW/    # Raspberry Pi Pico 2 W target: references Core (boots and runs; WiFi not yet working)
+├── studio/
+│   └── MogwaiNanoStudioGui/    # Desktop companion app, GUI (Avalonia)
+└── usings/                 # Dynamically-loadable plugin libraries (experimental — see mogwai.using)
 ```
 
 ## Documentation
@@ -233,7 +253,8 @@ src/MogwaiNano/
 - [ ] BLE support
 - [x] `.mog` library system ("units") — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library)
 - [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the units system above on more capable boards
-- [ ] Restructure the runtime into a shared core plus per-platform pieces (project references + linked shared files across a per-target `.nfproj`), so platform-specific dependencies (like the ESP32 pin-configuration package currently baked into the single project) no longer block building for other targets — this is what will bring Raspberry Pi Pico W support back
+- [x] Restructure the runtime into a shared core plus per-platform pieces — `MogwaiNanoCore` (platform-independent) plus `MogwaiNanoEsp32`/`MogwaiNanoPicoW` (each referencing Core and adding only what's platform-specific). Each release now ships two separate, independently versioned firmware binaries
+- [ ] Raspberry Pi Pico 2 W networking — the device boots and deploys successfully, but WiFi doesn't currently connect. Configuring it through Visual Studio's Device Explorer freezes VS at validation; injecting a configuration programmatically stores it correctly but the connection still fails, with no clear indication of why. Not yet usable with a Studio as a result
 - [x] MOGWAI NANO Studio GUI, built on Avalonia — grew beyond the originally planned "monitoring only" scope into a genuinely capable companion: its own code editor, a REPL-style command line, live console/debug views, file management, and themes. VS Code + the MOGWAI extension remains a great way to write and edit code too — pick whichever fits your workflow
 
 ## About

@@ -414,7 +414,7 @@ All ⚙️ **NANO-only.** Channels identified by a user-chosen name, like I2C/PW
 
 | Primitive | Signature | Description |
 |---|---|---|
-| `spi.open` | `'name' bus csPin frequency mode spi.open` | Opens a named SPI channel. `bus` must be `1` or `2` (like I2C, exactly two SPI buses exist). `csPin` is any GPIO — chip-select toggling is handled automatically by the driver, no manual write needed. `frequency` in Hz. `mode` is `0`-`3` (standard SPI CPOL/CPHA combinations). Refuses to reopen an already-used name. Unlike I2C, **no default pin mapping exists on either bus** — `device.setPinFunction` is mandatory for MOSI/MISO/SCK before every `spi.open`, no exceptions |
+| `spi.open` | `'name' bus csPin frequency mode spi.open` | Opens a named SPI channel. `bus` must be `1` or `2` (like I2C, exactly two SPI buses exist). `csPin` is any GPIO — chip-select toggling is handled automatically by the driver, no manual write needed. `frequency` in Hz. `mode` is `0`-`3` (standard SPI CPOL/CPHA combinations). Refuses to reopen an already-used name. Unlike I2C, **no default pin mapping exists on either bus** — `esp32.setPinFunction` is mandatory for MOSI/MISO/SCK before every `spi.open`, no exceptions |
 | `spi.close` | `'name' spi.close` | Closes the channel and releases the resource |
 | `spi.write` | `'name' data spi.write` | Sends a `MOGData` buffer of any length in a single transaction |
 | `spi.read` | `'name' length spi.read` → `.data` | Reads `length` bytes from the device and pushes them as a `MOGData`. `length` must be between `0` and `4096`, otherwise `MW.22` is raised; `MW.554` is raised if the read itself fails. Like `spi.write`, each call is its own transaction (the driver handles chip-select around it): for a protocol that has to write and read within the same transaction, use `spi.transfer` |
@@ -428,7 +428,7 @@ All ⚙️ **NANO-only.** Channels identified by a user-chosen name, like I2C/PW
 
 ## 13. PWM
 
-All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, following the same pattern as I2C. Requires the pin to already be configured for PWM via `device.setPinFunction` (see [ESP32 DeviceFunction values reference](esp32-device-function-values.md)) beforehand.
+All ⚙️ **NANO-only.** Channels are identified by a user-chosen name, following the same pattern as I2C. Requires the pin to already be configured for PWM via `esp32.setPinFunction` (see [ESP32 DeviceFunction values reference](esp32-device-function-values.md)) beforehand.
 
 | Primitive | Signature | Description |
 |---|---|---|
@@ -482,11 +482,11 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ## 16. Device-level platform access
 
-⚙️ **NANO-only.**
+⚙️ **NANO-only. ESP32 only** — this primitive exists in the `MogwaiNanoEsp32` binary alone; it isn't part of `MogwaiNanoPicoW` at all (not a runtime check, the primitive itself isn't compiled in). Raspberry Pi Pico 2 W has no equivalent yet.
 
 | Primitive | Signature | Description |
 |---|---|---|
-| `device.setPinFunction` | `pin function device.setPinFunction` | Dynamically reassigns a pin's function — e.g. designating I2C clock/data pins on a board where the default I2C bus isn't pre-wired (like `ESP32_S3_OCTAL`). `function` is a raw numeric value from the platform's own function enum (e.g. `nanoFramework.Hardware.Esp32`'s `DeviceFunction` — `131328`/`131329` for `I2C1_DATA`/`I2C1_CLOCK`), not a MOGWAI NANO abstraction — see the [ESP32 DeviceFunction values reference](esp32-device-function-values.md) for the complete list (SPI, I2C, serial, PWM, ADC, I2S, SDMMC). Detects the running platform at runtime and only invokes the platform-specific API when it matches, returning a clean error otherwise — this keeps the `.bin` universal across platforms rather than requiring a separate build per target. Currently implemented for ESP32 only; other platforms return a clean "unsupported" error |
+| `esp32.setPinFunction` | `pin function esp32.setPinFunction` | Dynamically reassigns a pin's function — e.g. designating I2C clock/data pins on a board where the default I2C bus isn't pre-wired (like `ESP32_S3_OCTAL`). `function` is a raw numeric value from `nanoFramework.Hardware.Esp32`'s `DeviceFunction` enum (e.g. `131328`/`131329` for `I2C1_DATA`/`I2C1_CLOCK`), not a MOGWAI NANO abstraction — see the [ESP32 DeviceFunction values reference](esp32-device-function-values.md) for the complete list (SPI, I2C, serial, PWM, ADC, I2S, SDMMC). Named `device.setPinFunction` before the runtime split into per-platform binaries (see the [project structure](../README.md#project-structure)) — renamed once "device" stopped being accurate |
 
 ---
 

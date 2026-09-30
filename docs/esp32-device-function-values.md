@@ -1,12 +1,12 @@
-# ESP32 `DeviceFunction` Values — Reference for `device.setPinFunction`
+# ESP32 `DeviceFunction` Values — Reference for `esp32.setPinFunction`
 
-Extracted from `nanoFramework.Hardware.Esp32`'s `DeviceFunction` enum (v1.6.42). These are the numeric values to pass as the `function` parameter to `device.setPinFunction pin function`.
+Extracted from `nanoFramework.Hardware.Esp32`'s `DeviceFunction` enum (v1.6.42). These are the numeric values to pass as the `function` parameter to `esp32.setPinFunction pin function`.
 
-This applies to the classic `ESP32_REV3` target. Other ESP32 variants (like `ESP32_S3_OCTAL`) may not follow the same default pin mapping at all — on those boards, `device.setPinFunction` may be required even for buses (like I2C) that need no configuration whatsoever on `ESP32_REV3`.
+This applies to the classic `ESP32_REV3` target. Other ESP32 variants (like `ESP32_S3_OCTAL`) may not follow the same default pin mapping at all — on those boards, `esp32.setPinFunction` may be required even for buses (like I2C) that need no configuration whatsoever on `ESP32_REV3`.
 
 ## Default pin mapping on `ESP32_REV3`
 
-Before reaching for `device.setPinFunction`, check whether the pin you need is already wired by default — no configuration needed in that case. This is nanoFramework's own default mapping, straight from the [official ESP32 Pin Out documentation](https://docs.nanoframework.net/content/esp32/esp32_pin_out.html).
+Before reaching for `esp32.setPinFunction`, check whether the pin you need is already wired by default — no configuration needed in that case. This is nanoFramework's own default mapping, straight from the [official ESP32 Pin Out documentation](https://docs.nanoframework.net/content/esp32/esp32_pin_out.html).
 
 ### I2C (already wired by default)
 
@@ -15,7 +15,7 @@ Before reaching for `device.setPinFunction`, check whether the pin you need is a
 | I2C1 | GPIO 18 | GPIO 19 |
 | I2C2 | GPIO 25 | GPIO 26 |
 
-This is exactly why `ESP32_REV3` never needs `device.setPinFunction` for I2C — the default bus is already usable as-is with `i2c.open`.
+This is exactly why `ESP32_REV3` never needs `esp32.setPinFunction` for I2C — the default bus is already usable as-is with `i2c.open`.
 
 ### SPI (already wired by default)
 
@@ -34,11 +34,11 @@ This is exactly why `ESP32_REV3` never needs `device.setPinFunction` for I2C —
 
 ### PWM — undefined by default
 
-All 16 PWM channels have no pin assigned at startup — `device.setPinFunction` is always required to use PWM on `ESP32_REV3`. Channels `PWM0`-`PWM7` use a low-precision timer; `PWM8`-`PWM15` use a high-resolution timer — pick based on the precision your use case needs (a passive buzzer doesn't care much; driving something more time-sensitive might).
+All 16 PWM channels have no pin assigned at startup — `esp32.setPinFunction` is always required to use PWM on `ESP32_REV3`. Channels `PWM0`-`PWM7` use a low-precision timer; `PWM8`-`PWM15` use a high-resolution timer — pick based on the precision your use case needs (a passive buzzer doesn't care much; driving something more time-sensitive might).
 
-### ADC — fixed GPIO mapping, no `device.setPinFunction` needed
+### ADC — fixed GPIO mapping, no `esp32.setPinFunction` needed
 
-Unlike PWM, ADC channels map to fixed GPIOs and don't need `device.setPinFunction` — just pass the right channel number to `adc.open`.
+Unlike PWM, ADC channels map to fixed GPIOs and don't need `esp32.setPinFunction` — just pass the right channel number to `adc.open`.
 
 | Channel | Internal controller | GPIO | Notes |
 |---|---|---|---|
@@ -77,7 +77,7 @@ Unlike PWM, ADC channels map to fixed GPIOs and don't need `device.setPinFunctio
 
 ---
 
-## `DeviceFunction` numeric values (for `device.setPinFunction`)
+## `DeviceFunction` numeric values (for `esp32.setPinFunction`)
 
 ## SPI
 
