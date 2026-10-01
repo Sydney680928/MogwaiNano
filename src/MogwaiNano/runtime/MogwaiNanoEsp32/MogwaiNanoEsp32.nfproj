@@ -36,6 +36,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\MogwaiNanoBlePeripheral\MogwaiNanoBlePeripheral.nfproj" />
     <ProjectReference Include="..\MogwaiNanoCore\MogwaiNanoCore.nfproj" />
   </ItemGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets')" />

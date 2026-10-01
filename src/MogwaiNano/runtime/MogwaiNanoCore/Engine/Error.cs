@@ -90,7 +90,6 @@ namespace MogwaiNano.Engine
             _unableToReadUnitError,
 
             _platformNotSupportedError
-
             ;
 
         private static void EnsureInitialized()

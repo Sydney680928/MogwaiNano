@@ -14,6 +14,7 @@
 
 using MogwaiNano.Engine;
 using MogwaiNano.Objects;
+using MogwaiNanoBlePeripheral;
 using System;
 using System.Threading;
 
@@ -23,8 +24,16 @@ namespace MogwaiNanoEsp32
     {
         public static void Main()
         {
-
             MogwaiNanoEngine.RegisterPrimitive("esp32.setPinFunction", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveDeviceSetPinFunction), true);
+
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.create", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralCreate));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.start", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralStart));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.stop", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralStop));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.getValue", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralGetValue));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.setValue", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralSetValue));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.notify", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralNotify));
+
+            MogwaiNanoEngine.Skills.Add("BLE-P");
 
             MogwaiNanoCore.MogwaiNanoSystem.Start();
 

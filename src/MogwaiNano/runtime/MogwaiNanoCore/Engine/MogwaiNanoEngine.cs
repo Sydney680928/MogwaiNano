@@ -64,7 +64,6 @@ namespace MogwaiNano.Engine
         private string _pendingRunCode;
         private bool _pendingDebugMode;
         private Thread _runThread;
-        private static readonly string[] _skills = { "GPIO", "I2C", "SSD1306", "PWM", "ADC", "SPI", "UNITS", "TASKS", "EVENTS", "TIMERS" };
         private EvalResult _lastResult;
         private Error _lastError;
         private int _iterationCount = 0;
@@ -171,7 +170,7 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public static string[] Skills => _skills;
+        public static ArrayList Skills { get; set; } = new ArrayList { "GPIO", "I2C", "SSD1306", "PWM", "ADC", "SPI", "UNITS", "TASKS", "EVENTS", "TIMERS" };
 
         public bool FrugalMode { get; set; } = false;
 
@@ -3195,7 +3194,7 @@ namespace MogwaiNano.Engine
 
             var skills = new MOGList(engine);
 
-            foreach (var skill in _skills)
+            foreach (string skill in Skills)
                 skills.AddItem(new MOGString(engine, skill));
 
             record.SetItem("skills", skills);
@@ -4296,7 +4295,7 @@ namespace MogwaiNano.Engine
         {
             var list = new MOGList(engine);
 
-            foreach (var skill in Skills)
+            foreach (string skill in Skills)
                 list.AddItem(new MOGName(engine, skill));
 
             engine.StackPush(list);
@@ -4317,7 +4316,7 @@ namespace MogwaiNano.Engine
             var skillName = engine.StackPop() as MOGName;
             var skillValue = skillName.Value.ToUpper();
 
-            foreach (var skill in Skills)
+            foreach (string skill in Skills)
             {
                 if (skill == skillValue)
                 {
@@ -5960,7 +5959,7 @@ namespace MogwaiNano.Engine
         }
 
         #endregion
-               
+
         #endregion
 
         #region STACK
@@ -6261,6 +6260,8 @@ namespace MogwaiNano.Engine
 
             return EvalResult.Failure(this, Error.UnknownNameError, $"unabled to purge unknown '{name}' event.");
         }
+
+        public EvalResult FireEvent(string name) => FireEvent(name, new MOGNull(this));
 
         public EvalResult FireEvent(string name, MOGObject eventData)
         {
@@ -6747,7 +6748,13 @@ namespace MogwaiNano.Engine
 
                 return EvalResult.NoError;
             }
-        }  
+        }
+
+        #endregion
+
+        #region BLE PERIPHERAL
+
+        
 
         #endregion
 
