@@ -39,7 +39,7 @@ The device only ever executes this minimal form — no complex parser, no syntac
 ## Why two runtimes?
 
 - **MOGWAI NANO Studio** (PC) — full syntactic sugar, an integrated editor, network device discovery, and orchestration logic written in regular MOGWAI.
-- **MOGWAI NANO** (device) — a minimal, rigorously disciplined RPN interpreter with GPIO, I2C (including a dedicated SSD1306 OLED display driver), PWM, ADC, timers, event support, and real parallel execution via tasks.
+- **MOGWAI NANO** (device) — a minimal, rigorously disciplined RPN interpreter with GPIO, I2C (including a dedicated SSD1306 OLED display driver), SPI, PWM, ADC, BLE peripheral (ESP32 only), timers, event support, and real parallel execution via tasks.
 
 This separation means the device firmware stays small and stable, while the desktop side can evolve freely — including reusing the existing [MOGWAI VS Code extension](https://github.com/Sydney680928/mogwai) with zero modification, since from the editor's point of view, you're just writing MOGWAI.
 
@@ -55,7 +55,7 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 ## Key features
 
 - **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags, structured error handling (`trap`/`guard`)
-- **Hardware support** — GPIO, I2C, SPI, PWM, ADC, and a dedicated SSD1306 OLED display driver
+- **Hardware support** — GPIO, I2C, SPI, PWM, ADC, BLE peripheral (ESP32 only), and a dedicated SSD1306 OLED display driver
 - **Tasks** — real parallel execution, each on its own native thread with a fully isolated runtime instance, communicating with the parent only through events. Practical only on a PSRAM-equipped board (~10KB per task) — see [Memory considerations](#memory-considerations)
 - **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~40KB-RAM devices
 - **Reusable code libraries** — *units*, stored on flash and loaded on demand, for sharing functions (an RTC helper library, for example) across scripts without copy-pasting
@@ -111,7 +111,7 @@ You only need one of the two firmware binaries — whichever matches your device
 
 ## Quick start
 
-### 1. Flash the firmware + application
+### 1. Flash the firmware + application (ESP32-S3 with Octal PSRAM — recommended)
 
 Download the latest `MogwaiNanoEsp32-<version>.bin` from the [Releases](../../releases) page, then:
 
@@ -119,6 +119,30 @@ Download the latest `MogwaiNanoEsp32-<version>.bin` from the [Releases](../../re
 # Install the nanoFramework flashing tool
 dotnet tool install -g nanoff
 
+# 1. Flash the firmware — be explicit about the target: nanoff cannot
+# auto-detect Octal vs Quad PSRAM, and silently picking the wrong one
+# will cause boot failures
+nanoff --target ESP32_S3_OCTAL --serialport COMx --masserase --update
+
+# 2. Power-cycle the board now — unplug, wait ~2 seconds, plug back in.
+#    Required: deploying the application right after flashing the firmware,
+#    without power-cycling in between, has been unreliable. Confirmed
+#    consistently reliable with this power cycle in between.
+
+# 3. Deploy the application — unlike ESP32_REV3 below, no explicit
+# --address is needed here; confirmed across 4 different S3 boards
+nanoff --target ESP32_S3_OCTAL --serialport COMx --deploy --image MogwaiNanoEsp32-<version>.bin
+```
+
+> **Known S3 quirk:** flashing can take noticeably longer than on a classic ESP32 — several minutes rather than seconds is normal, not a sign of a hung process. Let it run.
+
+> **Raspberry Pi Pico W:** the original (RP2040) hasn't been tried. For the Pico 2 W (RP2350), see [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below — it deploys, but isn't usable end-to-end yet.
+
+### 1b. Flash the firmware + application (classic ESP32 / ESP32_REV3)
+
+If you're using a classic ESP32 (`ESP32_REV3`) instead (see [Memory considerations](#memory-considerations) for why ESP32-S3 above is the recommended path):
+
+```bash
 # ESP32 — two separate commands (see note below on why)
 
 # 1. Flash the firmware (--masserase avoids issues from leftover factory partitions on a brand-new board)
@@ -140,30 +164,6 @@ nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNanoEsp32-<v
 > After deploying, check the device with `nanoff --devicedetails` or Device Explorer and look at the `Assemblies:` section to confirm success — `MogwaiNano` should be listed there with its dependencies. The `Deployment Map` field further down is unrelated to this (it reports on In-Field Update capability, which this target doesn't support) and will read `Empty` even on a fully successful deployment — don't use it to diagnose a failed deploy.
 
 > On ESP32, you may be asked to hold the BOOT/FLASH button on the board during flashing.
-
-> **Raspberry Pi Pico W:** the original (RP2040) hasn't been tried. For the Pico 2 W (RP2350), see [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below — it deploys, but isn't usable end-to-end yet.
-
-### 1b. Flash the firmware + application (ESP32-S3 with Octal PSRAM)
-
-If you're targeting an ESP32-S3 board instead of a classic ESP32/REV3 (recommended — see [Memory considerations](#memory-considerations)):
-
-```bash
-# 1. Flash the firmware — be explicit about the target: nanoff cannot
-# auto-detect Octal vs Quad PSRAM, and silently picking the wrong one
-# will cause boot failures
-nanoff --target ESP32_S3_OCTAL --serialport COMx --masserase --update
-
-# 2. Power-cycle the board now — unplug, wait ~2 seconds, plug back in.
-#    Required: deploying the application right after flashing the firmware,
-#    without power-cycling in between, has been unreliable. Confirmed
-#    consistently reliable with this power cycle in between.
-
-# 3. Deploy the application — unlike ESP32_REV3 above, no explicit
-# --address is needed here; confirmed across 4 different S3 boards
-nanoff --target ESP32_S3_OCTAL --serialport COMx --deploy --image MogwaiNanoEsp32-<version>.bin
-```
-
-> **Known S3 quirk:** flashing can take noticeably longer than on a classic ESP32 — several minutes rather than seconds is normal, not a sign of a hung process. Let it run.
 
 ### 1c. Flash the firmware + application (Raspberry Pi Pico 2 W)
 
@@ -237,7 +237,7 @@ src/MogwaiNano/
 - [Getting started guide](docs/getting-started.md) — step-by-step NANO tutorial (connect, GPIO, timers, events)
 - [Device primitives reference](docs/device-primitives.md) — complete, exhaustive reference for every primitive in the device runtime, marking which are shared with desktop MOGWAI and which are NANO-only
 - [Studio primitives reference](docs/studio-primitives.md) — the full `nano.*` command set exposed by MOGWAI NANO Studio (connection, discovery, running code, device state, autorun)
-- [ESP32 DeviceFunction values reference](docs/esp32-device-function-values.md) — the complete lookup table needed to use `device.setPinFunction` (SPI, I2C, serial, PWM, ADC, I2S, SDMMC)
+- [ESP32 DeviceFunction values reference](docs/esp32-device-function-values.md) — the complete lookup table needed to use `esp32.setPinFunction` (SPI, I2C, serial, PWM, ADC, I2S, SDMMC)
 - [Network protocol](docs/) *(coming soon)*
 
 ## Roadmap
@@ -250,7 +250,8 @@ src/MogwaiNano/
 - [ ] STM32 and TI validation
 - [x] ESP32-S3 / PSRAM validation — confirmed transparently usable by the managed heap, and confirmed to resolve the memory-fragmentation instability seen on plain ESP32 under sustained, multi-subsystem load (see [Memory considerations](#memory-considerations))
 - [x] Tasks — real parallel execution, each on its own native thread with a fully isolated runtime instance (confirmed practical on ESP32-S3/PSRAM, confirmed too tight on a plain ESP32)
-- [ ] BLE support
+- [x] BLE peripheral support (ESP32 only) — a single record defines a whole peripheral (services, characteristics, properties, initial values). Lives in its own assembly, kept out of `MogwaiNanoCore` to stay well under its metadata-table size limit
+- [ ] BLE central support (ESP32 only) — connecting to and interacting with other BLE peripherals from a MOGWAI NANO device
 - [x] `.mog` library system ("units") — load reusable MOGWAI NANO code from flash at runtime (e.g. a shared RTC helper library)
 - [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the units system above on more capable boards
 - [x] Restructure the runtime into a shared core plus per-platform pieces — `MogwaiNanoCore` (platform-independent) plus `MogwaiNanoEsp32`/`MogwaiNanoPicoW` (each referencing Core and adding only what's platform-specific). Each release now ships two separate, independently versioned firmware binaries

@@ -135,7 +135,6 @@ A *skill* is a name declared by the host application embedding MOGWAI, identifyi
 |---|---|
 | `skills` | Returns the full list of declared skills as a `MOGList`, e.g. `skills ?` → `('GPIO' 'I2C')` |
 | `hasSkill` | Tests whether a named skill is present, returns a boolean — `if ('I2C' hasSkill) then { ... }` |
-| `mogwai.assertSkill` | Checks for a skill and stops execution with an error message (`MW.9`, calling `MOGWAI.onError` if defined) if it's absent — the recommended way to declare a script's prerequisites: `'I2C' "This script requires I2C support." mogwai.assertSkill` |
 
 The current skills are also available via the `skills:` key of the `mogwai.info` (device-side) / `nano.info` (Studio-side) record.
 

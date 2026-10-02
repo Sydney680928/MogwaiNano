@@ -490,6 +490,65 @@ All ⚙️ **NANO-only** — a native, non-RPN primitive family wrapping the `na
 
 ---
 
+## 17. BLE Peripheral
+
+⚙️ **NANO-only. ESP32 only** — lives entirely in its own `MogwaiNanoBlePeripheral` assembly, referenced only by `MogwaiNanoEsp32` (kept out of `MogwaiNanoCore`, which is already close to its own metadata-table size limit). Raspberry Pi Pico 2 W has no equivalent yet. Declares the `'BLE-P'` skill once available — check with `hasSkill` before using.
+
+`ble.peripheral.create` takes the whole peripheral definition as a single record:
+
+```
+[
+    name: "TEST"
+    services:
+    (
+        [
+            name: "Service1"
+            uuid: "7EC2D911-9D30-48B9-BC37-963C3775F04C"
+            characteristics:
+            (
+                [
+                    name: "FreeValue"
+                    uuid: "C9B57B56-7835-4305-B25D-6D783A10227A"
+                    properties: "RW"
+                    value: D:00
+                ]
+                [
+                    name: "AutoValue"
+                    uuid: "BF564D26-ECB0-43A4-B77F-DFB67F594B11"
+                    properties: "RN"
+                    value: D:00
+                ]
+            )
+        ]
+    )
+]
+```
+
+`uuid:` is a standard dashed GUID string, for both services and characteristics. `properties:` combines any of `R` (Read), `W` (Write), `X` (WriteWithoutResponse), `I` (Indicate), `N` (Notify). `value:` is the characteristic's initial value, as `MOGData`.
+
+**Only the first service listed is ever advertised.** Every service and characteristic described is created regardless, and all are reachable once a client is connected — but BLE advertising/discovery only exposes that first service. Define everything under a single service if it all needs to be discoverable together.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `ble.peripheral.create` | `record ble.peripheral.create` | Defines the whole peripheral from a record, matching the shape above — implicitly resets any peripheral already defined first. Creates every GATT service and characteristic described, but doesn't start advertising; call `ble.peripheral.start` next |
+| `ble.peripheral.start` | `ble.peripheral.start` | Starts advertising the first defined service, making the peripheral discoverable and connectable. A no-op if already advertising. Fires `BLE_PERIPHERAL_DID_START` |
+| `ble.peripheral.stop` | `ble.peripheral.stop` | Stops advertising and tears the peripheral down entirely — a fresh `ble.peripheral.create` is needed before using it again. Fires `BLE_PERIPHERAL_DID_STOP` if it was actually advertising |
+| `ble.peripheral.setValue` | `value 'name' ble.peripheral.setValue` | Sets a characteristic's current value locally (`value` as `MOGData`). Doesn't notify connected clients by itself — call `ble.peripheral.notify` separately for that |
+| `ble.peripheral.getValue` | `'name' ble.peripheral.getValue` → `.data` | Reads a characteristic's current, locally-held value |
+| `ble.peripheral.notify` | `'name' ble.peripheral.notify` | Pushes a characteristic's current value to every subscribed client, if any (requires `N` or `I` in that characteristic's `properties`). A no-op if nobody is subscribed |
+
+**Events**, fired on the engine that created the peripheral:
+
+| Event | `eventData` | Fired when |
+|---|---|---|
+| `BLE_PERIPHERAL_DID_START` | — | `ble.peripheral.start` actually starts advertising |
+| `BLE_PERIPHERAL_DID_STOP` | — | advertising stops, whether via `ble.peripheral.stop` or a fresh `ble.peripheral.create` |
+| `BLE_PERIPHERAL_VALUE_DID_CHANGE` | `[name: uuid: value:]` — the characteristic that changed | a connected client writes to a characteristic (`W` or `X`) |
+
+Since nothing tears the peripheral down automatically on an abnormal exit, a good practice is calling `ble.peripheral.stop` from both `MOGWAI.onStop` and `MOGWAI.onError`.
+
+---
+
 ## Error codes
 
 MOGWAI uses structured `MW.xx` error codes.
@@ -511,3 +570,5 @@ MOGWAI uses structured `MW.xx` error codes.
 | `MW.580`–`MW.581` | Units |
 | `MW.590` | Platform not supported |
 | `MW.!!!` | Fatal |
+
+BLE Peripheral is the one exception: it defines its own `BLE.1` ("unable to create peripheral error"), in its own namespace rather than an `MW.5xx` sub-range — a deliberate choice, since it lives in its own assembly specifically to stay out of `MogwaiNanoCore` (whose own `Error.cs` is where every `MW.5xx` range above is actually defined, and is already close to its own metadata-table limit).
