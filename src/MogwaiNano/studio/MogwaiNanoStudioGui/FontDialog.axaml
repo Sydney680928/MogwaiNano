@@ -16,7 +16,7 @@ limitations under the License.
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="MogwaiNanoStudioGui.FontDialog"
-        Title="Editor Font"
+        Title="Font"
         Width="380"
         SizeToContent="Height"
         CanResize="False"

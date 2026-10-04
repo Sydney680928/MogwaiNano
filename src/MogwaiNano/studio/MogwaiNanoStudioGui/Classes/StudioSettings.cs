@@ -43,6 +43,10 @@ public class StudioSettings
     // name, so an unavailable font degrades gracefully to a generic
     // monospace one instead of failing outright — matters if this settings
     // file is ever copied across machines/platforms.
+    //
+    // Despite the "Editor" in these two names, they now drive the font of
+    // the output tabs too (see MainWindow.ApplyFontSettings) — the names are
+    // kept as they are so existing settings files keep working.
     public string EditorFontFamily { get; set; } = "Consolas,Cascadia Code,monospace";
     public double EditorFontSize { get; set; } = 14;
 

@@ -14,6 +14,7 @@
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -114,8 +115,7 @@ public partial class MainWindow : Window
         ApplyTheme(_settings.ThemePreference);
         RefreshRecentFilesMenu();
 
-        Editor.FontFamily = new FontFamily(_settings.EditorFontFamily);
-        Editor.FontSize = _settings.EditorFontSize;
+        ApplyFontSettings();
 
         // Stored as a named method (not a plain lambda) so it can be
         // temporarily unsubscribed — see SetEditorText — around programmatic
@@ -638,7 +638,7 @@ public partial class MainWindow : Window
         textBox.CaretIndex = newText.Length;
     }
 
-    // --- Editor font, via the View menu ---
+    // --- Font (editor and output tabs), via the View menu ---
 
     private async void OnFontClick(object? sender, RoutedEventArgs e)
     {
@@ -654,16 +654,39 @@ public partial class MainWindow : Window
             // font (e.g. this settings file copied to another machine)
             // degrades gracefully rather than failing outright.
             _settings.EditorFontFamily = $"{family},monospace";
-            Editor.FontFamily = new FontFamily(_settings.EditorFontFamily);
         }
 
         if (dialog.SelectedFontSize is double size)
         {
             _settings.EditorFontSize = size;
-            Editor.FontSize = size;
         }
 
+        ApplyFontSettings();
         _settings.Save();
+    }
+
+    // The font chosen in View > Font... applies everywhere text is read or
+    // typed — the editor and all four output tabs — so raising the size once
+    // (say, for a screen recording) keeps everything legible together. The
+    // tab headers are deliberately left out: they follow the menu's own font
+    // size, as ordinary UI chrome rather than content.
+    private void ApplyFontSettings()
+    {
+        var family = new FontFamily(_settings.EditorFontFamily);
+        var size = _settings.EditorFontSize;
+
+        var panes = new TemplatedControl[]
+        {
+            Editor,
+            CommandInput, ConsoleMogwaiOutput, MogwaiDebugOutput,
+            NanoCommandInput, ConsoleNanoOutput, NanoDebugOutput,
+        };
+
+        foreach (var pane in panes)
+        {
+            pane.FontFamily = family;
+            pane.FontSize = size;
+        }
     }
 
     // --- Theme, via the View menu ---
