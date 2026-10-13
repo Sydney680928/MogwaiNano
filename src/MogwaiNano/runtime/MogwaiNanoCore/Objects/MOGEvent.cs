@@ -28,6 +28,10 @@ namespace MogwaiNano.Objects
         {
             var func = Function.Clone() as MOGFunction;
             var obj = new MOGEvent(Engine, Name, func);
+
+            if (DebugInfo != null)
+                obj.DebugInfo = DebugInfo.Clone();
+
             return obj;
         }
     }

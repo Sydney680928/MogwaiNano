@@ -26,9 +26,11 @@ limitations under the License.
                      recognizable, and readable against each background -->
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="EditorTextBrush" Color="#0000FF"/>
+					<SolidColorBrush x:Key="EditorNanoTextBrush" Color="#00FF00"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="EditorTextBrush" Color="#569CD6"/>
+					<SolidColorBrush x:Key="EditorNanoTextBrush" Color="#569C00"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -134,6 +136,10 @@ limitations under the License.
                      BorderThickness="0"
                      Margin="8,8,8,8"
 					 Watermark="Code editor"
+					 SelectionBrush="#FF3A6EA5"
+					 SelectionForegroundBrush="White"
+					 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
                      Foreground="{DynamicResource EditorTextBrush}"/>
 
             <Border x:Name="FindBar"
@@ -155,6 +161,41 @@ limitations under the License.
                     <Button Content="↓" Width="28" Click="OnFindNextClick" ToolTip.Tip="Next match (Enter)"/>
                     <TextBlock x:Name="FindStatusText" VerticalAlignment="Center" MinWidth="70" Opacity="0.7"/>
                     <Button Content="✕" Width="28" Click="OnCloseFindBarClick" ToolTip.Tip="Close (Esc)"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Debug bar: shown only while a program runs in debug mode.
+                 Bottom-right so it never collides with the find bar (top-right). -->
+            <Border x:Name="DebugBar"
+                    IsVisible="False"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Margin="0,0,24,24"
+                    Padding="8,6"
+                    CornerRadius="4"
+                    Background="{DynamicResource SystemAltHighColor}"
+                    BorderBrush="{DynamicResource SystemBaseLowColor}"
+                    BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="DEBUG" VerticalAlignment="Center" FontWeight="Bold" Opacity="0.7"/>
+                    <Button x:Name="DebugPauseButton"
+                            Content="⏸ Pause"
+                            MinWidth="80"
+                            Click="OnDebugPauseClick"
+							IsEnabled="False"
+                            ToolTip.Tip="Pause at the next instruction (nano.debug.halt)"/>
+                    <Button x:Name="DebugResumeButton"
+                            Content="▶ Resume"
+                            MinWidth="80"
+                            Click="OnDebugResumeClick"
+							IsEnabled="False"   
+                            ToolTip.Tip="Resume execution (nano.debug.resume)"/>
+                    <Button x:Name="DebugStepButton"
+                            Content="⏭ Step"
+                            MinWidth="80"
+                            Click="OnDebugStepClick"
+							IsEnabled="False"
+                            ToolTip.Tip="Run one instruction then pause (nano.debug.step)"/>
                 </StackPanel>
             </Border>
         </Grid>

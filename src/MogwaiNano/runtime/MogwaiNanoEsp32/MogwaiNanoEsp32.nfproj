@@ -38,6 +38,8 @@
   <ItemGroup>
     <ProjectReference Include="..\MogwaiNanoBlePeripheral\MogwaiNanoBlePeripheral.nfproj" />
     <ProjectReference Include="..\MogwaiNanoCore\MogwaiNanoCore.nfproj" />
+    <ProjectReference Include="..\MogwaiNanoGpio\MogwaiNanoGpio.nfproj" />
+    <ProjectReference Include="..\MogwaiNanoSsd1306\MogwaiNanoSsd1306.nfproj" />
   </ItemGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets')" />
   <ProjectExtensions>

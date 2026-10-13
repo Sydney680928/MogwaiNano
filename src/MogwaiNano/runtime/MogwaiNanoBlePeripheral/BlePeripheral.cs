@@ -70,7 +70,7 @@ namespace MogwaiNanoBlePeripheral
 
             // Récupération des données
 
-            var name = record.GetItem("name") as MOGString;
+            var name = record.GetItem("name") as MOGName;
             var services = record.GetItem("services") as MOGList;
 
             // Validation des données du record
@@ -217,7 +217,7 @@ namespace MogwaiNanoBlePeripheral
                     request.Respond();
 
                 var eventData = new MOGRecord(characteristic.Engine);
-                eventData.SetItem("name", new MOGString(characteristic.Engine, characteristic.Name));
+                eventData.SetItem("name", new MOGName(characteristic.Engine, characteristic.Name));
                 eventData.SetItem("uuid", new MOGString(characteristic.Engine, characteristic.Uuid.ToString()));
                 eventData.SetItem("value", characteristic.Value);
 
@@ -252,7 +252,7 @@ namespace MogwaiNanoBlePeripheral
 
             // Récupération des données
 
-            var name = record.GetItem("name") as MOGString;
+            var name = record.GetItem("name") as MOGName;
             var uuid = record.GetItem("uuid") as MOGString;
             var characteristics = record.GetItem("characteristics") as MOGList;
 
@@ -297,7 +297,7 @@ namespace MogwaiNanoBlePeripheral
 
             // Récupération des données
 
-            var name = record.GetItem("name") as MOGString;
+            var name = record.GetItem("name") as MOGName;
             var uuid = record.GetItem("uuid") as MOGString;
             var properties = record.GetItem("properties") as MOGString;
             var value = record.GetItem("value") as MOGData;

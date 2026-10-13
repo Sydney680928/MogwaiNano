@@ -29,7 +29,7 @@ namespace MogwaiNanoStudioGui.Classes
         private MogwaiEngine _engine;
         private Timer _pingTimer;
 
-        public delegate void NanoProgramDidStartHandler();
+        public delegate void NanoProgramDidStartHandler(bool debugMode);
         public event NanoProgramDidStartHandler? NanoProgramDidStart;
 
         public delegate void NanoProgramDidEndHandler(string result);
@@ -51,7 +51,12 @@ namespace MogwaiNanoStudioGui.Classes
         public delegate void NanoDebugClearHandler();
         public event NanoDebugClearHandler? NanoDebugClear;
 
+        public delegate void NanoDebugInfoDidReceiveHandler(int startPos, int endPos, bool pauseRequested, bool nextStepRequested);
+        public event NanoDebugInfoDidReceiveHandler? NanoDebugInfoDidReceive;   
+
         public bool IsRunning { get; private set; } = false;
+
+        public bool IsInDebugMode { get; private set; } = false;
 
         public bool ViewMode { get; private set; } = false;
 
@@ -85,21 +90,23 @@ namespace MogwaiNanoStudioGui.Classes
         {
             // IsRunning = false;
 
-            NanoPrintLn?.Invoke("\ndevice disconnected !\n");
+            NanoDebugWrite?.Invoke("Device disconnected !");
         }
 
         private void NanoClient_MessageReceived(object? sender, ServerMessage message)
         {
             Debug.WriteLine($"\nMessage received {message}");
 
-            if (message.Function == "PROGRAM.DID.START")
+            if (message.Function == "PROGRAM.DID.START" || message.Function == "PROGRAM.DID.START.DEBUG")
             {
                 IsRunning = true;
-                NanoProgramDidStart?.Invoke();
+                IsInDebugMode = message.Function == "PROGRAM.DID.START.DEBUG";
+                NanoProgramDidStart?.Invoke(IsInDebugMode);
             }
             else if (message.Function == "PROGRAM.DID.END")
             {
                 IsRunning = false;
+                IsInDebugMode = false;
                 NanoProgramDidEnd?.Invoke(message.Parameters[0]);
             }
             else if (message.Function == "DEBUG.WRITE")
@@ -125,7 +132,24 @@ namespace MogwaiNanoStudioGui.Classes
             else if (message.Function == "DEBUG.CLEAR")
             {
                 NanoDebugClear?.Invoke();
-            }   
+            }
+            else if (message.Function == "DEBUG.INFO")
+            {
+                if (message.Parameters != null && message.Parameters.Length == 4)
+                {
+                    if (int.TryParse(message.Parameters[0], out int startPos) &&
+                        int.TryParse(message.Parameters[1], out int endPos) &&
+                        bool.TryParse(message.Parameters[2], out bool pauseRequested) &&
+                        bool.TryParse(message.Parameters[3], out bool nextStepRequested))
+                    {
+                        NanoDebugInfoDidReceive?.Invoke(startPos, endPos, pauseRequested, nextStepRequested);
+                    }
+                }
+            }
+            else if (message.Function == "DEBUG.COMMAND.RESULT")
+            {
+                NanoPrint?.Invoke($"\n{message.Parameters[0]}\n");
+            }
             else
             {
                 Debug.WriteLine($"Unhandled message: {message}");
@@ -186,7 +210,71 @@ namespace MogwaiNanoStudioGui.Classes
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
             }
 
-            var startResponse = await WaitResponse("PROGRAM.DID.START", 30000);
+            var startResponse = await WaitResponse("PROGRAM.DID.START", 60000);
+
+            if (startResponse == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> ExecuteDebugInstructionAsync(string code)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var messageState = new ServerMessage(SOURCE_NAME, "STATE.GET");
+            var responseState = await SendMessageAndWaitResponse(messageState);
+
+            if (responseState == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (responseState.Parameters[0] != "RUNNING")
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceIsNotRunningError);
+
+            IsRunning = false;
+
+            try
+            {
+                var message = new ServerMessage(SOURCE_NAME, "DEBUG.EXECUTE", code);
+                AppGlobal.NanoClient.SendMessage(message);
+            }
+            catch
+            {
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+            }
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> DebugAsync(string code)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+
+            var messageState = new ServerMessage(SOURCE_NAME, "STATE.GET");
+            var responseState = await SendMessageAndWaitResponse(messageState);
+
+            if (responseState == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+
+            if (responseState.Parameters[0] != "IDLE")
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceBusyError);
+
+            IsRunning = false;
+
+            try
+            {
+                code = code.Substring(1, code.Length - 2);
+                var message = new ServerMessage(SOURCE_NAME, "DEBUG", code);
+                AppGlobal.NanoClient.SendMessage(message);
+            }
+            catch
+            {
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+            }
+
+            var startResponse = await WaitResponse("PROGRAM.DID.START.DEBUG", 100000);
 
             if (startResponse == null)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
@@ -211,16 +299,16 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.NoError;
         }
 
-        public async Task<EvalResult> PurgeAutorunAsync()
+        public async Task<EvalResult> PurgeAutorunAsync(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "AUTORUN.PURGE");
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             var result = response.Parameters[0] ?? "!";
             _engine.StackPushBoolean(result == "OK");
@@ -228,16 +316,16 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.NoError;
         }
 
-        public async Task<EvalResult> GetAutorunAsync()
+        public async Task<EvalResult> GetAutorunAsync(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "AUTORUN.GET");
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             var code = response.Parameters[0] ?? "";
 
@@ -252,7 +340,7 @@ namespace MogwaiNanoStudioGui.Classes
             }
             catch (Exception ex)
             {
-                return EvalResult.Failure(_engine, Error.ParseError, ex.Message);
+                return EvalResult.Failure(_engine, Error.ParseError, word, ex.Message);
             }
             finally
             {
@@ -260,31 +348,31 @@ namespace MogwaiNanoStudioGui.Classes
             }
         }
 
-        public async Task<EvalResult> GetState()
+        public async Task<EvalResult> GetState(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var state = await GetStateValue();
 
             if (state == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             _engine.StackPushString(state);
 
             return EvalResult.NoError;
         }
 
-        public async Task<EvalResult> GetSession()
+        public async Task<EvalResult> GetSession(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "SESSION.GET");
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             var state = response.Parameters[0] ?? "";
             _engine.StackPushString(state);
@@ -292,16 +380,16 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.NoError;
         }
 
-        public async Task<EvalResult> GetLastResult()
+        public async Task<EvalResult> GetLastResult(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "LAST.RESULT.GET");
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             var state = response.Parameters[0] ?? "";
             _engine.StackPushString(state);
@@ -309,16 +397,16 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.NoError;
         }
 
-        public async Task<EvalResult> GetMemory()
+        public async Task<EvalResult> GetMemory(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "MEMORY.GET");
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             if (double.TryParse(response.Parameters[0], out double memory))
             {
@@ -327,19 +415,19 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else
             {
-                return EvalResult.Failure(_engine, Error.BadArgumentValueError, "Invalid memory value received from device.");
+                return EvalResult.Failure(_engine, Error.BadArgumentValueError, word, "Invalid memory value received from device.");
             }
         }
 
-        public async Task<EvalResult> GetName()
+        public async Task<EvalResult> GetName(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var name = await GetNameValue();
 
             if (name == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             _engine.StackPushString(name);
             return EvalResult.NoError;
@@ -360,32 +448,32 @@ namespace MogwaiNanoStudioGui.Classes
             }
         }
 
-        public async Task<EvalResult> SetName(string name)
+        public async Task<EvalResult> SetName(string word, string name)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "NAME.SET", name);
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             if (response.Parameters.Length > 0 && response.Parameters[0] != null && response.Parameters[0] == "OK")
                 return EvalResult.NoError;
 
-            return EvalResult.Failure(_engine, Error.BadArgumentValueError);
+            return EvalResult.Failure(_engine, Error.BadArgumentValueError, word);
         }
 
-        public async Task<EvalResult> StateIsRunning()
+        public async Task<EvalResult> StateIsRunning(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var state = await GetStateValue();
 
             if (state == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             _engine.StackPushBoolean(state == "RUNNING");
 
@@ -407,19 +495,51 @@ namespace MogwaiNanoStudioGui.Classes
             }
         }
 
-        public async Task<EvalResult> GetInfo()
+        public async Task<EvalResult> GetStack(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var stack = await GetStackValue();
+
+            if (stack == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+
+            _engine.Delegate?.ConsolePrintLn(_engine, "\nSTACK");
+            _engine.Delegate?.ConsolePrintLn(_engine, stack);
+            _engine.Delegate?.ConsolePrintLn(_engine, "\n");   
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<string?> GetStackValue()
+        {
+            var message = new ServerMessage(SOURCE_NAME, "STACK.GET");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response != null && response.Parameters != null && response.Parameters[0] != null)
+            {
+                return response.Parameters[0];
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public async Task<EvalResult> GetInfo(string word)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "INFO.GET");
             var response = await SendMessageAndWaitResponse(message);
 
             if (response == null)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             if (response.Parameters == null || response.Parameters.Length < 15)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid info response from device.");
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, word, "Invalid info response from device.");
 
             if (int.TryParse(response.Parameters[8], out int memory))
             {
@@ -484,9 +604,7 @@ namespace MogwaiNanoStudioGui.Classes
                 }
 
                 record.SetItem("usings", usingsList);
-
                 record.SetBoolean("frugalMode", response.Parameters[10] == "True");
-
                 record.SetBoolean("keepAlive", response.Parameters[14] == "ON");
 
                 _engine.StackPush(record);
@@ -495,7 +613,7 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else
             {
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid memory value received from device.");
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, word, "Invalid memory value received from device.");
             }
         }
 
@@ -516,10 +634,10 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.NoError;
         }
 
-        public async Task<EvalResult> GetUnits()
+        public async Task<EvalResult> GetUnits(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "UNITS.LIST");
             var response = await SendMessageAndWaitResponse(message);
@@ -543,12 +661,12 @@ namespace MogwaiNanoStudioGui.Classes
                 }
                 else
                 {
-                    return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Failed to retrieve units list from device.");
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, word, "Failed to retrieve units list from device.");
                 }
             }
             else
             {
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
             }
         }
 
@@ -753,10 +871,10 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Invalid response from device.");
         }
 
-        public async Task<EvalResult> GetUsings()
+        public async Task<EvalResult> GetUsings(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
 
             var message = new ServerMessage(SOURCE_NAME, "USINGS.LIST");
             var response = await SendMessageAndWaitResponse(message);
@@ -780,12 +898,12 @@ namespace MogwaiNanoStudioGui.Classes
                 }
                 else
                 {
-                    return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, "Failed to retrieve usings list from device.");
+                    return EvalResult.Failure(_engine, MogwaiNanoErrors.BadDeviceResponse, word, "Failed to retrieve usings list from device.");
                 }
             }
             else
             {
-                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError);
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
             }
         }
 
@@ -862,6 +980,76 @@ namespace MogwaiNanoStudioGui.Classes
 
             var result = response.Parameters[0] ?? "!";
             _engine.StackPushBoolean(result == "OK");
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> DebugHalt(string word)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var message = new ServerMessage(SOURCE_NAME, "DEBUG.HALT");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> DebugNextStep(string word)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var message = new ServerMessage(SOURCE_NAME, "DEBUG.STEP");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> DebugResume(string word)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var message = new ServerMessage(SOURCE_NAME, "DEBUG.RESUME");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> DebugSetTron(string word, int delay)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var message = new ServerMessage(SOURCE_NAME, "DEBUG.TRON", delay.ToString());
+            var response = await SendMessageAndWaitResponse(message);
+            
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+            
+            return EvalResult.NoError;
+        }
+
+        public async Task<EvalResult> DebugTroff(string word)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var message = new ServerMessage(SOURCE_NAME, "DEBUG.TROFF");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
 
             return EvalResult.NoError;
         }

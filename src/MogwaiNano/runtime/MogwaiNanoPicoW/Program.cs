@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using MogwaiNano.Engine;
+using MogwaiNanoGpio;
+using MogwaiNanoSsd1306;
 using System;
 using System.Diagnostics;
 using System.Threading;
+using static MogwaiNano.Engine.MogwaiNanoEngine;
 
 namespace MogwaiNanoPicoW
 {
@@ -22,8 +26,46 @@ namespace MogwaiNanoPicoW
     {
         public static void Main()
         {
-            MogwaiNanoCore.MogwaiNanoSystem.Start();
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.input", new PrimitiveDelegate(GpioManager.PrimitiveGpioModeInput));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.inputPullDown", new PrimitiveDelegate(GpioManager.PrimitiveGpioSetModeInputPullDown));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.inputPullUp", new PrimitiveDelegate(GpioManager.PrimitiveGpioSetModeInputPullUp));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.output", new PrimitiveDelegate(GpioManager.PrimitiveGpioSetModeOutput));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.read", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinRead));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.write.high", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinWriteHigh));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.write.low", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinWriteLow));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.toggle", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinToggle));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.close", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinClose));
 
+            MogwaiNanoEngine.Skills.Add("GPIO");
+
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.init", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Init));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.close", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Close));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.clear", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Clear));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.printString", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306PrintString));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawString", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawString));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.refresh", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Refresh));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawPixel", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawPixel));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawHorizontalLine", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawHorizontalLine));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawVerticalLine", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawHVerticalLine));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawRectangle", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawRectangle));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawFilledRectangle", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawFilledRectangle));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawBitmap", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawBitmap));
+
+            MogwaiNanoEngine.Skills.Add("SSD1306");
+
+            MogwaiNanoEngine.ResetDidExecute += (engine) =>
+            {
+                if (!engine.IsTask)
+                {
+                    if (!engine.KeepAlive)
+                        GpioManager.Cleanup();
+                }
+
+                SSD1306Manager.Cleanup(engine);
+            };
+
+            MogwaiNanoCore.MogwaiNanoSystem.Start();
+            
             Thread.Sleep(Timeout.Infinite);
         }
     }

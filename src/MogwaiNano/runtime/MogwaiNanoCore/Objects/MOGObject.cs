@@ -25,6 +25,8 @@ namespace MogwaiNano.Objects
 
         public MOGType Type { get; set; }
 
+        public DebugInformations DebugInfo { get; set; } = null;
+
         public MOGObject(MogwaiNanoEngine engine, MOGType type)
         {
             Engine = engine;

@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using Iot.Device.Ssd13xx;
-using Iot.Device.Ssd13xx.Samples;
 using MogwaiNano.Interfaces;
 using MogwaiNano.Objects;
 using nanoFramework.Runtime.Native;
 using System;
 using System.Collections;
 using System.Device.Adc;
-using System.Device.Gpio;
 using System.Device.I2c;
 using System.Device.Pwm;
 using System.Device.Spi;
@@ -29,7 +26,6 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using static Iot.Device.Ssd13xx.Ssd13xx;
 using GC = nanoFramework.Runtime.Native.GC;
 
 namespace MogwaiNano.Engine
@@ -42,14 +38,23 @@ namespace MogwaiNano.Engine
 
         private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
 
-        private static ArrayList _assemblies = new();   
+        private static ArrayList _assemblies = new();
         private static readonly object AssemblyLoadLock = new();
 
         public delegate EvalResult PrimitiveDelegate(MogwaiNanoEngine engine, string name);
 
         public static Hashtable Primitives = new(150);
-        
+
         public static Hashtable Usings { get; private set; } = new(2);
+
+        public delegate void ProgramDidStartHandler(MogwaiNanoEngine engine);
+        public static event ProgramDidStartHandler ProgramDidStart;
+
+        public delegate void ProgramDidEndHandler(MogwaiNanoEngine engine, EvalResult result);
+        public static event ProgramDidEndHandler ProgramDidEnd;
+
+        public delegate void ResetDidExecuteHandler(MogwaiNanoEngine engine);
+        public static event ResetDidExecuteHandler ResetDidExecute;
 
         private ArrayList _stacks = new();
         private MOGStack _currentStack = new();
@@ -69,6 +74,7 @@ namespace MogwaiNano.Engine
         private int _iterationCount = 0;
         private object _lastResultLock = new();
         private Parser _parser;
+        private bool _debugMode;
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -103,10 +109,6 @@ namespace MogwaiNano.Engine
 
         public Hashtable Stopwatches { get; } = new(2);
 
-        public Hashtable OpenedPins { get; } = new(3);
-
-        public GpioController GpioController { get; } = new();
-
         public Hashtable I2cDevices { get; } = new(2);
 
         public Hashtable PwmChannels { get; } = new(2);
@@ -116,8 +118,6 @@ namespace MogwaiNano.Engine
         public AdcController AdcController { get; } = new();
 
         public Hashtable SpiDevices { get; } = new(2);
-
-        public Ssd1306 Ssd1306 { get; set; }
 
         public Hashtable Tasks { get; } = new(2);
 
@@ -148,6 +148,29 @@ namespace MogwaiNano.Engine
 
         public bool ExitRequested { get; set; }
 
+        private bool _pauseRequested;
+
+        public bool PauseRequested
+        { 
+            get => _pauseRequested;
+
+            set
+            {
+                _pauseRequested = value;
+                
+                if (IsRunning && DebugMode)
+                    Delegate?.DebugMessage(this, $"{(_pauseRequested ? "Pause" : "Resume")}");
+            }
+        }
+
+        public bool NextStepRequested { get; set; }
+
+        public int DebugTronDelay { get; set; } = 0;
+
+        public bool DebugMode => _debugMode;
+
+        public string DebugCommand { get; set; }
+
         public static Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
         public EvalResult LastResult
@@ -170,7 +193,7 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public static ArrayList Skills { get; set; } = new ArrayList { "GPIO", "I2C", "SSD1306", "PWM", "ADC", "SPI", "UNITS", "TASKS", "EVENTS", "TIMERS" };
+        public static ArrayList Skills { get; set; } = new ArrayList { "I2C", "PWM", "ADC", "SPI", "UNITS", "TASKS", "EVENTS", "TIMERS" };
 
         public bool FrugalMode { get; set; } = false;
 
@@ -415,6 +438,11 @@ namespace MogwaiNano.Engine
             Primitives.Add("debug.write", new PrimitiveDelegate(PrimitiveDebugWrite));
             Primitives.Add("debug.vs.write", new PrimitiveDelegate(PrimitiveVsDebugWrite));
             Primitives.Add("debug.clear", new PrimitiveDelegate(PrimitiveDebugClear));
+            Primitives.Add("debug.tron", new PrimitiveDelegate(PrimitiveDebugSetTron));
+            Primitives.Add("debug.troff", new PrimitiveDelegate(PrimitiveDebugTroff));
+            Primitives.Add("debug.halt", new PrimitiveDelegate(PrimitiveDebugHalt));
+            Primitives.Add("¤", new PrimitiveDelegate(PrimitiveDebugHalt));
+            Primitives.Add("debug.stack", new PrimitiveDelegate(PrimitiveDebugStack));
 
             Primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));
             Primitives.Add("error.reset", new PrimitiveDelegate(PrimitiveErrorReset));
@@ -434,16 +462,6 @@ namespace MogwaiNano.Engine
             Primitives.Add("mogwai.using", new PrimitiveDelegate(PrimitiveMogwaiUsing));
             Primitives.Add("mogwai.keepAlive", new PrimitiveDelegate(PrimitiveMogwaiKeepAlive));
 
-            Primitives.Add("gpio.setMode.input", new PrimitiveDelegate(PrimitiveGpioModeInput));
-            Primitives.Add("gpio.setMode.inputPullDown", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullDown));
-            Primitives.Add("gpio.setMode.inputPullUp", new PrimitiveDelegate(PrimitiveGpioSetModeInputPullUp));
-            Primitives.Add("gpio.setMode.output", new PrimitiveDelegate(PrimitiveGpioSetModeOutput));
-            Primitives.Add("gpio.read", new PrimitiveDelegate(PrimitiveGpioPinRead));
-            Primitives.Add("gpio.write.high", new PrimitiveDelegate(PrimitiveGpioPinWriteHigh));
-            Primitives.Add("gpio.write.low", new PrimitiveDelegate(PrimitiveGpioPinWriteLow));
-            Primitives.Add("gpio.toggle", new PrimitiveDelegate(PrimitiveGpioPinToggle));
-            Primitives.Add("gpio.close", new PrimitiveDelegate(PrimitiveGpioPinClose));
-
             Primitives.Add("i2c.open", new PrimitiveDelegate(PrimitiveI2cOpen));
             Primitives.Add("i2c.close", new PrimitiveDelegate(PrimitiveI2cClose));
             Primitives.Add("i2c.write", new PrimitiveDelegate(PrimitiveI2cWrite));
@@ -451,19 +469,6 @@ namespace MogwaiNano.Engine
             Primitives.Add("i2c.read", new PrimitiveDelegate(PrimitiveI2cRead));
             Primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
             Primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
-
-            Primitives.Add("ssd1306.init", new PrimitiveDelegate(PrimitiveSsd1306Init));
-            Primitives.Add("ssd1306.close", new PrimitiveDelegate(PrimitiveSsd1306Close));
-            Primitives.Add("ssd1306.clear", new PrimitiveDelegate(PrimitiveSsd1306Clear));
-            Primitives.Add("ssd1306.printString", new PrimitiveDelegate(PrimitiveSsd1306PrintString));
-            Primitives.Add("ssd1306.drawString", new PrimitiveDelegate(PrimitiveSsd1306DrawString));
-            Primitives.Add("ssd1306.refresh", new PrimitiveDelegate(PrimitiveSsd1306Refresh));
-            Primitives.Add("ssd1306.drawPixel", new PrimitiveDelegate(PrimitiveSsd1306DrawPixel));
-            Primitives.Add("ssd1306.drawHorizontalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHorizontalLine));
-            Primitives.Add("ssd1306.drawVerticalLine", new PrimitiveDelegate(PrimitiveSsd1306DrawHVerticalLine));
-            Primitives.Add("ssd1306.drawRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawRectangle));
-            Primitives.Add("ssd1306.drawFilledRectangle", new PrimitiveDelegate(PrimitiveSsd1306DrawFilledRectangle));
-            Primitives.Add("ssd1306.drawBitmap", new PrimitiveDelegate(PrimitiveSsd1306DrawBitmap));
 
             Primitives.Add("pwm.open", new PrimitiveDelegate(PrimitivePwmOpen));
             Primitives.Add("pwm.close", new PrimitiveDelegate(PrimitivePwmClose));
@@ -573,7 +578,7 @@ namespace MogwaiNano.Engine
 
                 Reset(KeepAlive);
 
-                // _debugMode = debugMode
+                _debugMode = debugMode;
 
                 var stopwatch = Stopwatch.StartNew();
 
@@ -583,12 +588,28 @@ namespace MogwaiNano.Engine
                 if (Delegate != null)
                     Delegate.ProgramStart(this, code);
 
+                ProgramDidStart?.Invoke(this);
+
                 MOGFunction program;
 
                 try
                 {
-                    program = new MOGFunction(this, code);
+                    if (debugMode)
+                    {
+                        Delegate?.DebugMessage(this, "EXECUTING IN DEBUG MODE");           
+                    }
+                    else
+                    {
+                        Delegate?.DebugMessage(this, "EXECUTING IN RELEASE MODE");
+                    }
+
+                    Delegate?.DebugMessage(this, "Parsing...");
+       
+                    program = new MOGFunction(this, code, withProgressInformations: true);
                     code = null;
+
+                    Debug.WriteLine(program.ToString());
+                    Debug.WriteLine();
                 }
                 catch (Exception ex)
                 {
@@ -609,12 +630,16 @@ namespace MogwaiNano.Engine
                     if (Delegate != null)
                         Delegate.ProgramEnd(this, LastResult);
 
+                    ProgramDidEnd?.Invoke(this, LastResult);
+
                     return LastResult;
                 }
 
                 HaltRequested = false;
                 ExitRequested = false;
                 //ReturnRequested = false;
+
+                Delegate?.DebugMessage(this, "Running...");
 
                 EvalResult result = program.Execute();
                 program = null;
@@ -629,36 +654,52 @@ namespace MogwaiNano.Engine
 
                 if (result.IsError)
                 {
+                    Delegate?.DebugMessage(this, $"Error {result.Error}");
+
                     if (Functions.Contains("MOGWAI.onError"))
                     {
+                        Delegate?.DebugMessage(this, "Executing MOGWAI.onError...");
+
                         var onErrorFunction = Functions["MOGWAI.onError"] as MOGFunction;
                         result2 = onErrorFunction.Execute();
 
                         if (result2.IsError)
+                        {
+                            Delegate?.DebugMessage(this, $"Error {result2.Error}");
                             result = result2;
+                        }
                     }
                 }
                 else
                 {
                     if (Functions.Contains("MOGWAI.onStop"))
                     {
+                        Delegate?.DebugMessage(this, "Executing MOGWAI.onStop...");
+
                         var onStopFunction = Functions["MOGWAI.onStop"] as MOGFunction;
                         result2 = onStopFunction.Execute();
 
                         if (result2.IsError)
+                        {
+                            Delegate?.DebugMessage(this, $"Error {result2.Error}");
                             result = result2;
+                        }
                     }
                 }
 
                 stopwatch.Stop();
                 result.Duration = stopwatch.Elapsed;
 
-                // _debugMode = false;
+                Delegate?.DebugMessage(this, $"Total duration {result.Duration}");
+
+                _debugMode = false;
 
                 LastResult = result;
 
                 if (Delegate != null)
                     Delegate.ProgramEnd(this, result);
+
+                ProgramDidEnd?.Invoke(this, LastResult);
 
                 if (LastResult != EvalResult.NoError)
                 {
@@ -725,7 +766,7 @@ namespace MogwaiNano.Engine
 
             return s;
         }
-        
+
         private static string ObjectVisualization(MOGObject obj)
         {
             var sb = new StringBuilder();
@@ -821,17 +862,11 @@ namespace MogwaiNano.Engine
             {
                 CleanupUsings();
                 CleanupStopwatchs();
-                CleanupOpenPins();
+
                 CleanupI2cDevices();
                 CleanupSpiDevices();
                 CleanupPwmChannels();
                 CleanupAdcChannels();
-
-                if (Ssd1306 != null)
-                {
-                    Ssd1306.Dispose();
-                    Ssd1306 = null;
-                }
 
                 _stacks.Clear();
                 _currentStack = new MOGStack();
@@ -844,11 +879,15 @@ namespace MogwaiNano.Engine
 
                 DisableInterrupts = false;
                 FrugalMode = false;
-            }         
+            }
 
             HaltRequested = false;
             BreakRequested = false;
             ExitRequested = false;
+            PauseRequested = false;
+            NextStepRequested = false;
+
+            ResetDidExecute?.Invoke(this);
         }
 
         public void Halt() => HaltRequested = true;
@@ -907,7 +946,7 @@ namespace MogwaiNano.Engine
             }
         }
 
-        
+
         #region PRIMITIVES
 
         private static EvalResult PrimitivePlus(MogwaiNanoEngine engine, string name)
@@ -1344,6 +1383,58 @@ namespace MogwaiNano.Engine
         {
             if (engine.Delegate != null)
                 return engine.Delegate.DebugClear(engine);
+
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveDebugHalt(MogwaiNanoEngine engine, string name)
+        {
+            if (engine.DebugMode)
+                engine.PauseRequested = true;
+            
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveDebugStack(MogwaiNanoEngine engine, string name)
+        {
+            var s = $"\nStack\n{engine.GetStack()}";
+            engine.StackPush(new MOGString(engine, s)); 
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveDebugSetTron(MogwaiNanoEngine engine, string name)
+        {
+            // 500 debug.tron
+
+            if (engine.DebugMode)
+            {
+                var s = engine.StackSign(1);
+
+                if (s.Length == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+                if (s[0] == typeof(MOGNumber))
+                {
+                    var delay = engine.StackPop() as MOGNumber;
+
+                    if (delay.Value < 0 || delay.Value > 5000)
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "value must be between 0 and 5000");
+
+                    engine.DebugTronDelay = (int)delay.Value;
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+            }
+
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveDebugTroff(MogwaiNanoEngine engine, string name)
+        {
+            // debug.troff
+
+            if (engine.DebugMode)
+                engine.DebugTronDelay = 0;
 
             return EvalResult.NoError;
         }
@@ -3141,13 +3232,13 @@ namespace MogwaiNano.Engine
 
             if (s.Length == 0)
                 return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-            
+
             if (s[0] != typeof(MOGBoolean))
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
 
             var b = engine.StackPop() as MOGBoolean;
             engine.KeepAlive = b.Value;
-            
+
             return EvalResult.NoError;
         }
 
@@ -3188,8 +3279,8 @@ namespace MogwaiNano.Engine
             var primitives = new MOGList(engine);
 
             foreach (string key in Primitives.Keys)
-                primitives.AddItem(new MOGName(engine, key));  
-            
+                primitives.AddItem(new MOGName(engine, key));
+
             record.SetItem("primitives", primitives);
 
             var skills = new MOGList(engine);
@@ -3211,7 +3302,7 @@ namespace MogwaiNano.Engine
             foreach (string usingName in engine.InstalledUsings)
                 usings.AddItem(new MOGName(engine, usingName));
 
-            record.SetItem("usings", usings);   
+            record.SetItem("usings", usings);
 
             record.SetItem("frugalMode", new MOGBoolean(engine, engine.FrugalMode));
 
@@ -4619,96 +4710,6 @@ namespace MogwaiNano.Engine
 
         #endregion
 
-        #region GPIO
-
-        private static EvalResult PrimitiveGpioModeInput(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.Input);
-
-        private static EvalResult PrimitiveGpioSetModeInputPullDown(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.InputPullDown);
-
-        private static EvalResult PrimitiveGpioSetModeInputPullUp(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.InputPullUp);
-
-        private static EvalResult PrimitiveGpioSetModeOutput(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.Output);
-
-        private static EvalResult PrimitiveGpioPinWriteHigh(MogwaiNanoEngine engine, string name) => GpioPinWrite(engine, name, PinValue.High);
-
-        private static EvalResult PrimitiveGpioPinWriteLow(MogwaiNanoEngine engine, string name) => GpioPinWrite(engine, name, PinValue.Low);
-
-        private static EvalResult PrimitiveGpioPinRead(MogwaiNanoEngine engine, string name)
-        {
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var numPin = engine.StackPop() as MOGNumber;
-
-            if (numPin.Value < 0)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
-
-            var pin = engine.GetPin((int)numPin.Value);
-
-            if (pin == null)
-                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
-
-            var e = pin.Read();
-            engine.StackPush(new MOGNumber(engine, e == PinValue.High ? 1 : 0));
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveGpioPinToggle(MogwaiNanoEngine engine, string name)
-        {
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var numPin = engine.StackPop() as MOGNumber;
-
-            if (numPin.Value < 0)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
-
-            var pin = engine.GetPin((int)numPin.Value);
-
-            if (pin == null)
-                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
-
-            pin.Toggle();
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveGpioPinClose(MogwaiNanoEngine engine, string name)
-        {
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var numPin = engine.StackPop() as MOGNumber;
-
-            if (numPin.Value < 0)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
-
-            var nPin = (int)numPin.Value;
-
-            if (!engine.ClosePin(nPin))
-                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
-
-            return EvalResult.NoError;
-        }
-
-        #endregion
-
         #region I2C
 
         private static EvalResult PrimitiveI2cOpen(MogwaiNanoEngine engine, string name)
@@ -5587,379 +5588,6 @@ namespace MogwaiNano.Engine
 
         #endregion
 
-        #region SSD1306 OLED SCREEN
-
-        private static EvalResult PrimitiveSsd1306Init(MogwaiNanoEngine engine, string name)
-        {
-            // bus address ssd1306.init
-
-            var s = engine.StackSign(2);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
-            {
-                var address = engine.StackPop() as MOGNumber;
-                var bus = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 != null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsOpenedError, name);
-
-                int busNumber = (int)bus.Value;
-                int addressNumber = (int)address.Value;
-
-                if (busNumber < 1 || busNumber > 2)
-                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C bus number must be between 1 and 2");
-
-                if (addressNumber < 0 || addressNumber > 127)
-                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "I2C address number must be between 0 and 127");
-
-                if (engine.Ssd1306 != null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsOpenedError, name);
-
-                try
-                {
-                    I2cConnectionSettings settings = new(busNumber, addressNumber, I2cBusSpeed.FastMode);
-                    I2cDevice i2cDevice = I2cDevice.Create(settings);
-
-                    engine.Ssd1306 = new(i2cDevice, DisplayResolution.OLED128x64);
-                    engine.Ssd1306.ClearScreen();
-                }
-                catch (Exception ex)
-                {
-                    if (engine.Ssd1306 != null)
-                    {
-                        engine.Ssd1306.Dispose();
-                        engine.Ssd1306 = null;
-                    }
-
-                    return EvalResult.Failure(engine, Error.Ssd1306InitError, name, "failed to initialize ssd1306 display", $"bus {busNumber}", $"address {addressNumber:X2}", ex.Message);
-                }
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306Close(MogwaiNanoEngine engine, string name)
-        {
-            if (engine.Ssd1306 != null)
-            {
-                engine.Ssd1306.Dispose();
-                engine.Ssd1306 = null;
-            }
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveSsd1306Clear(MogwaiNanoEngine engine, string name)
-        {
-            if (engine.Ssd1306 == null)
-                return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-            engine.Ssd1306.ClearScreen();
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveSsd1306PrintString(MogwaiNanoEngine engine, string name)
-        {
-            // x y text size center ssd1306.printString
-
-            var s = engine.StackSign(5);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
-            {
-                var center = engine.StackPop() as MOGBoolean;
-                var size = engine.StackPop() as MOGNumber;
-                var text = engine.StackPop() as MOGString;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    if (engine.Ssd1306.Font == null)
-                        engine.Ssd1306.Font = new BasicFont();
-
-                    engine.Ssd1306.Write((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306DrawString(MogwaiNanoEngine engine, string name)
-        {
-            // x y text size center ssd1306.drawString
-
-            var s = engine.StackSign(5);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGString) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
-            {
-                var center = engine.StackPop() as MOGBoolean;
-                var size = engine.StackPop() as MOGNumber;
-                var text = engine.StackPop() as MOGString;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    if (engine.Ssd1306.Font == null)
-                        engine.Ssd1306.Font = new BasicFont();
-
-                    engine.Ssd1306.DrawString((int)x.Value, (int)y.Value, text.Value, (byte)size.Value, center.Value);
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306Refresh(MogwaiNanoEngine engine, string name)
-        {
-            if (engine.Ssd1306 == null)
-                return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-            engine.Ssd1306.Display();
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveSsd1306DrawPixel(MogwaiNanoEngine engine, string name)
-        {
-            // x y true ssd1306.drawPixel   
-
-            var s = engine.StackSign(3);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber))
-            {
-                var set = engine.StackPop() as MOGBoolean;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    engine.Ssd1306.DrawPixel((int)x.Value, (int)y.Value, set.Value);
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306DrawHorizontalLine(MogwaiNanoEngine engine, string name)
-        {
-            // x y len true ssd1306.drawHorizontalLine  
-
-            var s = engine.StackSign(4);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
-            {
-                var set = engine.StackPop() as MOGBoolean;
-                var len = engine.StackPop() as MOGNumber;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    engine.Ssd1306.DrawHorizontalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306DrawHVerticalLine(MogwaiNanoEngine engine, string name)
-        {
-            // x y len true ssd1306.drawVerticalLine 
-
-            var s = engine.StackSign(4);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber))
-            {
-                var set = engine.StackPop() as MOGBoolean;
-                var len = engine.StackPop() as MOGNumber;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    engine.Ssd1306.DrawVerticalLine((int)x.Value, (int)y.Value, (int)len.Value, set.Value);
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306DrawRectangle(MogwaiNanoEngine engine, string name)
-        {
-            // x y w h true ssd1306.drawRectangle
-
-            var s = engine.StackSign(5);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
-            {
-                var set = engine.StackPop() as MOGBoolean;
-                var height = engine.StackPop() as MOGNumber;
-                var width = engine.StackPop() as MOGNumber;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    int vx = (int)x.Value;
-                    int vy = (int)y.Value;
-                    int vw = (int)width.Value;
-                    int vh = (int)height.Value;
-
-                    engine.Ssd1306.DrawHorizontalLine(vx, vy, vw, set.Value);
-                    engine.Ssd1306.DrawVerticalLine(vx + vw - 1, vy, vh, set.Value);
-                    engine.Ssd1306.DrawHorizontalLine(vx, vy + vh - 1, vw, set.Value);
-                    engine.Ssd1306.DrawVerticalLine(vx, vy, vh, set.Value);
-
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306DrawFilledRectangle(MogwaiNanoEngine engine, string name)
-        {
-            // x y w h true ssd1306.drawFilledRectangle
-
-            var s = engine.StackSign(5);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGBoolean) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber))
-            {
-                var set = engine.StackPop() as MOGBoolean;
-                var height = engine.StackPop() as MOGNumber;
-                var width = engine.StackPop() as MOGNumber;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    engine.Ssd1306.DrawFilledRectangle((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value, set.Value);
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSsd1306DrawBitmap(MogwaiNanoEngine engine, string name)
-        {
-            // x y w h data size ssd1306.drawBitmap
-
-            var s = engine.StackSign(6);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGData) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGNumber) && s[4] == typeof(MOGNumber) && s[5] == typeof(MOGNumber))
-            {
-                var size = engine.StackPop() as MOGNumber;
-                var data = engine.StackPop() as MOGData;
-                var height = engine.StackPop() as MOGNumber;
-                var width = engine.StackPop() as MOGNumber;
-                var y = engine.StackPop() as MOGNumber;
-                var x = engine.StackPop() as MOGNumber;
-
-                if (engine.Ssd1306 == null)
-                    return EvalResult.Failure(engine, Error.Ssd1306IsClosedError, name);
-
-                try
-                {
-                    engine.Ssd1306.DrawBitmap((int)x.Value, (int)y.Value, (int)width.Value, (int)height.Value, data.Items, (byte)size.Value);
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.Ssd1306OperationError, name, ex.Message);
-                }
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        #endregion
-
         #endregion
 
         #region STACK
@@ -5994,6 +5622,8 @@ namespace MogwaiNano.Engine
         public void StackDup() => _currentStack.Dup();
 
         public void StackDrop() => _currentStack.Drop();
+
+        public string GetStack() => _currentStack.Dump();
 
         #endregion
 
@@ -6320,117 +5950,6 @@ namespace MogwaiNano.Engine
 
         #endregion
 
-        #region GPIO
-
-        public GpioPin GetPin(int pinNumber)
-        {
-            if (OpenedPins.Contains(pinNumber))
-                return OpenedPins[pinNumber] as GpioPin;
-
-            return null;
-        }
-
-        public bool ClosePin(int pinNumber)
-        {
-            if (OpenedPins.Contains(pinNumber))
-            {
-                var pin = OpenedPins[pinNumber] as GpioPin;
-                OpenedPins.Remove(pinNumber);
-                pin.ValueChanged -= GpioPin_ValueChanged;
-                pin.Dispose();
-                return true;
-            }
-
-            return false;
-        }
-
-        private static EvalResult GpioPinWrite(MogwaiNanoEngine engine, string name, PinValue pinValue)
-        {
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var numPin = engine.StackPop() as MOGNumber;
-
-            if (numPin.Value < 0)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
-
-            var pin = engine.GetPin((int)numPin.Value);
-
-            if (pin == null)
-                return EvalResult.Failure(engine, Error.GpioUnknownPinError, name);
-
-            pin.Write(pinValue);
-
-            return EvalResult.NoError;
-        }
-
-        private void CleanupOpenPins()
-        {
-            foreach (int pinNumber in OpenedPins.Keys)
-            {
-                var pin = OpenedPins[pinNumber] as GpioPin;
-                pin.ValueChanged -= GpioPin_ValueChanged;
-                pin.Dispose();
-                pin = null;
-            }
-
-            OpenedPins.Clear();
-        }
-
-        private static EvalResult SetPinMode(MogwaiNanoEngine engine, string name, PinMode mode)
-        {
-            // Used by all pin mode known
-            // 4 gpio.setMode.xxx
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var numPin = engine.StackPop() as MOGNumber;
-
-            if (numPin.Value < 0)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
-
-            var nPin = (int)numPin.Value;
-
-            if (engine.OpenedPins.Contains(nPin))
-            {
-                var pin = engine.OpenedPins[nPin] as GpioPin;
-                pin.SetPinMode(mode);
-            }
-            else
-            {
-                GpioPin newPin = engine.GpioController.OpenPin(nPin, mode);
-                engine.OpenedPins.Add(nPin, newPin);
-
-                newPin.ValueChanged += engine.GpioPin_ValueChanged;
-            }
-
-            return EvalResult.NoError;
-        }
-
-        public void GpioPin_ValueChanged(object sender, PinValueChangedEventArgs e)
-        {
-            var eventType = e.ChangeType == PinEventTypes.Rising ? 1 : 0;
-
-            var record = new MOGRecord(this);
-            record.SetItem("pin", new MOGNumber(this, e.PinNumber));
-            record.SetItem("eventType", new MOGNumber(this, eventType));
-
-            FireEvent("GPIO_PIN_CHANGED", record);
-        }
-
-        #endregion
-
         #region I2C
 
         public void CleanupI2cDevices()
@@ -6749,12 +6268,6 @@ namespace MogwaiNano.Engine
                 return EvalResult.NoError;
             }
         }
-
-        #endregion
-
-        #region BLE PERIPHERAL
-
-        
 
         #endregion
 

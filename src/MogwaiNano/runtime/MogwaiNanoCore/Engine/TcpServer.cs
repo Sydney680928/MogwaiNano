@@ -24,7 +24,7 @@ namespace MogwaiNano.Engine
 {
     public class TcpServer
     {
-        private const int MAX_MESSAGE_SIZE = 16384;
+        private const int MAX_MESSAGE_SIZE = 32768;
         private const int MAX_QUEUE_SIZE = 100; 
 
         private Thread _tcpThread;

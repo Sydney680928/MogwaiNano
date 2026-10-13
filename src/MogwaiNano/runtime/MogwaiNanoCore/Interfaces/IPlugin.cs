@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections;
 
 namespace MogwaiNano.Interfaces
 {
@@ -15,7 +12,7 @@ namespace MogwaiNano.Interfaces
 
         ArrayList Errors { get; }
 
-        void Initialize( MogwaiNano.Engine.MogwaiNanoEngine engine);
+        void Initialize(MogwaiNano.Engine.MogwaiNanoEngine engine);
 
         void CleanUp(int engineId);
     }

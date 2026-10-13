@@ -21,6 +21,7 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using MOGWAI.Engine;
 using MogwaiNanoStudioGui.Classes;
 using System;
 using System.Collections.Generic;
@@ -70,6 +71,8 @@ public partial class MainWindow : Window
     // Set whenever the editor's content changes; cleared on New/Open/Save
     // (successful) — used to warn before an action that would lose it.
     private bool _hasUnsavedChanges;
+
+    private IStorageFile? _originalCodeFile;
 
     // Assigns Editor.Text programmatically (New/Open/recent files) without
     // marking the result as an unsaved change.
@@ -244,28 +247,94 @@ public partial class MainWindow : Window
         // SAME string (a single call), rather than sent as a separate call
         // beforehand — an inconsistent ordering was observed when the two
         // were posted as two separate actions.
-        AppGlobal.EngineDelegate.ProgramEnded += result => OnUiThread(() =>
+        AppGlobal.EngineDelegate.ProgramEnded += (result) => OnUiThread( () =>
         {
             WriteMogwaiConsoleLine(Environment.NewLine + (result.ToString() ?? string.Empty));
             WriteMogwaiConsoleLine(string.Empty);
+
+            /*
+            if (!AppGlobal.MogwaiEngine.IsRunning)
+            {
+                Editor.IsReadOnly = false;
+                ApplyEditorForeground(false);
+            }
+            */
         });
 
-        // Console + Debug NANO (device, once connected) — these events fire
-        // from MogwaiNanoClient's network thread, never the UI thread: hence
-        // the systematic use of OnUiThread below.
-        AppGlobal.NanoRuntime.NanoPrintLn += text => OnUiThread(() => WriteNanoConsoleLine(text));
+        AppGlobal.EngineDelegate.ProgramStarted += (code, debugMode) => OnUiThread(() =>
+        {
+            Editor.IsReadOnly = true;
+        });
+
+        AppGlobal.EngineDelegate.UseNewCodeFile += (filename, code) => OnUiThread(async () =>
+        {
+            if (!await ConfirmDiscardUnsavedChangesAsync())
+                return;
+
+            var sp = TopLevel.GetTopLevel(this)!.StorageProvider;
+            var sf = await sp.TryGetFileFromPathAsync(new Uri(filename));
+
+            if (sf != null)
+            {
+                _originalCodeFile = _currentFile;
+                
+                if (await LoadFileIntoEditorAsync(sf))
+                {                    
+                    Editor.IsReadOnly = true;
+                    ApplyEditorForeground(true);
+                }
+            }
+        });
+
+    // Console + Debug NANO (device, once connected) — these events fire
+    // from MogwaiNanoClient's network thread, never the UI thread: hence
+    // the systematic use of OnUiThread below.
+    AppGlobal.NanoRuntime.NanoPrintLn += text => OnUiThread(() => WriteNanoConsoleLine(text));
         AppGlobal.NanoRuntime.NanoPrint += text => OnUiThread(() => WriteNanoConsole(text));
         AppGlobal.NanoRuntime.NanoDebugWrite += message => OnUiThread(() => AppendNanoDebugMessage(message));
         AppGlobal.NanoRuntime.NanoDebugClear += () => OnUiThread(() => _nanoDebugMessages.Clear());
         AppGlobal.NanoRuntime.NanoConsoleClear += () => OnUiThread(() => ConsoleNanoOutput.Text = string.Empty);
 
+        AppGlobal.NanoRuntime.NanoProgramDidStart += (debugMode) => OnUiThread(() =>
+        {
+            Editor.IsReadOnly = true;
+
+            if (debugMode)
+            {
+                DebugPauseButton.IsEnabled = false;
+                DebugResumeButton.IsEnabled = false;
+                DebugStepButton.IsEnabled = false;
+
+                ShowDebugBar();
+            }
+        });
+
         // Writes the device's final result to the Console NANO automatically
         // whenever a program running on it ends (PROGRAM.DID.END). The
         // leading newline is baked into the same string (one call), not
         // sent separately beforehand — same lesson learned from the MOGWAI
-        // console's ProgramEnded handling: two separate calls risk an
+        // console's ProgramEnded handling: two separate calls risk an²
         // inconsistent order against other concurrent output.
-        AppGlobal.NanoRuntime.NanoProgramDidEnd += result => OnUiThread(() => WriteNanoConsoleLine(Environment.NewLine + result));
+        AppGlobal.NanoRuntime.NanoProgramDidEnd += result => OnUiThread(async () =>
+        {
+            WriteNanoConsoleLine(Environment.NewLine + result);
+            HideDebugBar();
+
+            await UpdateCodeFileIfNeeded();
+
+            Editor.IsReadOnly = false;
+        });
+
+        AppGlobal.NanoRuntime.NanoDebugInfoDidReceive += (startPos, endPos, pauseRequested, nextStepRequested) => OnUiThread(() =>
+        {
+            Editor.CaretIndex = endPos + 1;
+            Editor.SelectionStart = startPos;
+            Editor.SelectionEnd = endPos + 1;              
+
+            DebugPauseButton.IsEnabled = !pauseRequested;
+            DebugResumeButton.IsEnabled = pauseRequested;
+            DebugStepButton.IsEnabled = pauseRequested;
+        });
 
         // Connection state — reflects a connect/disconnect done from this UI
         // just as well as a nano.connect/nano.user.connect typed as MOGWAI
@@ -277,14 +346,38 @@ public partial class MainWindow : Window
             UpdateDeviceMenuState(true);
         });
 
-        AppGlobal.NanoClient.Disconnected += (_, _) => OnUiThread(() =>
+        AppGlobal.NanoClient.Disconnected += (_, _) => OnUiThread(async () =>
         {
             StatusDot.Fill = Brushes.Gray;
             StatusText.Text = "Not connected";
             UpdateDeviceMenuState(false);
+
+            await UpdateCodeFileIfNeeded();
         });
 
         UpdateDeviceMenuState(false);
+    }
+
+    private async Task UpdateCodeFileIfNeeded()
+    {
+        if (_originalCodeFile != null)
+        {
+            await LoadFileIntoEditorAsync(_originalCodeFile);
+            _originalCodeFile = null;
+        }
+
+        Editor.SelectionStart = Editor.CaretIndex;
+        Editor.SelectionEnd = Editor.CaretIndex;
+
+        ApplyEditorForeground(false);
+    }
+
+    private void ApplyEditorForeground(bool nanoMode)
+    {
+        string key = nanoMode ? "EditorNanoTextBrush" : "EditorTextBrush";
+        
+        if (Editor.TryFindResource(key, Editor.ActualThemeVariant, out var res))
+            Editor.Foreground = res as IBrush ?? Brushes.White;
     }
 
     // True if the given point falls within the bounds of at least one
@@ -386,6 +479,34 @@ public partial class MainWindow : Window
         FindBar.IsVisible = false;
         FindStatusText.Text = string.Empty;
         Editor.Focus();
+    }
+
+    // --- Debug bar ---
+    // Non-modal overlay on the editor, same idea as the find bar. It is shown
+    // while a program runs in debug mode and hidden otherwise.
+
+    /// <summary>Shows the debug bar (Pause / Resume / Step).</summary>
+    public void ShowDebugBar() => DebugBar.IsVisible = true;
+
+    /// <summary>Hides the debug bar.</summary>
+    public void HideDebugBar() => DebugBar.IsVisible = false;
+
+    /// <summary>True while the debug bar is displayed.</summary>
+    public bool IsDebugBarVisible => DebugBar.IsVisible;
+
+    private async void OnDebugPauseClick(object? sender, RoutedEventArgs e)
+    {
+        await AppGlobal.NanoRuntime.DebugHalt("debug.halt");
+    }
+
+    private async void OnDebugResumeClick(object? sender, RoutedEventArgs e)
+    {
+        await AppGlobal.NanoRuntime.DebugResume("debug.resume");
+    }
+
+    private async void OnDebugStepClick(object? sender, RoutedEventArgs e)
+    {
+        await AppGlobal.NanoRuntime.DebugNextStep("debug.step");
     }
 
     private void OnFindTextBoxKeyDown(object? sender, KeyEventArgs e)
@@ -786,7 +907,6 @@ public partial class MainWindow : Window
     private async Task ExecuteMogwaiCommand(string command)
     {
         WriteMogwaiConsoleLine($"> {command}");
-        WriteMogwaiConsoleLine(string.Empty);
         await RunMogwaiCode(command, isRepl: true);
     }
 
@@ -881,10 +1001,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = await AppGlobal.NanoRuntime.RunAsync(canonicalCode);
+        EvalResult? result = null;
 
-        if (result.IsError)
-            WriteNanoConsoleLine(result.ToString() ?? string.Empty);
+        if (AppGlobal.NanoRuntime.IsInDebugMode)
+        {
+            result = await AppGlobal.NanoRuntime.ExecuteDebugInstructionAsync(canonicalCode);
+
+            if (result.IsError)
+                WriteNanoConsoleLine(result.ToString() ?? string.Empty);
+        }
+        else
+        {
+            result = await AppGlobal.NanoRuntime.RunAsync(canonicalCode);
+
+            if (result.IsError)
+                WriteNanoConsoleLine(result.ToString() ?? string.Empty);
+        }
     }
 
     // --- Editor: run its whole content as a MOGWAI script ---
@@ -963,7 +1095,7 @@ public partial class MainWindow : Window
     // unsaved-changes check happens in each of those callers instead, since
     // "Recent Files" needs it too but arrives via a different path (see
     // OpenRecentFileAsync).
-    private async Task LoadFileIntoEditorAsync(IStorageFile file)
+    private async Task<bool> LoadFileIntoEditorAsync(IStorageFile file)
     {
         try
         {
@@ -974,12 +1106,15 @@ public partial class MainWindow : Window
             _currentFile = file;
             UpdateTitle();
             AddRecentFile(file);
+
+            return true;
         }
         catch (Exception ex)
         {
             // TODO: replace with a real user notification once a
             // message/toast mechanism is in place
             StatusText.Text = $"Failed to open file: {ex.Message}";
+            return false;
         }
     }
 

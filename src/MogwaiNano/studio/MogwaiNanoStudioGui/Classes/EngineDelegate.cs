@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Avalonia.Controls;
+using Avalonia.Threading;
 using MOGWAI.Engine;
 using MOGWAI.Interfaces;
 using MOGWAI.Objects;
-using Avalonia.Controls;
-using Avalonia.Threading;
 using System;
 using System.IO;
 using System.Net;
@@ -64,11 +64,15 @@ namespace MogwaiNanoStudioGui.Classes
         // at its own construction.
         public Window? OwnerWindow { get; set; }
 
+        public event Action<string, bool>? ProgramStarted;
+
         // Fired when the engine signals the actual end of a program's
         // execution — used as the point to display the result rather than
         // relying on RunAsync's Task returning, whose ordering relative to
         // the program's last internal ConsolePrintLn/ConsolePrint calls isn't guaranteed.
         public event Action<EvalResult>? ProgramEnded;
+
+        public event Action<string, string>? UseNewCodeFile;
 
         private MogwaiEngine _engine;
 
@@ -94,6 +98,8 @@ namespace MogwaiNanoStudioGui.Classes
             "run",
 
             "nano.run",
+            "nano.debug",
+            "nano.debugall",
             "nano.connect",
             "nano.disconnect",
             "nano.isConnected",
@@ -140,6 +146,14 @@ namespace MogwaiNanoStudioGui.Classes
             "nano.usings.purge",
 
             "nano.keepAlive",
+
+            "nano.debug.halt",
+            "nano.debug.resume",
+            "nano.debug.step",  
+            "nano.debug.tron",
+            "nano.debug.troff",
+
+            "nano.stack",
 
             "mogwai.memory",
             "mogwai.reboot",
@@ -293,6 +307,77 @@ namespace MogwaiNanoStudioGui.Classes
 
                     var code = engine.StackPopCode();
                     return await AppGlobal.NanoRuntime.RunAsync(code.ToStringCode());
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.debug" || word == "nano.debugall")
+            {
+                // { ... } nano.debug
+                // "filename" nano.debug
+
+                var s = engine.StackSign(1);
+
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGString))
+                {
+                    // debug filename
+
+                    var filename = engine.StackPopString();
+
+                    try
+                    {
+                        var code = File.ReadAllText(filename.Value);
+
+                        if (!string.IsNullOrEmpty(code))
+                        {
+                            var function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
+
+                            string debugCode;
+
+                            if (word == "nano.debugall")
+                            {
+                                debugCode = function.ToDebugAllString();
+                            }
+                            else
+                            {
+                                debugCode = function.ToDebugString();
+                            }
+
+                            UseNewCodeFile?.Invoke(filename.Value, code);
+
+                            return await AppGlobal.NanoRuntime.DebugAsync(debugCode);
+                        }
+                        else
+                        {
+                            return EvalResult.Failure(engine, Error.BadArgumentValueError, word, "empty code provided");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return EvalResult.Failure(engine, Error.ParseError, word, ex.Message);
+                    }
+                }
+                else if (s[0] == typeof(MOGCode))
+                {
+                    // debug { ... }
+
+                    var code = engine.StackPopCode();
+
+                    string debugCode;
+
+                    if (word == "nano.debugall")
+                    {
+                        debugCode = code.ToDebugAllString();
+                    }
+                    else
+                    {
+                        debugCode = code.ToDebugString();
+                    }
+
+                    return await AppGlobal.NanoRuntime.DebugAsync(debugCode);
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
@@ -467,19 +552,19 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else if (word == "nano.state")
             {
-                return await AppGlobal.NanoRuntime.GetState();
+                return await AppGlobal.NanoRuntime.GetState(word);
             }
             else if (word == "nano.memory")
             {
-                return await AppGlobal.NanoRuntime.GetMemory();
+                return await AppGlobal.NanoRuntime.GetMemory(word);
             }
             else if (word == "nano.info")
             {
-                return await AppGlobal.NanoRuntime.GetInfo();
+                return await AppGlobal.NanoRuntime.GetInfo(word);
             }
             else if (word == "nano.name")
             {
-                return await AppGlobal.NanoRuntime.GetName();
+                return await AppGlobal.NanoRuntime.GetName(word);
             }
             else if (word == "nano.name.set")
             {
@@ -491,26 +576,26 @@ namespace MogwaiNanoStudioGui.Classes
                 if (s[0] == typeof(MOGString))
                 {
                     var name = engine.StackPopString();
-                    return await AppGlobal.NanoRuntime.SetName(name.Value);
+                    return await AppGlobal.NanoRuntime.SetName(word, name.Value);
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
             }
             else if (word == "nano.session")
             {
-                return await AppGlobal.NanoRuntime.GetSession();
+                return await AppGlobal.NanoRuntime.GetSession(word);
             }
             else if (word == "nano.lastResult")
             {
-                return await AppGlobal.NanoRuntime.GetLastResult();
+                return await AppGlobal.NanoRuntime.GetLastResult(word);
             }
             else if (word == "nano.isRunning")
             {
-                return await AppGlobal.NanoRuntime.StateIsRunning();
+                return await AppGlobal.NanoRuntime.StateIsRunning(word);
             }
             else if (word == "nano.autorun.get")
             {
-                return await AppGlobal.NanoRuntime.GetAutorunAsync();
+                return await AppGlobal.NanoRuntime.GetAutorunAsync(word);
             }
             else if (word == "nano.autorun.set")
             {
@@ -559,7 +644,7 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else if (word == "nano.autorun.purge")
             {
-                return await AppGlobal.NanoRuntime.PurgeAutorunAsync();
+                return await AppGlobal.NanoRuntime.PurgeAutorunAsync(word);
             }
             else if (word == "nano.halt")
             {
@@ -571,7 +656,7 @@ namespace MogwaiNanoStudioGui.Classes
                 }
                 catch
                 {
-                    return EvalResult.Failure(engine, MogwaiNanoErrors.DeviceUnreachableError);
+                    return EvalResult.Failure(engine, MogwaiNanoErrors.DeviceUnreachableError, word);
                 }
             }
             else if (word == "nano.reboot")
@@ -584,7 +669,7 @@ namespace MogwaiNanoStudioGui.Classes
                 }
                 catch
                 {
-                    return EvalResult.Failure(engine, MogwaiNanoErrors.DeviceUnreachableError);
+                    return EvalResult.Failure(engine, MogwaiNanoErrors.DeviceUnreachableError, word);
                 }
             }
             else if (word == "nano.send")
@@ -680,7 +765,7 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else if (word == "nano.units")
             {
-                return await AppGlobal.NanoRuntime.GetUnits();
+                return await AppGlobal.NanoRuntime.GetUnits(word);
             }
             else if (word == "nano.units.purge")
             {
@@ -848,7 +933,7 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else if (word == "nano.usings")
             {
-                return await AppGlobal.NanoRuntime.GetUsings();
+                return await AppGlobal.NanoRuntime.GetUsings(word);
             }
             else if (word == "nano.usings.purge")
             {
@@ -883,18 +968,61 @@ namespace MogwaiNanoStudioGui.Classes
 
                     var keepAlive = engine.StackPopBoolean();
 
-                    return await AppGlobal.NanoRuntime.SetKeepAliveAsync(word, keepAlive.Value);                    
+                    return await AppGlobal.NanoRuntime.SetKeepAliveAsync(word, keepAlive.Value);
                 }
             }
+            else if (word == "nano.debug.halt")
+            {
+                return await AppGlobal.NanoRuntime.DebugHalt(word);
+            }
+            else if (word == "nano.debug.step")
+            {
+                return await AppGlobal.NanoRuntime.DebugNextStep(word);
+            }
+            else if (word == "nano.debug.resume")
+            {
+                return await AppGlobal.NanoRuntime.DebugResume(word);
+            }
+            else if (word == "nano.debug.tron")
+            {
+                var s = engine.StackSign(1);
 
-            return EvalResult.NoExternalFunction;
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGNumber))
+                {
+                    var delay = engine.StackPopNumber();
+
+                    if (delay.IntValue < 0 || delay.IntValue > 5000)
+                        return EvalResult.Failure(engine, Error.BadArgumentValueError, word, "delay must be between 0 and 5000 milliseconds");
+                
+                    return await AppGlobal.NanoRuntime.DebugSetTron(word, delay.IntValue);       
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+            }
+            else if (word == "nano.debug.troff")
+            {
+                return await AppGlobal.NanoRuntime.DebugTroff(word);
+            }
+            else if (word == "nano.stack")
+            {
+                return await AppGlobal.NanoRuntime.GetStack(word);
+            }
+
+                return EvalResult.NoExternalFunction;
         }
 
         // ─── Console ─────────────────────────────────────────────────────────
 
         private object _ConsoleAccessLocker = new();
 
-        public Task ProgramStart(MogwaiEngine engine, string code) => Task.CompletedTask;
+        public Task ProgramStart(MogwaiEngine engine, string code)
+        {
+            ProgramStarted?.Invoke(code, engine.DebugMode);
+            return Task.CompletedTask;
+        }
 
         public Task ProgramEnd(MogwaiEngine engine, EvalResult result)
         {

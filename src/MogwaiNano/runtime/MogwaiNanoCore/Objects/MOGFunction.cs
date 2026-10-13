@@ -36,15 +36,15 @@ namespace MogwaiNano.Objects
         }
 
 
-        public MOGFunction(MogwaiNanoEngine engine, string content) : base(engine, content)
+        public MOGFunction(MogwaiNanoEngine engine, string content, bool automaticMode = true, bool withProgressInformations = false) : base(engine, content, automaticMode, withProgressInformations)
         {
 
         }
 
-        public override EvalResult Execute()
+        public override EvalResult Execute(bool debugCommand = false)
         {
             Engine.VarPushContext(Name);
-            var r = base.Execute();
+            var r = base.Execute(debugCommand);
             //Engine.ReturnRequested = false;
             Engine.VarPopContext();
 
@@ -65,7 +65,7 @@ namespace MogwaiNano.Objects
 
         public override MOGObject Clone()
         {
-            var obj = new MOGFunction(Engine, Content);
+            var obj = new MOGFunction(Engine, Content, false);
 
             if (Engine.FrugalMode)
             {
@@ -75,15 +75,18 @@ namespace MogwaiNano.Objects
             {
                 if (Items != null)
                 {
+                    obj.Items = new();
+
                     foreach (MOGObject item in Items)
                         obj.Items.Add(item.Clone());
                 }
             }
 
+            if (DebugInfo != null)
+                obj.DebugInfo = DebugInfo.Clone();
+
             return obj;
         }
-
-
         public override string ToString() => $"«{ToStringCode()}»";
     }
 }

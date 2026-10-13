@@ -108,6 +108,11 @@ namespace MogwaiNanoCore
                 var code = message.Parameters[0];
                 AppGlobal.MogwaiNanoEngine.RunAsync(code);
             }
+            else if (message.Function == "DEBUG")
+            {
+                var code = message.Parameters[0];
+                AppGlobal.MogwaiNanoEngine.RunAsync(code, true);    
+            }
             else if (message.Function == "AUTORUN.SET")
             {
                 // On stocke le code dans I:\autorun.mogwai pour qu'il soit exécuté au démarrage
@@ -585,6 +590,48 @@ namespace MogwaiNanoCore
                 {
                     AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "KEEPALIVE.SET", "ERROR", "Missing parameters"));
                 }
+            }
+            else if (message.Function == "DEBUG.STEP")
+            {
+                AppGlobal.MogwaiNanoEngine.NextStepRequested = true;
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.STEP", "OK"));
+            }
+            else if (message.Function == "DEBUG.HALT")
+            {
+                AppGlobal.MogwaiNanoEngine.PauseRequested = true;
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.HALT", "OK"));
+            }
+            else if (message.Function == "DEBUG.RESUME")
+            {
+                AppGlobal.MogwaiNanoEngine.PauseRequested = false;
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.RESUME", "OK"));
+            }
+            else if (message.Function == "DEBUG.TRON")
+            {
+                if (message.Parameters.Length > 0 && message.Parameters[0] != null && int.TryParse(message.Parameters[0], out int delay))
+                {
+                    AppGlobal.MogwaiNanoEngine.DebugTronDelay = delay;
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.TRON", "OK"));
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.TRON", "ERROR"));
+                }
+            }
+            else if (message.Function == "DEBUG.TROFF")
+            {
+                AppGlobal.MogwaiNanoEngine.DebugTronDelay = 0;
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.TROFF", "OK"));
+            }
+            else if (message.Function == "STACK.GET")
+            {
+                var stackInfo = AppGlobal.MogwaiNanoEngine.GetStack();
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "STACK.GET", stackInfo));   
+            }
+            else if (message.Function == "DEBUG.EXECUTE")
+            {
+                if (message.Parameters.Length > 0 && message.Parameters[0] != null)
+                    AppGlobal.MogwaiNanoEngine.DebugCommand = message.Parameters[0];
             }
         }
 

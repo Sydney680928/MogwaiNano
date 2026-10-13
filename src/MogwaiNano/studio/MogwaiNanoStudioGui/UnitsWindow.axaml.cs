@@ -45,7 +45,7 @@ public partial class UnitsWindow : Window
 
             if (connected)
             {
-                var result = await AppGlobal.NanoRuntime.GetUnits();
+                var result = await AppGlobal.NanoRuntime.GetUnits("from studio");
 
                 if (!result.IsError)
                 {

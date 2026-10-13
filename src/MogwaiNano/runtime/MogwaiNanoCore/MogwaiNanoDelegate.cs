@@ -39,8 +39,16 @@ namespace MogwaiNano
         {
             if (!engine.IsTask)
             {
-                var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.START");
-                AppGlobal.TcpServer.EnqueueMessage(msg);
+                if (engine.DebugMode)
+                {
+                    var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.START.DEBUG", code);
+                    AppGlobal.TcpServer.EnqueueMessage(msg);
+                }
+                else
+                {
+                    var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "PROGRAM.DID.START", code);
+                    AppGlobal.TcpServer.EnqueueMessage(msg);
+                }
             }
         }
 

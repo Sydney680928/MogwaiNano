@@ -30,6 +30,11 @@ namespace MogwaiNano.Objects
         public override MOGObject Clone()
         {
             var obj = new MOGString(Engine, Value);
+
+
+            if (DebugInfo != null)
+                obj.DebugInfo = DebugInfo.Clone();
+
             return obj;
         }
 

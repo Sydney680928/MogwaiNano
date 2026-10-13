@@ -1,9 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using Iot.Device.Ssd13xx;
 using System;
 
-namespace Iot.Device.Ssd13xx.Samples
+namespace MogwaiNanoSsd1306
 {
     /// <summary>
     /// A basic font  8x8 size.

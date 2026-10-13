@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 
 namespace MogwaiNano.Objects
 {
@@ -93,11 +94,36 @@ namespace MogwaiNano.Objects
             }
         }
 
+        public string Dump()
+        {
+            var sb = new StringBuilder();
+
+            if (_top == 0)
+            {
+                sb.Append("stack is empty");
+            }
+            else
+            {
+                var s = (int)(Math.Log10(_top) + 1);
+                var format = $"D{s}";
+                var index = 0;
+
+                for (int i = _top - 1; i >= 0; i--)
+                {
+                    sb.AppendLine($"{index.ToString(format)}: {_items[i]}");
+                    index++;
+                }
+            }
+
+            return sb.ToString();
+        }
+
         private void Grow()
         {
             var newItems = new MOGObject[_items.Length * 2];
             Array.Copy(_items, newItems, _items.Length);
             _items = newItems;
         }
+
     }
 }

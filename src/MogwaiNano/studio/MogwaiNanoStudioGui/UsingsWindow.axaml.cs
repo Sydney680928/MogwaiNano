@@ -45,7 +45,7 @@ public partial class UsingsWindow : Window
 
             if (connected)
             {
-                var result = await AppGlobal.NanoRuntime.GetUsings();
+                var result = await AppGlobal.NanoRuntime.GetUsings("from studio");
 
                 if (!result.IsError)
                 {

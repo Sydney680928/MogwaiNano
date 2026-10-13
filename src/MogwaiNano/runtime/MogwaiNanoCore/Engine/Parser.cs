@@ -27,18 +27,22 @@ namespace MogwaiNano.Engine
         private int _index;
         private MogwaiNanoEngine _engine;
         private StringBuilder _item;
+        private string _debugInfo;
 
         public Parser(MogwaiNanoEngine engine)
         {
             _engine = engine;
         }
 
-        public ArrayList Parse(string code)
+        public ArrayList Parse(string code, bool withProgressInformations = false)
         {
             _items = new();
             _index = 0;
             _code = code;
             _item = new();
+
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
 
             while (_index < _code.Length)
             {
@@ -57,38 +61,68 @@ namespace MogwaiNano.Engine
                 }
                 else if (c == '"')
                 {
-                    GetEnclosedItem('"', '"');
-                    _items.Add(new MOGString(_engine, _item.ToString()));
+                    var parts = GetEnclosedItem('"', '"');
+                    var mogString = new MOGString(_engine, parts[0]);
+
+                    if (parts.Length > 1)
+                        mogString.DebugInfo = new DebugInformations(parts[1]);  
+                    
+                    _items.Add(mogString);
                     _item.Clear();
                 }
                 else if (c == '\'')
                 {
-                    GetEnclosedItem('\'', '\'');
-                    _items.Add(new MOGName(_engine, _item.ToString()));
+                    var parts = GetEnclosedItem('\'', '\'');
+                    var mogName = new MOGName(_engine, parts[0]);
+
+                    if (parts.Length > 1)
+                        mogName.DebugInfo = new DebugInformations(parts[1]);
+
+                    _items.Add(mogName);
                     _item.Clear();
                 }
                 else if (c == '(')
                 {
-                    GetEnclosedItem('(', ')');
-                    _items.Add(new MOGList(_engine, _item.ToString()));
+                    var parts = GetEnclosedItem('(', ')');
+                    var mogList = new MOGList(_engine, parts[0]);
+
+                    if (parts.Length > 1)
+                        mogList.DebugInfo = new DebugInformations(parts[1]);
+
+                    _items.Add(mogList);
                     _item.Clear();
                 }
                 else if (c == '[')
                 {
-                    GetEnclosedItem('[', ']');
-                    _items.Add(new MOGRecord(_engine, _item.ToString()));
+                    var parts = GetEnclosedItem('[', ']');
+                    var mogRecord = new MOGRecord(_engine, parts[0]);
+
+                    if (parts.Length > 1)
+                        mogRecord.DebugInfo = new DebugInformations(parts[1]);
+
+                    _items.Add(mogRecord);
                     _item.Clear();
                 }
                 else if (c == '{')
                 {
-                    GetEnclosedItem('{', '}');
-                    _items.Add(new MOGCode(_engine, _item.ToString()));
+                    var parts = GetEnclosedItem('{', '}');
+                    var mogCode = new MOGCode(_engine, parts[0]);
+
+                    if (parts.Length > 1)
+                        mogCode.DebugInfo = new DebugInformations(parts[1]);
+
+                    _items.Add(mogCode);
                     _item.Clear();
                 }
                 else if (c == '«')
                 {
-                    GetEnclosedItem('«', '»');
-                    _items.Add(new MOGFunction(_engine, _item.ToString()));
+                    var parts = GetEnclosedItem('«', '»');
+                    var mogFunction = new MOGFunction(_engine, parts[0]);
+                    
+                    if (parts.Length > 1)
+                        mogFunction.DebugInfo = new DebugInformations(parts[1]);
+                    
+                    _items.Add(mogFunction);
                     _item.Clear();
                 }
                 else
@@ -104,19 +138,45 @@ namespace MogwaiNano.Engine
                 _item.Clear();
             }
 
+            stopWatch.Stop();   
+
+            if (withProgressInformations)
+                _engine.Delegate?.DebugMessage(_engine, $"Parsing completed in {stopWatch.ElapsedMilliseconds} ms.");
+
             return _items;
         }
 
         private MOGObject ParseItem(string item)
         {
+            DebugInformations debugInfo = null;
+            var parts = item.Split('§');
+
+            if (parts.Length > 1)
+            {
+                item = parts[0];
+                debugInfo = new DebugInformations(parts[1]);
+            }
+
             if (item == "true")
-                return new MOGBoolean(_engine, true);
+            {
+                var obj = new MOGBoolean(_engine, true);
+                obj.DebugInfo = debugInfo;
+                return obj;
+            }
 
             if (item == "false")
-                return new MOGBoolean(_engine, false);
+            {
+                var obj = new MOGBoolean(_engine, false);
+                obj.DebugInfo = debugInfo;
+                return obj;
+            }
 
             if (item == "null")
-                return new MOGNull(_engine);
+            {
+                var obj = new MOGNull(_engine);
+                obj.DebugInfo = debugInfo;
+                return obj;
+            }
 
             if (item.StartsWith("0x"))
             {
@@ -125,7 +185,9 @@ namespace MogwaiNano.Engine
                     try
                     {
                         float n = System.Convert.ToByte(item.Substring(2), 16);
-                        return new MOGNumber(_engine, n);
+                        var obj = new MOGNumber(_engine, n);
+                        obj.DebugInfo = debugInfo;
+                        return obj;
                     }
                     catch
                     {
@@ -141,17 +203,20 @@ namespace MogwaiNano.Engine
             if (item.StartsWith("D:"))
             {
                 var content = item.Substring(2);
+                MOGData data = null;
 
                 if (content.Length == 0)
                 {
-                    var data = new MOGData(_engine);
-                    return data;
+                    data = new MOGData(_engine);
                 }
                 else
                 {
-                    var data = new MOGData(_engine, content);
-                    return data;
+                    data = new MOGData(_engine, content);
                 }
+
+                data.DebugInfo = debugInfo;
+
+                return data;
             }
 
             if (item.EndsWith(":") && item.Length > 1)
@@ -161,7 +226,9 @@ namespace MogwaiNano.Engine
                 if (!_engine.IsValidName(name, false))
                     throw new MogwaiParseErrorException($"invalid key {item}");
 
-                return new MOGKey(_engine, name);
+                var obj = new MOGKey(_engine, name);
+                obj.DebugInfo = debugInfo;
+                return obj;
             }
 
             if (item.StartsWith(".") && item.Length > 1)
@@ -174,7 +241,11 @@ namespace MogwaiNano.Engine
                 var t = _engine.GetType(name);
 
                 if (t != null)
-                    return t.Clone();
+                {
+                    var obj = t.Clone();
+                    obj.DebugInfo = debugInfo;
+                    return obj;
+                }
 
                 throw new MogwaiParseErrorException($"unknown type {item}");
             }
@@ -186,19 +257,31 @@ namespace MogwaiNano.Engine
                 if (!_engine.IsValidName(name, false))
                     throw new MogwaiParseErrorException($"invalid reference {item}");
 
-                return new MOGRef(_engine, name);
+                var obj = new MOGRef(_engine, name);
+                obj.DebugInfo = debugInfo;
+                return obj;
             }
 
             if (LooksLikeNumber(item))
             {
                 if (float.TryParse(item, out float value))
-                    return new MOGNumber(_engine, value);
+                {
+                    var obj = new MOGNumber(_engine, value);
+                    obj.DebugInfo = debugInfo;  
+                    return obj;
+                }
             }
 
             if (_engine.IsPrimitive(item))
-                return new MOGPrimitive(_engine, item);
+            {
+                var obj = new MOGPrimitive(_engine, item);
+                obj.DebugInfo = debugInfo;
+                return obj;
+            }
 
-            return new MOGWord(_engine, item);
+            var objWord = new MOGWord(_engine, item);
+            objWord.DebugInfo = debugInfo;
+            return objWord  ;
         }
 
         private static bool LooksLikeNumber(string token)
@@ -225,7 +308,7 @@ namespace MogwaiNano.Engine
             return false;
         }
 
-        private void GetEnclosedItem(char firstChar, char lastChar)
+        private string[] GetEnclosedItem(char firstChar, char lastChar)
         {
             int level = 0;
             char currentChar = '\0';
@@ -251,7 +334,35 @@ namespace MogwaiNano.Engine
                             }
                             else if (level == 0 || --level < 0)
                             {
-                                return;
+                                if (_index < _code.Length)
+                                {
+                                    var nextChar = _code[_index];
+
+                                    if (nextChar == '§')
+                                    {
+                                        _index++;
+
+                                        _item.Append('\x1E');
+
+                                        while (_index < _code.Length)
+                                        {
+                                            currentChar = _code[_index++];
+
+                                            if (currentChar == ' ')
+                                            {
+                                                break;
+                                            }
+                                            else
+                                            {
+                                                _item.Append(currentChar);
+                                            }
+                                        }
+
+                                        return _item.ToString().Split('\x1E');
+                                    }
+                                }
+
+                                return new string[] { _item.ToString() };
                             }
                         }
                         else if (currentChar == firstChar)
@@ -272,9 +383,9 @@ namespace MogwaiNano.Engine
             }
 
             if (currentChar != lastChar)
-            {
                 throw new System.Exception($"missing closing character '{lastChar}'");
-            }
+
+            return _item.ToString().Split('\x1E');
         }
     }
 }

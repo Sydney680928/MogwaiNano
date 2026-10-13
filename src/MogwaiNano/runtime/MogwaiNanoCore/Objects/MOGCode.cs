@@ -18,13 +18,14 @@ using System;
 using System.Collections;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using GC = nanoFramework.Runtime.Native.GC;
 
 namespace MogwaiNano.Objects
 {
     public class MOGCode : MOGObject
     {
-        public ArrayList Items { get; private set; }
+        public ArrayList Items { get; internal set; }
 
         public string Content { get; protected set; }
 
@@ -45,13 +46,16 @@ namespace MogwaiNano.Objects
             }
         }
 
-        public MOGCode(MogwaiNanoEngine engine, string content) : this(engine)
+        public MOGCode(MogwaiNanoEngine engine, string content, bool automaticMode = true, bool withProgressInformation = false) : this(engine)
         {
             Content = content;
             AutoEval = Content.StartsWith("!");
+
+            if (automaticMode)
+                Parse(withProgressInformation);
         }
 
-        public bool Parse()
+        public bool Parse(bool withProgressInformations = false)
         {
             try
             {
@@ -59,7 +63,7 @@ namespace MogwaiNano.Objects
                     return false;
 
                 var parser = new Parser(Engine);
-                Items = parser.Parse(Content);
+                Items = parser.Parse(Content, withProgressInformations);
                 parser = null;
 
                 if (Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
@@ -70,13 +74,18 @@ namespace MogwaiNano.Objects
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine(Content);
+
+                if (withProgressInformations)
+                    Engine.Delegate?.DebugMessage(Engine, ex.Message);
+
                 return false;
             }
         }
 
-        public virtual EvalResult Execute()
+        public virtual EvalResult Execute(bool debugCommand = false)
         {
             if (Engine.HaltRequested)
                 return EvalResult.Failure(Engine, Error.HaltEncounteredError);
@@ -116,18 +125,80 @@ namespace MogwaiNano.Objects
                         if (Engine.HaltRequested)
                             return EvalResult.Failure(Engine, Error.HaltEncounteredError);
 
-                        if (Engine.FrugalMode)
-                        {
-                            Engine.CurrentEvalObject = item;
-                        }
-                        else
-                        {
-                            Engine.CurrentEvalObject = item.Clone();
-                        }
-
                         try
                         {
+                            var savedCurrentEvalObject = Engine.CurrentEvalObject;
+
+                            if (Engine.FrugalMode)
+                            {
+                                Engine.CurrentEvalObject = item;
+                            }
+                            else
+                            {
+                                Engine.CurrentEvalObject = item.Clone();
+                            }
+
+                            if (!debugCommand && Engine.DebugMode && Engine.CurrentEvalObject.DebugInfo != null)
+                            {
+                                if (Engine.DebugCommand != null)
+                                {
+                                    Engine.DebugCommand = null;
+
+                                    var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.COMMAND.RESULT", "MOGWAI NANO\nCannot execute command: program is not paused.");
+                                    AppGlobal.TcpServer.EnqueueMessage(msg);
+                                }
+
+                                if (Engine.PauseRequested)
+                                {
+                                    Engine.DebugCommand = null;
+
+                                    var debugInfo = Engine.CurrentEvalObject.DebugInfo;
+                                    var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.INFO", debugInfo.StartPos.ToString(), debugInfo.EndPos.ToString(), Engine.PauseRequested.ToString(), Engine.NextStepRequested.ToString());
+                                    AppGlobal.TcpServer.EnqueueMessage(msg);
+
+                                    while (Engine.PauseRequested)
+                                    {
+                                        if (Engine.DebugCommand != null)
+                                        {
+                                            var code = new MOGCode(Engine, Engine.DebugCommand, false);
+
+                                            Engine.DebugCommand = null;
+
+                                            var r = code.Execute(true);
+
+                                            var debugMsg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.COMMAND.RESULT", r.ToString());
+                                            AppGlobal.TcpServer.EnqueueMessage(debugMsg);
+                                        }
+
+                                        if (Engine.NextStepRequested)
+                                        {
+                                            Engine.NextStepRequested = false;
+                                            break;
+                                        }
+                                        else if (Engine.HaltRequested)
+                                        {
+                                            break;
+                                        }
+
+                                        Thread.Sleep(50);
+                                    }
+
+                                    Engine.DebugCommand = null;
+                                }
+                                else if (Engine.DebugTronDelay > 0)
+                                {
+                                    var debugInfo = Engine.CurrentEvalObject.DebugInfo;
+                                    var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.INFO", debugInfo.StartPos.ToString(), debugInfo.EndPos.ToString(), Engine.PauseRequested.ToString(), Engine.NextStepRequested.ToString());
+                                    AppGlobal.TcpServer.EnqueueMessage(msg);
+
+                                    Thread.Sleep(Engine.DebugTronDelay);
+                                }
+                            }
+
                             result = Engine.CurrentEvalObject.EngineEval();
+
+                            if (debugCommand)
+                                Engine.CurrentEvalObject = savedCurrentEvalObject;
                         }
                         catch (Exception ex)
                         {
@@ -167,7 +238,7 @@ namespace MogwaiNano.Objects
 
         public override MOGObject Clone()
         {
-            var obj = new MOGCode(Engine, Content);
+            var obj = new MOGCode(Engine, Content, false);
 
             if (Engine.FrugalMode)
             {
@@ -177,10 +248,15 @@ namespace MogwaiNano.Objects
             {
                 if (Items != null)
                 {
+                    obj.Items = new();
+
                     foreach (MOGObject item in Items)
                         obj.Items.Add(item.Clone());
                 }
             }
+
+            if (DebugInfo != null)
+                obj.DebugInfo = DebugInfo.Clone();
 
             return obj;
         }
