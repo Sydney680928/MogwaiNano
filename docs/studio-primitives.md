@@ -66,6 +66,62 @@ A *unit* is a named piece of MOGWAI NANO code, stored permanently on the device'
 | `nano.reboot` | `nano.reboot` | Forces an immediate reboot on the device, bypassing `MOGWAI.onReboot` entirely — unlike the device-side `mogwai.reboot`, which runs that hook first |
 | `nano.send` | `"string" nano.send` | Sends an arbitrary string to the connected device: `"TIME=15:45" nano.send`. The device fires a `STUDIO_DID_SEND` event on the currently running program, with the received string available as `eventData` (a plain `MOGString`), letting a long-running program (`forever do { ... }`) react to free-form commands from Studio without needing to be stopped and relaunched. No built-in message format is imposed — parsing the string (e.g. a `NAME=value` convention) is entirely up to the receiving script |
 
+## Debugging
+
+Step-by-step debugging of a program running on the device. `nano.debug` and `nano.debugall` run a program like `nano.run` does, but in *debug mode*: Studio attaches to each instruction the position it has in your original source, and as the program runs the device reports which instruction it is about to execute, which Studio highlights in the code editor. A pause always happens *before* the highlighted instruction, which has therefore not been executed yet.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `nano.debug` | `{ ... } nano.debug` | Runs a code block on the device in debug mode, like `nano.run`, with the minimum of debug information: only the instructions that matter for stepping can be paused on — primitives, words, and auto-evaluated lists and records. Literals, ordinary lists and records, and blocks can't. Raises the same errors as `nano.run` |
+| `nano.debugall` | `{ ... } nano.debugall` | Same as `nano.debug`, but every token can be paused on, literals included — only the tokens that MOGWAI itself marks as not pausable are left out. A finer step-by-step, at the cost of more debug information to parse and so a longer start |
+| `nano.debug.halt` | `nano.debug.halt` | Requests a pause at the next instruction that can be paused on. The command-line equivalent of the debug panel's **Pause** button, and of `debug.halt` / `¤` written in the code. Ignored when no debug session is running |
+| `nano.debug.step` | `nano.debug.step` | While paused, executes a single instruction, then pauses again at the next one that can be paused on. *Step-into* only — there is no step-over or step-out yet. The equivalent of the **Step** button. Ignored when no debug session is running |
+| `nano.debug.resume` | `nano.debug.resume` | Leaves the pause and lets the program run on. The equivalent of the **Resume** button. Ignored when no debug session is running |
+| `nano.debug.tron` | `delay nano.debug.tron` | Trace mode: waits `delay` milliseconds between each instruction and shows the current instruction in the editor as it goes — `150 nano.debug.tron` for one instruction every 150 ms. Ignored when no debug session is running |
+| `nano.debug.troff` | `nano.debug.troff` | Turns the trace off — equivalent to `0 nano.debug.tron` |
+| `nano.stack` | `nano.stack` | Asks the connected device, over the TCP connection, for a string representing its stack and displays it in the MOGWAI console. The top of the stack comes first (`0:`), one item per line. Available at any time — in a normal run as well as in a debug session, and particularly handy while a program is paused. The Studio-side counterpart of the device's `debug.stack` primitive |
+
+Like the other `nano.*` primitives, the `nano.debug.*` commands travel to the device over the TCP connection. While a debug session is running, type them in the **Console MOGWAI** tab. The debug panel buttons send the same commands.
+
+For example, with `50 60 "Hello" (1 2 3) true [x: 50 y: 20]` on the device's stack:
+
+```
+> nano.stack
+
+STACK
+0: [x: 50 y: 20]
+1: true
+2: (1 2 3)
+3: "Hello"
+4: 60
+5: 50
+```
+
+Inside the code itself, `debug.halt` (or `¤`), `debug.tron` and `debug.troff` are also available as ordinary primitives — see the [Shared Primitives Reference](shared-primitives.md). So is `debug.stack`, the device-side counterpart of `nano.stack` — see the [Device Primitives Reference](device-primitives.md). `resume` and `step` have no such primitive for now: they are only available from Studio.
+
+### The debug panel
+
+A **Pause / Resume / Step** bar appears over the code editor when a debug session starts, and is hidden again when the program ends (it is not shown outside debug mode). Its buttons enable and disable themselves according to the state of the session, from the information the device sends back with every instruction it reports:
+
+| State | Pause | Resume | Step |
+|---|---|---|---|
+| Running | enabled | disabled | disabled |
+| Paused (including after a **Step**) | disabled | enabled | enabled |
+
+**Resume** returns the session to the *Running* state. **Step** executes one instruction and leaves the session paused.
+
+### Running code while paused
+
+While the program is paused, you can type code in the NANO console and run it, to inspect or change variables, the stack, and so on. This code runs normally: it is not debugged, so it never pauses or highlights anything, and whatever it does stays in effect when the program resumes.
+
+### Limitations
+
+- Parsing takes longer in debug mode than in a normal run, in exchange for being able to debug the program — all the more so with `nano.debugall`, which carries more debug information.
+- Tasks can't be run in debug mode yet.
+- Units are loaded without debug information, so they can't be stepped through yet.
+- Events can be stepped through, as if their handler were a function of the source code.
+- `nano.debug.step` is step-into only; there is no step-over or step-out.
+
 ## Device state and info
 
 | Primitive | Signature | Description |

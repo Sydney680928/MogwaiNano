@@ -330,8 +330,43 @@ task 'TSK2' do
 | `debug.vs.write` | ⚙️ | `v debug.vs.write` | Like `debug.write`, but writes through `Debug.WriteLine` — into the debugger's output window (Visual Studio) — instead of over the network channel to a connected Studio. Meant for testing the runtime, or a plugin, in isolation, from a test project with no Studio connected |
 | `console.clear` | ⚙️ | `console.clear` | Sends `CONSOLE.CLEAR` to a connected Studio, clearing its Console NANO output |
 | `debug.clear` | ⚙️ | `debug.clear` | Sends `DEBUG.CLEAR` to a connected Studio, clearing its Debug NANO output |
+| `debug.halt` / `¤` | 🔗 | `debug.halt` | Debug mode only: requests a pause before the next instruction that can be paused on — a breakpoint. `¤` is a shorter way of writing `debug.halt`. No effect outside debug mode. Resuming is done from Studio — see [Debugging](#debugging-a-program) below |
+| `debug.tron` | 🔗 | `delay debug.tron` | Debug mode only: waits `delay` milliseconds between each instruction and shows the current instruction in the Studio editor, like a trace. No effect outside debug mode |
+| `debug.troff` | 🔗 | `debug.troff` | Debug mode only: turns the trace off — equivalent to `0 debug.tron`. No effect outside debug mode |
+| `debug.stack` | ⚙️ | `debug.stack` → `.string` | Pushes a string representing the stack as it was when the primitive was called, the top of the stack first (`0:`), one item per line, under a `STACK` heading — see the example below. Works in a normal run as well as in debug mode. Studio's `nano.stack` asks the device for this same representation and displays it |
 
 `?`, `??` and `debug.write` accept a `MOGRef` (`&variable`) and dereference it automatically before printing.
+
+### Inspecting the stack
+
+`debug.stack` pushes onto the stack a string representing the stack, which can then be displayed or sent anywhere. With `50 60 "Hello" (1 2 3) true [x: 50 y: 20]` on the stack, `debug.stack` pushes:
+
+```
+STACK
+0: [x: 50 y: 20]
+1: true
+2: (1 2 3)
+3: "Hello"
+4: 60
+5: 50
+```
+
+The string describes the stack as it was when the primitive was called — `debug.stack` itself isn't part of it. From MOGWAI NANO Studio, `nano.stack` asks the connected device for the same representation and displays it in the MOGWAI console, which makes it a convenient way to look at a program's stack while it is paused (see the [Studio Primitives Reference](studio-primitives.md)).
+
+### Debugging a program
+
+A program sent with `nano.debug` or `nano.debugall` (see the [Studio Primitives Reference](studio-primitives.md)) runs on the device in *debug mode*. Studio sends it with the position of each instruction in your original source attached to it; the device keeps that information with the instruction while it runs, and a program sent without it simply runs as before.
+
+Before executing an instruction that can be paused on, the device checks what it has been asked to do:
+
+- **A pause was requested** (`debug.halt`, `¤`, `nano.debug.halt` or `nano.debug.step`): it reports the position of the instruction about to run to Studio, which highlights it in the editor, then waits. That instruction has not been executed yet. It stays there until Studio asks it to resume or to execute a single instruction.
+- **A trace delay is set** (`debug.tron`): it reports the position the same way, then waits for the delay before going on.
+
+Which instructions can be paused on depends on the command used: with `nano.debug`, primitives, words and auto-evaluated lists and records; with `nano.debugall`, every token, literals included. Blocks never are.
+
+`debug.resume` and `debug.step` are **not** primitives: they only exist as messages sent by Studio to the device, through `nano.debug.resume`, `nano.debug.step` or the buttons of the debug panel. A script can therefore pause itself with `¤`, but cannot resume itself.
+
+Limitations for now: stepping is *step-into* only (no step-over or step-out); tasks can't be run in debug mode; units are loaded without debug information, so they can't be stepped through. An event handler, on the other hand, can be stepped through like a function of the source code.
 
 ---
 

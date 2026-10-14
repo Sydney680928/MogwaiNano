@@ -59,6 +59,7 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 - **Tasks** — real parallel execution, each on its own native thread with a fully isolated runtime instance, communicating with the parent only through events. Practical only on a PSRAM-equipped board (~10KB per task) — see [Memory considerations](#memory-considerations)
 - **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~40KB-RAM devices
 - **Reusable code libraries** — *units*, stored on flash and loaded on demand, for sharing functions (an RTC helper library, for example) across scripts without copy-pasting
+- **Integrated step-by-step debugger** — run a program in debug mode from MOGWAI NANO Studio and follow it instruction by instruction: the instruction about to run is highlighted in your original source, with Pause / Resume / Step controls, an optional trace delay, and the ability to run code in the console while paused to inspect or change variables and the stack. Parsing takes longer in debug mode, in exchange for being able to debug
 - **Timers & stopwatches** — one-shot and recurring timers running independently of your main program, plus named stopwatches for measuring elapsed time
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
 - **Network protocol** — UDP discovery + reliable TCP communication, with automatic disconnection detection and clean recovery
@@ -93,7 +94,7 @@ None of this is a bug to "just fix" — it's a direct, measured consequence of r
 
 ## MOGWAI NANO Studio
 
-MOGWAI NANO Studio is the graphical companion app that talks to a device from your PC — built with [Avalonia](https://avaloniaui.net/): its own code editor, separate live console tabs for local and device output, file management, and light/dark themes. Download, run, no terminal required.
+MOGWAI NANO Studio is the graphical companion app that talks to a device from your PC — built with [Avalonia](https://avaloniaui.net/): its own code editor, separate live console tabs for local and device output, file management, and light/dark themes, and a step-by-step debug panel (Pause / Resume / Step) that highlights the instruction being executed in your source. Download, run, no terminal required.
 
 ![MOGWAI NANO Studio GUI](images/studio-gui-screenshot.png)
 
@@ -236,7 +237,7 @@ src/MogwaiNano/
 
 - [Getting started guide](docs/getting-started.md) — step-by-step NANO tutorial (connect, GPIO, timers, events)
 - [Device primitives reference](docs/device-primitives.md) — complete, exhaustive reference for every primitive in the device runtime, marking which are shared with desktop MOGWAI and which are NANO-only
-- [Studio primitives reference](docs/studio-primitives.md) — the full `nano.*` command set exposed by MOGWAI NANO Studio (connection, discovery, running code, device state, autorun)
+- [Studio primitives reference](docs/studio-primitives.md) — the full `nano.*` command set exposed by MOGWAI NANO Studio (connection, discovery, running and debugging code, device state, autorun)
 - [ESP32 DeviceFunction values reference](docs/esp32-device-function-values.md) — the complete lookup table needed to use `esp32.setPinFunction` (SPI, I2C, serial, PWM, ADC, I2S, SDMMC)
 - [Network protocol](docs/) *(coming soon)*
 
@@ -256,6 +257,7 @@ src/MogwaiNano/
 - [ ] Dynamic PE loading for true runtime extensibility (nanoFramework already supports loading compiled assemblies dynamically, though it requires PSRAM) — a possible complement to the units system above on more capable boards
 - [x] Restructure the runtime into a shared core plus per-platform pieces — `MogwaiNanoCore` (platform-independent) plus `MogwaiNanoEsp32`/`MogwaiNanoPicoW` (each referencing Core and adding only what's platform-specific). Each release now ships two separate, independently versioned firmware binaries
 - [ ] Raspberry Pi Pico 2 W networking — the device boots and deploys successfully, but WiFi doesn't currently connect. Configuring it through Visual Studio's Device Explorer freezes VS at validation; injecting a configuration programmatically stores it correctly but the connection still fails, with no clear indication of why. Not yet usable with a Studio as a result
+- [x] Integrated step-by-step debugger — `nano.debug`/`nano.debugall` run a program in debug mode, with the current instruction highlighted in the Studio editor and Pause / Resume / Step controls. Step-into only for now (no step-over or step-out), and not yet available for tasks or units
 - [x] MOGWAI NANO Studio GUI, built on Avalonia — grew beyond the originally planned "monitoring only" scope into a genuinely capable companion: its own code editor, a REPL-style command line, live console/debug views, file management, and themes. VS Code + the MOGWAI extension remains a great way to write and edit code too — pick whichever fits your workflow
 
 ## About

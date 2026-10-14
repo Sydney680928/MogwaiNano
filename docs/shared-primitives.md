@@ -159,6 +159,9 @@ On NANO, flags are volatile — reset on every new program run, not persisted ac
 | `??` / `console.print` | Print the top of stack, without a newline |
 | `debug.write` | Write a debug message — on a connected NANO device, this is streamed back to MOGWAI NANO Studio in real time |
 | `?d` | Displays an object in a clear, detailed form that depends on its type — records, lists and `MOGData` each get their own layout, any other type is shown as `?` would (see below) |
+| `debug.halt` / `¤` | Pauses execution at the next instruction when running in debug mode — a breakpoint. `¤` is simply a shorter way of writing `debug.halt`, as `?` is for `console.println`. No effect outside debug mode (see below) |
+| `debug.tron` | `delay debug.tron` — in debug mode, waits `delay` milliseconds between each instruction and shows the current instruction as it goes, like a trace. No effect outside debug mode (see below) |
+| `debug.troff` | Turns the trace off — equivalent to `0 debug.tron`. No effect outside debug mode (see below) |
 
 ### `?d` — detailed display
 
@@ -210,6 +213,29 @@ isTask:              false
 ...
 000001F0  38 2C 31 31 38 38 33 2C 36 33 31 33 2C 39 38     | 8,11883,6313,98   |
 ```
+
+### Debug controls
+
+`debug.halt` (or `¤`), `debug.tron` and `debug.troff` control a step-by-step debug session from inside the code being debugged. They behave identically on desktop MOGWAI and on MOGWAI NANO, and they do nothing at all outside debug mode, so they can safely be left in a program that is also run normally.
+
+| Primitive | Effect in debug mode |
+|---|---|
+| `debug.halt` / `¤` | Requests a pause: execution stops *before* the next instruction that can be paused on, which is therefore not executed yet, and waits to be resumed |
+| `150 debug.tron` | Slows execution down to one instruction every 150 ms and shows each current instruction in the editor |
+| `debug.troff` | Stops the trace and returns to full speed |
+
+```
+{
+    10 -> 'counter'
+    ¤                      # breakpoint: the debugger pauses here
+    counter 2 * ?
+    100 debug.tron         # trace the next instructions, one every 100 ms
+    counter 3 * ?
+    debug.troff
+} nano.debug
+```
+
+Resuming or stepping is not done from the code: on MOGWAI NANO it is done from MOGWAI NANO Studio, with the debug panel or the `nano.debug.resume` and `nano.debug.step` commands — see the [Studio Primitives Reference](studio-primitives.md). There is no `debug.resume` or `debug.step` primitive.
 
 ## System primitives
 
