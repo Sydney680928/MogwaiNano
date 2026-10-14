@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+### Removed
+
+## [0.8.0] - 2026-10-14
+
+### Added
+
 - **Integrated step-by-step debugger** — a program can now be run in debug mode and followed instruction by instruction, with the instruction about to be executed highlighted in the Studio's code editor. In a normal run the code sent to the device is the desugared form of your source, with no way to relate it back to what you typed. In debug mode, Studio decorates that desugared code with the position of each instruction in your original source, and the device keeps it with the instruction while it runs — so the device can tell Studio exactly which part of your source it is about to execute. The device does all the work: the debug information is simply ignored when it isn't there, so a normal run behaves exactly as before. Pausing happens *before* the highlighted instruction, which has therefore not been executed yet. See the [Studio Primitives Reference](docs/studio-primitives.md) and the [Shared Primitives Reference](docs/shared-primitives.md)
   - `nano.debug` — runs a program in debug mode, like `nano.run`. Minimal mode: only the instructions that matter for stepping (primitives, words, and auto-evaluated lists and records) can be paused on.
   - `nano.debugall` — same as `nano.debug`, but every token can be paused on, literals included, for a finer step-by-step. Only the tokens that MOGWAI itself marks as not pausable are left out. The price is more debug information to parse, and so a longer start.
@@ -24,10 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Updated
 
 - **`View > Font...` now applies to every pane, not just the editor** — the font family and size chosen there are used by the code editor and by all four output tabs (Console MOGWAI, Debug MOGWAI, Console NANO, Debug NANO), so raising the size once makes everything legible together, e.g. for a screen recording. Tab headers keep following the menu's own font size
-
-### Fixed
-
-### Removed
 
 ## [0.7.0] - 2026-10-01
 
@@ -294,7 +300,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.5.0
