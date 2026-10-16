@@ -18,7 +18,7 @@ namespace MogwaiNanoEsp32LED
 
         private const int TickMs = 100;
         private const int BlinkTicks = 3;
-        private const int DefaultBrightness = 30;
+        private const int DefaultBrightness = 5;
 
         private static readonly object _lock = new object();
 
@@ -132,7 +132,7 @@ namespace MogwaiNanoEsp32LED
 
                 _runtimeState = state;
                 _blinkOn = true;
-                Render();
+                Render(1);
             }
         }
 
@@ -277,7 +277,10 @@ namespace MogwaiNanoEsp32LED
         }
 
         // À appeler sous verrou : calcule la couleur effective et l'envoie.
-        private static bool Render()
+
+        private static bool Render() => Render(_brightness);
+
+        private static bool Render(int brightness)
         {
             int r = 0, g = 0, b = 0;
 
@@ -339,7 +342,10 @@ namespace MogwaiNanoEsp32LED
         }
 
         // À appeler sous verrou. Applique la luminosité globale.
-        private static bool Write(int r, int g, int b)
+
+        private static bool Write(int r, int g, int b) => Write(r, g, b, _brightness);
+
+        private static bool Write(int r, int g, int b, int brightness)
         {
             if (!_enabled || _pin < 0)
                 return false;
@@ -354,7 +360,7 @@ namespace MogwaiNanoEsp32LED
                 _neo = new Ws2812c(_pin, 1);
                 _image = _neo.Image;
 
-                _image.SetPixel(0, 0, Color.FromArgb(r * _brightness / 255, g * _brightness / 255, b * _brightness / 255));
+                _image.SetPixel(0, 0, Color.FromArgb(r * brightness / 255, g * brightness / 255, b * brightness / 255));
                 _neo.Update();
                 return true;
             }
