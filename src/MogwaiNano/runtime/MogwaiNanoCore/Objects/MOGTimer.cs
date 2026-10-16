@@ -17,7 +17,7 @@ using System.Threading;
 
 namespace MogwaiNano.Objects
 {
-    internal class MOGTimer : MOGFireObject
+    public class MOGTimer : MOGFireObject
     {
         private Timer _timer;
 
