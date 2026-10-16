@@ -38,6 +38,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MogwaiNanoBlePeripheral\MogwaiNanoBlePeripheral.nfproj" />
     <ProjectReference Include="..\MogwaiNanoCore\MogwaiNanoCore.nfproj" />
+    <ProjectReference Include="..\MogwaiNanoEsp32LED\MogwaiNanoEsp32LED.nfproj" />
     <ProjectReference Include="..\MogwaiNanoGpio\MogwaiNanoGpio.nfproj" />
     <ProjectReference Include="..\MogwaiNanoSsd1306\MogwaiNanoSsd1306.nfproj" />
   </ItemGroup>

@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using MogwaiNano;
 using MogwaiNano.Engine;
 using MogwaiNano.Objects;
 using MogwaiNanoBlePeripheral;
+using MogwaiNanoEsp32LED;
 using MogwaiNanoGpio;
 using MogwaiNanoSsd1306;
 using System;
+using System.Diagnostics;
 using System.Threading;
 using static MogwaiNano.Engine.MogwaiNanoEngine;
 
@@ -63,7 +66,7 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawFilledRectangle", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawFilledRectangle));
             MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawBitmap", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawBitmap));
 
-            MogwaiNanoEngine.Skills.Add("SSD1306");
+            MogwaiNanoEngine.Skills.Add("SSD1306");        
 
             MogwaiNanoEngine.ResetDidExecute += (engine) =>
             {
@@ -75,6 +78,44 @@ namespace MogwaiNanoEsp32
 
                 if (!engine.KeepAlive)
                     SSD1306Manager.Cleanup(engine);
+            };
+      
+            LedManager.Initialize(48);
+
+            MogwaiNano.AppGlobal.RuntimeStateChanged += (state) =>
+            {
+                if (state == 1)
+                {
+                    LedManager.SetState(LedState.Starting);
+                }
+                else if (state == 2)
+                {
+                    LedManager.SetState(LedState.Ready);
+                }
+                else if (state == 3)
+                {
+                    LedManager.SetState(LedState.Fault);
+                }
+                else if (state == 4)
+                {
+                    LedManager.SetState(LedState.Parsing);
+                }
+                else if (state == 5)
+                {
+                    LedManager.SetState(LedState.Running);
+                }
+                else if (state == 6)
+                {
+                    LedManager.SetState(LedState.ProgramError);
+                }
+                else if (state == 7)
+                {
+                    LedManager.SetState(LedState.Paused);
+                }
+                else if (state == 8)
+                {
+                    LedManager.SetState(LedState.Stepping);
+                }
             };
 
             MogwaiNanoCore.MogwaiNanoSystem.Start();

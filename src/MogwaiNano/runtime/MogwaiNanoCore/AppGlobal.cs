@@ -40,6 +40,11 @@ namespace MogwaiNano
         public static NanoParameters NanoParameters { get; set; }
         public static string IpAddress { get; set; } = "?.?.?.?";
 
+        public delegate void RuntimeStateDelegate(int state);
+        public static event RuntimeStateDelegate RuntimeStateChanged;
+        
+        public static void SetRuntimeState(int state) => RuntimeStateChanged?.Invoke(state);
+
         public static void Initialize()
         {
             RandomGenerator = new Random();

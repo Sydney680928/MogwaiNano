@@ -31,6 +31,8 @@ namespace MogwaiNanoCore
     {
         public static void Start()
         {
+            MogwaiNano.AppGlobal.SetRuntimeState(1);
+
             Power.OnRebootEvent += Power_OnRebootEvent;
 
             Debug.WriteLine("MOGWAI NANO");
@@ -77,6 +79,7 @@ namespace MogwaiNanoCore
             AppGlobal.MogwaiNanoEngine.Delegate = @delegate;
 
             Debug.WriteLine($"Memory: {GC.Run(true)} bytes free.");
+            MogwaiNano.AppGlobal.SetRuntimeState(1);
 
             if (File.Exists(@"I:\autorun.mog"))
             {
@@ -89,6 +92,8 @@ namespace MogwaiNanoCore
             {
                 Debug.WriteLine("Ready.");
             }
+
+            MogwaiNano.AppGlobal.SetRuntimeState(2);
 
             Thread.Sleep(Timeout.Infinite);
         }
