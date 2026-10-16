@@ -21,6 +21,8 @@ namespace MogwaiNano
     {
         public string Name { get; set; } = "MogwaiNanoDevice";
 
+        public int LedGpio { get; set; } = -1;
+
         public static NanoParameters Load(string filename)
         {
             try

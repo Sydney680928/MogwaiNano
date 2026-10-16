@@ -16,6 +16,7 @@ using MogwaiNano;
 using MogwaiNano.Engine;
 using MogwaiNano.Objects;
 using MogwaiNanoBlePeripheral;
+using MogwaiNanoCore;
 using MogwaiNanoEsp32LED;
 using MogwaiNanoGpio;
 using MogwaiNanoSsd1306;
@@ -79,42 +80,48 @@ namespace MogwaiNanoEsp32
                 if (!engine.KeepAlive)
                     SSD1306Manager.Cleanup(engine);
             };
-      
-            LedManager.Initialize(48);
 
-            MogwaiNano.AppGlobal.RuntimeStateChanged += (state) =>
+            MogwaiNanoSystem.MogwaiNanoLedSettings += (gpio) =>
             {
-                if (state == 1)
+                if (gpio > -1)
                 {
-                    LedManager.SetState(LedState.Starting);
-                }
-                else if (state == 2)
-                {
-                    LedManager.SetState(LedState.Ready);
-                }
-                else if (state == 3)
-                {
-                    LedManager.SetState(LedState.Fault);
-                }
-                else if (state == 4)
-                {
-                    LedManager.SetState(LedState.Parsing);
-                }
-                else if (state == 5)
-                {
-                    LedManager.SetState(LedState.Running);
-                }
-                else if (state == 6)
-                {
-                    LedManager.SetState(LedState.ProgramError);
-                }
-                else if (state == 7)
-                {
-                    LedManager.SetState(LedState.Paused);
-                }
-                else if (state == 8)
-                {
-                    LedManager.SetState(LedState.Stepping);
+                    LedManager.Initialize(gpio);
+
+                    MogwaiNano.AppGlobal.RuntimeStateChanged += (state) =>
+                    {
+                        if (state == 1)
+                        {
+                            LedManager.SetState(LedState.Starting);
+                        }
+                        else if (state == 2)
+                        {
+                            LedManager.SetState(LedState.Ready);
+                        }
+                        else if (state == 3)
+                        {
+                            LedManager.SetState(LedState.Fault);
+                        }
+                        else if (state == 4)
+                        {
+                            LedManager.SetState(LedState.Parsing);
+                        }
+                        else if (state == 5)
+                        {
+                            LedManager.SetState(LedState.Running);
+                        }
+                        else if (state == 6)
+                        {
+                            LedManager.SetState(LedState.ProgramError);
+                        }
+                        else if (state == 7)
+                        {
+                            LedManager.SetState(LedState.Paused);
+                        }
+                        else if (state == 8)
+                        {
+                            LedManager.SetState(LedState.Stepping);
+                        }
+                    };
                 }
             };
 

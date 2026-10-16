@@ -29,8 +29,15 @@ namespace MogwaiNanoCore
 {
     public class MogwaiNanoSystem
     {
+        public delegate void MogwaiNanoLedGpioEventHandler(int gpio);
+        public static event MogwaiNanoLedGpioEventHandler MogwaiNanoLedSettings;
+
         public static void Start()
         {
+            AppGlobal.Initialize();
+            AppGlobal.NanoParameters = NanoParameters.Load(AppGlobal.PARAMETERS_FILE);
+            MogwaiNanoLedSettings?.Invoke(AppGlobal.NanoParameters.LedGpio);
+
             MogwaiNano.AppGlobal.SetRuntimeState(1);
 
             Power.OnRebootEvent += Power_OnRebootEvent;
@@ -38,10 +45,6 @@ namespace MogwaiNanoCore
             Debug.WriteLine("MOGWAI NANO");
             Debug.WriteLine($"Version {MogwaiNanoEngine.Version}");
             Debug.WriteLine("(c) 2026 Stéphane Sibué");
-
-            AppGlobal.Initialize();
-
-            AppGlobal.NanoParameters = NanoParameters.Load(AppGlobal.PARAMETERS_FILE);
 
             Debug.WriteLine($"Device name: {AppGlobal.NanoParameters.Name}");
             Debug.WriteLine($"Session: {AppGlobal.Session}");
