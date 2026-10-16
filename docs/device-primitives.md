@@ -168,6 +168,8 @@ All loop forms interrupt cleanly if the executed block returns an error, and sup
 | `event.purge` | — | `'name' event.purge` | Removes a registered event handler |
 | `AFTER` | `timer 'name' after <ms> do { ... }` | `block interval 'name' AFTER` | Creates a one-shot timer |
 | `EVERY` | `timer 'name' every <ms> do { ... }` | `block interval 'name' EVERY` | Creates a recurring timer |
+| `POST` | `post { ... }` | `block POST` | Posts a block of code to the execution queue: it runs in the next scheduler cycle, after pending events and timers, without creating an intermediate timer |
+| `LATER` | `after <ms> do { ... }` | `block interval LATER` | Runs a block once after a delay in milliseconds, without a timer name |
 | `timer.start` | — | `'name' timer.start` | Starts a previously created timer |
 | `timer.stop` | — | `'name' timer.stop` | Stops a timer without removing it |
 | `timer.purge` | — | `'name' timer.purge` | Removes a timer entirely |
@@ -177,6 +179,8 @@ All of the above are 🔗 **Shared** with the desktop engine.
 **How event data reaches your handler:** when an event fires, its data is injected as a local variable called `eventData`, automatically available inside the handler block — no special syntax needed to receive it.
 
 **Robustness:** `AFTER`/`EVERY` refuse to create a timer with a name that's already in use (same protection as `EVENT`) rather than silently replacing it — call `timer.purge` first if you need to recreate one under the same name. A negative interval is also rejected.
+
+**`POST` and `LATER`:** `post { ... }` posts a block to the engine's execution queue. The block executes in the next scheduler cycle, after pending events and timers — without creating an intermediate timer. `post { }` with an empty block is valid, and lets the scheduler process pending events without executing any additional code. It is functionally equivalent to `after 0 do { }`, with clearer intent. The main use case is deferred execution from an event handler, so that pending events are processed before a long computation. `after <ms> do { ... }` (canonical `LATER`) runs a block once after a delay in milliseconds, without naming a timer, unlike `timer 'name' after <ms> do { ... }`.
 
 **Hardware events (NANO-only):** `GPIO_PIN_CHANGED` follows the same event mechanism, firing with a `MOGRecord` containing `pin` (the pin number) and `eventType` (`1` = rising edge, `0` = falling edge).
 

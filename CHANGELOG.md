@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `POST` and `LATER` — two deferred-execution primitives ported from the desktop MOGWAI engine, where they behave identically. `POST` (sugared form: `post { ... }`) posts a block of code to the engine's execution queue: the block runs in the next scheduler cycle, after pending events and timers, without creating an intermediate timer. An empty block (`post { }`) is valid and simply lets the scheduler process pending events. Functionally equivalent to `after 0 do { }`, with clearer intent. The main use case is deferred execution from an event handler, so that pending events are processed before a long computation starts. `LATER` (sugared form: `after 2000 do { ... }`) runs a block once after a delay in milliseconds, with no timer name — the unnamed counterpart of `timer 'name' after <ms> do { ... }`. See the [Shared Primitives Reference](docs/shared-primitives.md)
+
 ### Updated
 
 ### Fixed

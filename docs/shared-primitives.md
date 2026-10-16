@@ -90,6 +90,8 @@ This page only covers what's **common** to both. For NANO-specific primitives (`
 | `EVENT` | `onEvent 'NAME' do { ... }` |
 | `AFTER` | `timer 'name' after <ms> do { ... }` |
 | `EVERY` | `timer 'name' every <ms> do { ... }` |
+| `POST` | `post { ... }` |
+| `LATER` | `after <ms> do { ... }` |
 
 ## Functions
 
@@ -108,6 +110,21 @@ User-defined functions get their own local variable scope. Function names live i
 | `timer.purge` | Removes a named timer entirely |
 
 Timer names are plain `MOGName` values, not reserved words — they can be stored in variables and computed dynamically, just like any other data.
+
+## Deferred execution
+
+Canonical `POST` and `LATER` are listed with the other canonical forms in *Control flow* above.
+
+**`post`** posts a block of code to the engine's execution queue. The block executes in the next scheduler cycle, after pending events and timers — without creating an intermediate timer. `post { }` with an empty block is valid, and is useful to let the scheduler process pending events without executing any additional code. Functionally equivalent to `after 0 do { }`, with clearer intent.
+
+The main use case is deferred execution from an event handler — for example, to let pending events be processed before a long computation. With `post`, the engine processes them before executing the block.
+
+**`after <ms> do { ... }`** (canonical `LATER`) runs a block once, after a delay in milliseconds, without naming a timer, unlike `timer 'name' after <ms> do { ... }`.
+
+```
+after 2000 do { "Two seconds later" ? }
+post { "Next scheduler cycle" ? }
+```
 
 ## Events
 
