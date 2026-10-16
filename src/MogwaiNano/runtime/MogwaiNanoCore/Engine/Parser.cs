@@ -41,6 +41,8 @@ namespace MogwaiNano.Engine
             _code = code;
             _item = new();
 
+            string[] parts = null;
+
             var stopWatch = new Stopwatch();
             stopWatch.Start();
 
@@ -48,87 +50,91 @@ namespace MogwaiNano.Engine
             {
                 char c = _code[_index++];
 
-                if (c == ' ')
+                switch (c)
                 {
-                    if (_item.Length > 0)
-                    {
-                        var parsedItem = ParseItem(_item.ToString());
-                        _items.Add(parsedItem);
+                    case ' ':
+                        if (_item.Length > 0)
+                        {
+                            var parsedItem = ParseItem(_item.ToString());
+                            _items.Add(parsedItem);
+                            _item.Clear();
+                        }
+                        break;
+
+                    case '"':
+                        parts = GetEnclosedItem('"', '"');
+                        var mogString = new MOGString(_engine, parts[0]);
+
+                        if (parts.Length > 1)
+                            mogString.DebugInfo = new DebugInformations(parts[1]);
+
+                        _items.Add(mogString);
                         _item.Clear();
-                    }
+                        break;
 
-                    continue;
+                    case '\'':
+                        parts = GetEnclosedItem('\'', '\'');
+                        var mogName = new MOGName(_engine, parts[0]);
+
+                        if (parts.Length > 1)
+                            mogName.DebugInfo = new DebugInformations(parts[1]);
+
+                        _items.Add(mogName);
+                        _item.Clear();
+                        break;
+
+                    case '(':
+                        parts = GetEnclosedItem('(', ')');
+                        var mogList = new MOGList(_engine, parts[0]);
+
+                        if (parts.Length > 1)
+                            mogList.DebugInfo = new DebugInformations(parts[1]);
+
+                        _items.Add(mogList);
+                        _item.Clear();
+                        break;
+
+                    case '[':
+                        parts = GetEnclosedItem('[', ']');
+                        var mogRecord = new MOGRecord(_engine, parts[0]);
+
+                        if (parts.Length > 1)
+                            mogRecord.DebugInfo = new DebugInformations(parts[1]);
+
+                        _items.Add(mogRecord);
+                        _item.Clear();
+
+                        break;
+
+                    case '{':
+                        parts = GetEnclosedItem('{', '}');
+                        var mogCode = new MOGCode(_engine, parts[0]);
+
+                        if (parts.Length > 1)
+                            mogCode.DebugInfo = new DebugInformations(parts[1]);
+
+                        _items.Add(mogCode);
+                        _item.Clear();
+
+                        break;
+
+                    case '«':
+                        parts = GetEnclosedItem('«', '»');
+                        var mogFunction = new MOGFunction(_engine, parts[0]);
+
+                        if (parts.Length > 1)
+                            mogFunction.DebugInfo = new DebugInformations(parts[1]);
+
+                        _items.Add(mogFunction);
+                        _item.Clear();
+
+                        break;
+
+                    default:
+                        _item.Append(c);
+                        break;
                 }
-                else if (c == '"')
-                {
-                    var parts = GetEnclosedItem('"', '"');
-                    var mogString = new MOGString(_engine, parts[0]);
 
-                    if (parts.Length > 1)
-                        mogString.DebugInfo = new DebugInformations(parts[1]);  
-                    
-                    _items.Add(mogString);
-                    _item.Clear();
-                }
-                else if (c == '\'')
-                {
-                    var parts = GetEnclosedItem('\'', '\'');
-                    var mogName = new MOGName(_engine, parts[0]);
-
-                    if (parts.Length > 1)
-                        mogName.DebugInfo = new DebugInformations(parts[1]);
-
-                    _items.Add(mogName);
-                    _item.Clear();
-                }
-                else if (c == '(')
-                {
-                    var parts = GetEnclosedItem('(', ')');
-                    var mogList = new MOGList(_engine, parts[0]);
-
-                    if (parts.Length > 1)
-                        mogList.DebugInfo = new DebugInformations(parts[1]);
-
-                    _items.Add(mogList);
-                    _item.Clear();
-                }
-                else if (c == '[')
-                {
-                    var parts = GetEnclosedItem('[', ']');
-                    var mogRecord = new MOGRecord(_engine, parts[0]);
-
-                    if (parts.Length > 1)
-                        mogRecord.DebugInfo = new DebugInformations(parts[1]);
-
-                    _items.Add(mogRecord);
-                    _item.Clear();
-                }
-                else if (c == '{')
-                {
-                    var parts = GetEnclosedItem('{', '}');
-                    var mogCode = new MOGCode(_engine, parts[0]);
-
-                    if (parts.Length > 1)
-                        mogCode.DebugInfo = new DebugInformations(parts[1]);
-
-                    _items.Add(mogCode);
-                    _item.Clear();
-                }
-                else if (c == '«')
-                {
-                    var parts = GetEnclosedItem('«', '»');
-                    var mogFunction = new MOGFunction(_engine, parts[0]);
-                    
-                    if (parts.Length > 1)
-                        mogFunction.DebugInfo = new DebugInformations(parts[1]);
-                    
-                    _items.Add(mogFunction);
-                    _item.Clear();
-                }
-                else
-                {
-                    _item.Append(c);
-                }
             }
 
             if (_item.Length > 0)
@@ -151,31 +157,30 @@ namespace MogwaiNano.Engine
             DebugInformations debugInfo = null;
             var parts = item.Split('§');
 
+            MOGObject obj = null;
+
             if (parts.Length > 1)
             {
                 item = parts[0];
                 debugInfo = new DebugInformations(parts[1]);
             }
 
-            if (item == "true")
+            switch (item)
             {
-                var obj = new MOGBoolean(_engine, true);
-                obj.DebugInfo = debugInfo;
-                return obj;
-            }
+                case "true":
+                    obj = new MOGBoolean(_engine, true);
+                    obj.DebugInfo = debugInfo;
+                    return obj;
 
-            if (item == "false")
-            {
-                var obj = new MOGBoolean(_engine, false);
-                obj.DebugInfo = debugInfo;
-                return obj;
-            }
+                case "false":
+                    obj = new MOGBoolean(_engine, false);
+                    obj.DebugInfo = debugInfo;
+                    return obj;
 
-            if (item == "null")
-            {
-                var obj = new MOGNull(_engine);
-                obj.DebugInfo = debugInfo;
-                return obj;
+                case "null":
+                    obj = new MOGNull(_engine);
+                    obj.DebugInfo = debugInfo;
+                    return obj;
             }
 
             if (item.StartsWith("0x"))
@@ -185,7 +190,7 @@ namespace MogwaiNano.Engine
                     try
                     {
                         float n = System.Convert.ToByte(item.Substring(2), 16);
-                        var obj = new MOGNumber(_engine, n);
+                        obj = new MOGNumber(_engine, n);
                         obj.DebugInfo = debugInfo;
                         return obj;
                     }
@@ -226,7 +231,7 @@ namespace MogwaiNano.Engine
                 if (!_engine.IsValidName(name, false))
                     throw new MogwaiParseErrorException($"invalid key {item}");
 
-                var obj = new MOGKey(_engine, name);
+                obj = new MOGKey(_engine, name);
                 obj.DebugInfo = debugInfo;
                 return obj;
             }
@@ -242,7 +247,7 @@ namespace MogwaiNano.Engine
 
                 if (t != null)
                 {
-                    var obj = t.Clone();
+                    obj = t.Clone();
                     obj.DebugInfo = debugInfo;
                     return obj;
                 }
@@ -257,7 +262,7 @@ namespace MogwaiNano.Engine
                 if (!_engine.IsValidName(name, false))
                     throw new MogwaiParseErrorException($"invalid reference {item}");
 
-                var obj = new MOGRef(_engine, name);
+                obj = new MOGRef(_engine, name);
                 obj.DebugInfo = debugInfo;
                 return obj;
             }
@@ -266,7 +271,7 @@ namespace MogwaiNano.Engine
             {
                 if (float.TryParse(item, out float value))
                 {
-                    var obj = new MOGNumber(_engine, value);
+                    obj = new MOGNumber(_engine, value);
                     obj.DebugInfo = debugInfo;  
                     return obj;
                 }
@@ -274,14 +279,14 @@ namespace MogwaiNano.Engine
 
             if (_engine.IsPrimitive(item))
             {
-                var obj = new MOGPrimitive(_engine, item);
+                obj = new MOGPrimitive(_engine, item);
                 obj.DebugInfo = debugInfo;
                 return obj;
             }
 
-            var objWord = new MOGWord(_engine, item);
-            objWord.DebugInfo = debugInfo;
-            return objWord  ;
+            obj = new MOGWord(_engine, item);
+            obj.DebugInfo = debugInfo;
+            return obj;
         }
 
         private static bool LooksLikeNumber(string token)
