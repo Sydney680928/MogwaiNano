@@ -36,7 +36,8 @@ namespace MogwaiNanoCore
         {
             AppGlobal.Initialize();
             AppGlobal.NanoParameters = NanoParameters.Load(AppGlobal.PARAMETERS_FILE);
-            MogwaiNanoLedSettings?.Invoke(AppGlobal.NanoParameters.LedGpio);
+            
+            MogwaiNanoLedSettings?.Invoke(AppGlobal.NanoParameters.OnboardLedGpio);
 
             MogwaiNano.AppGlobal.SetRuntimeState(1);
 
@@ -82,7 +83,12 @@ namespace MogwaiNanoCore
             AppGlobal.MogwaiNanoEngine.Delegate = @delegate;
 
             Debug.WriteLine($"Memory: {GC.Run(true)} bytes free.");
-            MogwaiNano.AppGlobal.SetRuntimeState(1);
+
+            Debug.WriteLine("Ready.");
+
+            MogwaiNano.AppGlobal.SetRuntimeState(2);
+
+            Thread.Sleep(1000);
 
             if (File.Exists(@"I:\autorun.mog"))
             {
@@ -91,12 +97,6 @@ namespace MogwaiNanoCore
                 string code = File.ReadAllText(@"I:\autorun.mog");
                 AppGlobal.MogwaiNanoEngine.RunAsync(code);
             }
-            else
-            {
-                Debug.WriteLine("Ready.");
-            }
-
-            MogwaiNano.AppGlobal.SetRuntimeState(2);
 
             Thread.Sleep(Timeout.Infinite);
         }
@@ -640,6 +640,27 @@ namespace MogwaiNanoCore
             {
                 if (message.Parameters.Length > 0 && message.Parameters[0] != null)
                     AppGlobal.MogwaiNanoEngine.DebugCommand = message.Parameters[0];
+            }
+            else if (message.Function == "ONBOARD.LED.GET")
+            {
+                // On retourne la valeur du gpio de la LED
+
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "ONBOARD.LED.GET", AppGlobal.NanoParameters.OnboardLedGpio.ToString()));
+            }
+            else if (message.Function == "ONBOARD.LED.SET")
+            {
+                // On stocke la valeur du gpio de la LED
+
+                if (message.Parameters != null && message.Parameters.Length > 0 && int.TryParse(message.Parameters[0], out var v))
+                {
+                    AppGlobal.NanoParameters.OnboardLedGpio = v;
+                    AppGlobal.NanoParameters.Save(AppGlobal.PARAMETERS_FILE);
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "ONBOARD.LED.SET", "OK"));
+                }
+                else
+                {
+                    AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "ONBOARD.LED.SET", "ERROR", "bad parameter"));
+                }
             }
         }
 

@@ -465,6 +465,52 @@ namespace MogwaiNanoStudioGui.Classes
             return EvalResult.Failure(_engine, Error.BadArgumentValueError, word);
         }
 
+        public async Task<EvalResult> GetOnboardLedGpio(string word)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var v = await GetOnboardLedGpioValue();
+
+            if (v == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+
+            _engine.StackPushNumber(v.Value);
+            return EvalResult.NoError;
+        }
+
+        public async Task<int?> GetOnboardLedGpioValue()
+        {
+            var message = new ServerMessage(SOURCE_NAME, "ONBOARD.LED.GET");
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response != null && response.Parameters != null && response.Parameters.Length > 0 && int.TryParse(response.Parameters[0], out var v))
+            {
+                return v;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public async Task<EvalResult> SetOnboardLedGpio(string word, int value)
+        {
+            if (!AppGlobal.NanoClient.IsConnected)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError, word);
+
+            var message = new ServerMessage(SOURCE_NAME, "ONBOARD.LED.SET", value.ToString());
+            var response = await SendMessageAndWaitResponse(message);
+
+            if (response == null)
+                return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceUnreachableError, word);
+
+            if (response.Parameters.Length > 0 && response.Parameters[0] != null && response.Parameters[0] == "OK")
+                return EvalResult.NoError;
+
+            return EvalResult.Failure(_engine, Error.BadArgumentValueError, word);
+        }
+
         public async Task<EvalResult> StateIsRunning(string word)
         {
             if (!AppGlobal.NanoClient.IsConnected)

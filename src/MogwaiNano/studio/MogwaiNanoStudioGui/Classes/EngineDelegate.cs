@@ -155,6 +155,9 @@ namespace MogwaiNanoStudioGui.Classes
 
             "nano.stack",
 
+            "nano.onboard.led",
+            "nano.onboard.led.set",
+
             "mogwai.memory",
             "mogwai.reboot",
             "mogwai.frugalMode",
@@ -1010,8 +1013,28 @@ namespace MogwaiNanoStudioGui.Classes
             {
                 return await AppGlobal.NanoRuntime.GetStack(word);
             }
+            else if (word == "nano.onboard.led")
+            {
+                return await AppGlobal.NanoRuntime.GetOnboardLedGpio(word);
+            }
+            else if (word == "nano.onboard.led.set")
+            {
+                var s = engine.StackSign(1);
 
-                return EvalResult.NoExternalFunction;
+                if (s.Count == 0)
+                    return EvalResult.Failure(engine, Error.TooFewArgumentsError, word);
+
+                if (s[0] == typeof(MOGNumber))
+                {
+                    var v = engine.StackPopNumber();
+                    return await AppGlobal.NanoRuntime.SetOnboardLedGpio(word, (int)v.Value);
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
+
+            }
+
+            return EvalResult.NoExternalFunction;
         }
 
         // ─── Console ─────────────────────────────────────────────────────────

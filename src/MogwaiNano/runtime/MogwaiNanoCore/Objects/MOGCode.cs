@@ -156,6 +156,8 @@ namespace MogwaiNano.Objects
                                     var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.INFO", debugInfo.StartPos.ToString(), debugInfo.EndPos.ToString(), Engine.PauseRequested.ToString(), Engine.NextStepRequested.ToString());
                                     AppGlobal.TcpServer.EnqueueMessage(msg);
 
+                                    MogwaiNanoEngine.FireProgramDidPauseEvent(Engine);
+
                                     while (Engine.PauseRequested)
                                     {
                                         if (Engine.DebugCommand != null)
@@ -184,6 +186,8 @@ namespace MogwaiNano.Objects
                                     }
 
                                     Engine.DebugCommand = null;
+
+                                    MogwaiNanoEngine.FireProgramDidResumeEvent(Engine);
                                 }
                                 else if (Engine.DebugTronDelay > 0)
                                 {

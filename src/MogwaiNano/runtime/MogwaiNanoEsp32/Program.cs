@@ -31,43 +31,66 @@ namespace MogwaiNanoEsp32
     {
         public static void Main()
         {
-            MogwaiNanoEngine.RegisterPrimitive("esp32.setPinFunction", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveDeviceSetPinFunction), true);
+            MogwaiNanoEngine.RegisterPrimitive("esp32.setPinFunction", new (PrimitiveDeviceSetPinFunction), true);
 
-            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.input", new PrimitiveDelegate(GpioManager.PrimitiveGpioModeInput));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.inputPullDown", new PrimitiveDelegate(GpioManager.PrimitiveGpioSetModeInputPullDown));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.inputPullUp", new PrimitiveDelegate(GpioManager.PrimitiveGpioSetModeInputPullUp));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.output", new PrimitiveDelegate(GpioManager.PrimitiveGpioSetModeOutput));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.read", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinRead));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.write.high", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinWriteHigh));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.write.low", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinWriteLow));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.toggle", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinToggle));
-            MogwaiNanoEngine.RegisterPrimitive("gpio.close", new PrimitiveDelegate(GpioManager.PrimitiveGpioPinClose));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.input", new (GpioManager.PrimitiveGpioModeInput));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.inputPullDown", new (GpioManager.PrimitiveGpioSetModeInputPullDown));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.inputPullUp", new (GpioManager.PrimitiveGpioSetModeInputPullUp));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.output", new (GpioManager.PrimitiveGpioSetModeOutput));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.read", new (GpioManager.PrimitiveGpioPinRead));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.write.high", new (GpioManager.PrimitiveGpioPinWriteHigh));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.write.low", new (GpioManager.PrimitiveGpioPinWriteLow));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.toggle", new (GpioManager.PrimitiveGpioPinToggle));
+            MogwaiNanoEngine.RegisterPrimitive("gpio.close", new (GpioManager.PrimitiveGpioPinClose));
 
             MogwaiNanoEngine.Skills.Add("GPIO");
 
-            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.create", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralCreate));
-            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.start", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralStart));
-            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.stop", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralStop));
-            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.getValue", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralGetValue));
-            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.setValue", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralSetValue));
-            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.notify", new MogwaiNanoEngine.PrimitiveDelegate(BlePeripheral.PrimitiveBlePeripheralNotify));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.create", new (BlePeripheral.PrimitiveBlePeripheralCreate));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.start", new (BlePeripheral.PrimitiveBlePeripheralStart));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.stop", new (BlePeripheral.PrimitiveBlePeripheralStop));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.getValue", new (BlePeripheral.PrimitiveBlePeripheralGetValue));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.setValue", new (BlePeripheral.PrimitiveBlePeripheralSetValue));
+            MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.notify", new (BlePeripheral.PrimitiveBlePeripheralNotify));
+
+            MogwaiNanoEngine.RegisterExternalError(BlePeripheral.BlePeripheralUnableToCreateError);
+
 
             MogwaiNanoEngine.Skills.Add("BLE-P");
 
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.init", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Init));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.close", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Close));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.clear", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Clear));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.printString", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306PrintString));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawString", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawString));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.refresh", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306Refresh));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawPixel", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawPixel));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawHorizontalLine", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawHorizontalLine));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawVerticalLine", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawHVerticalLine));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawRectangle", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawRectangle));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawFilledRectangle", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawFilledRectangle));
-            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawBitmap", new PrimitiveDelegate(SSD1306Manager.PrimitiveSsd1306DrawBitmap));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.init", new (SSD1306Manager.PrimitiveSsd1306Init));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.close", new (SSD1306Manager.PrimitiveSsd1306Close));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.clear", new (SSD1306Manager.PrimitiveSsd1306Clear));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.printString", new (SSD1306Manager.PrimitiveSsd1306PrintString));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawString", new (SSD1306Manager.PrimitiveSsd1306DrawString));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.refresh", new (SSD1306Manager.PrimitiveSsd1306Refresh));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawPixel", new (SSD1306Manager.PrimitiveSsd1306DrawPixel));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawHorizontalLine", new (SSD1306Manager.PrimitiveSsd1306DrawHorizontalLine));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawVerticalLine", new (SSD1306Manager.PrimitiveSsd1306DrawHVerticalLine));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawRectangle", new (SSD1306Manager.PrimitiveSsd1306DrawRectangle));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawFilledRectangle", new (SSD1306Manager.PrimitiveSsd1306DrawFilledRectangle));
+            MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawBitmap", new (SSD1306Manager.PrimitiveSsd1306DrawBitmap));
 
-            MogwaiNanoEngine.Skills.Add("SSD1306");        
+            MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306InitError);
+            MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306OperationError);
+            MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306IsClosedError);
+            MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306IsOpenedError);
+
+            MogwaiNanoEngine.Skills.Add("SSD1306");
+
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.set", new (LedManager.PrimitiveLedSet));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.off", new (LedManager.PrimitiveLedOff));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.green", new (LedManager.PrimitiveLedGreen));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.red", new (LedManager.PrimitiveLedRed));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.blue", new(LedManager.PrimitiveLedBlue));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.orange", new (LedManager.PrimitiveLedOrange));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.yellow", new (LedManager.PrimitiveLedYellow));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.purple", new (LedManager.PrimitiveLedPurple));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.brightness", new (LedManager.PrimitiveLedBrightness));
+            MogwaiNanoEngine.RegisterPrimitive("onboard.led.release", new (LedManager.PrimitiveLedRelease));
+
+            MogwaiNanoEngine.RegisterExternalError(LedManager.LedOperationError);
+
+            MogwaiNanoEngine.Skills.Add("ONBOARD-LED");
 
             MogwaiNanoEngine.ResetDidExecute += (engine) =>
             {
@@ -78,7 +101,11 @@ namespace MogwaiNanoEsp32
                 }
 
                 if (!engine.KeepAlive)
+                {
                     SSD1306Manager.Cleanup(engine);
+                    LedManager.Cleanup(engine);
+                }
+
             };
 
             MogwaiNanoSystem.MogwaiNanoLedSettings += (gpio) =>
@@ -89,38 +116,57 @@ namespace MogwaiNanoEsp32
 
                     MogwaiNano.AppGlobal.RuntimeStateChanged += (state) =>
                     {
-                        if (state == 1)
+                        if (state == 0)
+                        {                                                 
+                           LedManager.SetState(LedState.Off);
+                        }
+                        else if (state == 1)
                         {
-                            LedManager.SetState(LedState.Starting);
+                            LedManager.SetState(LedState.Initializing);
                         }
                         else if (state == 2)
                         {
-                            LedManager.SetState(LedState.Ready);
+                            LedManager.SetState(LedState.Idle);
                         }
                         else if (state == 3)
                         {
-                            LedManager.SetState(LedState.Fault);
+                            LedManager.SetState(LedState.Running);
                         }
                         else if (state == 4)
                         {
-                            LedManager.SetState(LedState.Parsing);
+                            LedManager.SetState(LedState.Paused);
                         }
                         else if (state == 5)
                         {
-                            LedManager.SetState(LedState.Running);
+                            LedManager.SetState(LedState.Error);
                         }
-                        else if (state == 6)
+                    };
+
+                    MogwaiNanoEngine.ProgramDidStart += (engine) =>
+                    {
+                        MogwaiNano.AppGlobal.SetRuntimeState(3);
+                    };
+
+                    MogwaiNanoEngine.ProgramDidEnd += (engine, result) =>
+                    {
+                        if (result.IsError)
                         {
-                            LedManager.SetState(LedState.ProgramError);
+                            MogwaiNano.AppGlobal.SetRuntimeState(5);
                         }
-                        else if (state == 7)
+                        else
                         {
-                            LedManager.SetState(LedState.Paused);
+                            MogwaiNano.AppGlobal.SetRuntimeState(2);
                         }
-                        else if (state == 8)
-                        {
-                            LedManager.SetState(LedState.Stepping);
-                        }
+                    };
+
+                    MogwaiNanoEngine.ProgramDidPause += (engine) =>
+                    {
+                        MogwaiNano.AppGlobal.SetRuntimeState(4);
+                    };
+
+                    MogwaiNanoEngine.ProgramDidResume += (engine) =>
+                    {
+                        MogwaiNano.AppGlobal.SetRuntimeState(3);
                     };
                 }
             };

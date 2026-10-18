@@ -53,6 +53,12 @@ namespace MogwaiNano.Engine
         public delegate void ProgramDidEndHandler(MogwaiNanoEngine engine, EvalResult result);
         public static event ProgramDidEndHandler ProgramDidEnd;
 
+        public delegate void ProgramDidPauseHandler(MogwaiNanoEngine engine);
+        public static event ProgramDidPauseHandler ProgramDidPause;
+
+        public delegate void ProgramDidResumeHandler(MogwaiNanoEngine engine);
+        public static event ProgramDidResumeHandler ProgramDidResume;
+
         public delegate void ResetDidExecuteHandler(MogwaiNanoEngine engine);
         public static event ResetDidExecuteHandler ResetDidExecute;
 
@@ -172,6 +178,10 @@ namespace MogwaiNano.Engine
         public string DebugCommand { get; set; }
 
         public static Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
+
+        public static void FireProgramDidPauseEvent(MogwaiNanoEngine engine) => ProgramDidPause?.Invoke(engine);
+
+        public static void FireProgramDidResumeEvent(MogwaiNanoEngine engine) => ProgramDidResume?.Invoke(engine);
 
         public EvalResult LastResult
         {
@@ -316,6 +326,8 @@ namespace MogwaiNano.Engine
 
             return p(engine, name);
         }
+
+        public static void RegisterExternalError(Error error) => Error.RegisterExternalError(error);
 
         public static void RegisterPrimitive(string name, PrimitiveDelegate primitive, bool allowReplacePrimitive = false)
         {
@@ -565,15 +577,6 @@ namespace MogwaiNano.Engine
 
         public EvalResult Run(string code, bool debugMode = false)
         {
-            if (IsTask)
-            {
-                Debug.WriteLine($"task   '{Name}' run with {GC.Run(true)} bytes free");
-            }
-            else
-            {
-                Debug.WriteLine($"mother '{Name}' run with {GC.Run(true)} bytes free");
-            }
-
             try
             {
                 IsRunning = true;

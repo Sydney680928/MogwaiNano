@@ -1,23 +1,34 @@
+// Copyright 2026 Stéphane Sibué
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using Iot.Device.Ws28xx.Esp32;
 using MogwaiNano.Engine;
 using MogwaiNano.Objects;
 using System;
 using System.Diagnostics;
 using System.Drawing;
-using System.Threading;
 
 namespace MogwaiNanoEsp32LED
 {
     /// <summary>
-    /// Pilote la LED WS2812 intégrée (ESP32) : témoin d'état du runtime,
+    /// Pilote la LED WS2812 intégrée (ESP32) : témoin d'état du runtime en couleurs fixes,
     /// avec possibilité pour un script MOGWAI de prendre le contrôle.
     /// </summary>
     public class LedManager
     {
         public static Error LedOperationError = new("LED.1", "led operation error");
 
-        private const int TickMs = 100;
-        private const int BlinkTicks = 3;
         private const int DefaultBrightness = 5;
 
         private static readonly object _lock = new object();
@@ -26,11 +37,8 @@ namespace MogwaiNanoEsp32LED
         private static BitmapImage _image;
         private static int _pin = -1;
         private static bool _enabled;
-        private static bool _stop;
-        private static Thread _thread;
 
         private static LedState _runtimeState = LedState.Off;
-        private static bool _blinkOn = true;
         private static int _brightness = DefaultBrightness;
 
         private static bool _scriptOwned;
@@ -80,31 +88,14 @@ namespace MogwaiNanoEsp32LED
                 _scriptOwned = false;
                 _ownerId = null;
                 _runtimeState = LedState.Off;
-                _blinkOn = true;
-                _stop = false;
-
-                _thread = new Thread(Worker);
-                _thread.Start();
             }
 
             return true;
         }
 
-        /// <summary>Arrête le clignotement et éteint la LED.</summary>
+        /// <summary>Éteint la LED et libère le driver.</summary>
         public static void Shutdown()
         {
-            Thread thread;
-
-            lock (_lock)
-            {
-                _stop = true;
-                thread = _thread;
-                _thread = null;
-            }
-
-            if (thread != null)
-                thread.Join();
-
             lock (_lock)
             {
                 if (_enabled)
@@ -121,7 +112,8 @@ namespace MogwaiNanoEsp32LED
 
         /// <summary>
         /// Change l'état du runtime. Si un script a pris la LED, l'état est mémorisé
-        /// mais pas affiché (sauf Paused / Stepping, toujours prioritaires).
+        /// mais pas affiché (sauf Paused, toujours prioritaire).
+        /// La LED est systématiquement réécrite, même si l'état est inchangé.
         /// </summary>
         public static void SetState(LedState state)
         {
@@ -131,8 +123,7 @@ namespace MogwaiNanoEsp32LED
                     return;
 
                 _runtimeState = state;
-                _blinkOn = true;
-                Render(1);
+                Render();
             }
         }
 
@@ -177,12 +168,19 @@ namespace MogwaiNanoEsp32LED
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
-        public static EvalResult PrimitiveLedOff(MogwaiNanoEngine engine, string name)
-        {
-            // led.off
+        public static EvalResult PrimitiveLedOff(MogwaiNanoEngine engine, string name) => TakeControl(engine, name, 0, 0, 0);
 
-            return TakeControl(engine, name, 0, 0, 0);
-        }
+        public static EvalResult PrimitiveLedGreen(MogwaiNanoEngine engine, string name) => TakeControl(engine, name, 0, 255, 0);
+
+        public static EvalResult PrimitiveLedRed(MogwaiNanoEngine engine, string name) => TakeControl(engine, name, 255, 0, 0);
+
+        public static EvalResult PrimitiveLedBlue(MogwaiNanoEngine engine, string name) => TakeControl(engine, name, 0, 0, 255);
+
+        public static EvalResult PrimitiveLedOrange(MogwaiNanoEngine engine, string name) => TakeControl(engine, name, 255, 80, 0);
+
+        public static EvalResult PrimitiveLedYellow(MogwaiNanoEngine engine, string name) => TakeControl(engine, name, 255, g: 160, 0);
+
+        public static EvalResult PrimitiveLedPurple(MogwaiNanoEngine engine, string name) => TakeControl(engine, name, 160, 0, 255);
 
         public static EvalResult PrimitiveLedBrightness(MogwaiNanoEngine engine, string name)
         {
@@ -263,34 +261,18 @@ namespace MogwaiNanoEsp32LED
         {
             _scriptOwned = false;
             _ownerId = null;
-            _blinkOn = true;
             Render();
         }
 
-        // À appeler sous verrou.
-        private static bool IsBlinking()
-        {
-            if (_scriptOwned)
-                return false;
-
-            return _runtimeState == LedState.Starting || _runtimeState == LedState.Parsing;
-        }
-
         // À appeler sous verrou : calcule la couleur effective et l'envoie.
-
-        private static bool Render() => Render(_brightness);
-
-        private static bool Render(int brightness)
+        private static bool Render()
         {
             int r = 0, g = 0, b = 0;
 
             if (_runtimeState == LedState.Paused)
             {
-                b = 255;
-            }
-            else if (_runtimeState == LedState.Stepping)
-            {
-                r = 255; g = 255; b = 255;
+                // Pause : orange, prioritaire sur la couleur du script.
+                r = 255; g = 80;
             }
             else if (_scriptOwned)
             {
@@ -300,21 +282,19 @@ namespace MogwaiNanoEsp32LED
             {
                 switch (_runtimeState)
                 {
-                    case LedState.Starting:
-                    case LedState.Parsing:
-                        if (_blinkOn)
-                        {
-                            r = 255; g = 80;
-                        }
+                    case LedState.Initializing:
+                        r = 255; g = 80;
                         break;
 
-                    case LedState.Ready:
-                    case LedState.Running:
+                    case LedState.Idle:
                         g = 255;
                         break;
 
-                    case LedState.Fault:
-                    case LedState.ProgramError:
+                    case LedState.Running:
+                        b = 255;
+                        break;
+
+                    case LedState.Error:
                         r = 255;
                         break;
                 }
@@ -342,10 +322,7 @@ namespace MogwaiNanoEsp32LED
         }
 
         // À appeler sous verrou. Applique la luminosité globale.
-
-        private static bool Write(int r, int g, int b) => Write(r, g, b, _brightness);
-
-        private static bool Write(int r, int g, int b, int brightness)
+        private static bool Write(int r, int g, int b)
         {
             if (!_enabled || _pin < 0)
                 return false;
@@ -360,7 +337,7 @@ namespace MogwaiNanoEsp32LED
                 _neo = new Ws2812c(_pin, 1);
                 _image = _neo.Image;
 
-                _image.SetPixel(0, 0, Color.FromArgb(r * brightness / 255, g * brightness / 255, b * brightness / 255));
+                _image.SetPixel(0, 0, Color.FromArgb(r * _brightness / 255, g * _brightness / 255, b * _brightness / 255));
                 _neo.Update();
                 return true;
             }
@@ -371,49 +348,6 @@ namespace MogwaiNanoEsp32LED
                 ReleaseDriver();
                 _enabled = false;
                 return false;
-            }
-        }
-
-        private static void Worker()
-        {
-            int tick = 0;
-
-            while (true)
-            {
-                Thread.Sleep(TickMs);
-
-                lock (_lock)
-                {
-                    if (_stop)
-                        return;
-
-                    if (!_enabled)
-                        continue;
-
-                    if (_runtimeState == LedState.Stepping)
-                    {
-                        // Le flash blanc a duré un tick : retour au bleu.
-                        _runtimeState = LedState.Paused;
-                        Render();
-                        continue;
-                    }
-
-                    if (IsBlinking())
-                    {
-                        tick++;
-
-                        if (tick >= BlinkTicks)
-                        {
-                            tick = 0;
-                            _blinkOn = !_blinkOn;
-                            Render();
-                        }
-                    }
-                    else
-                    {
-                        tick = 0;
-                    }
-                }
             }
         }
     }

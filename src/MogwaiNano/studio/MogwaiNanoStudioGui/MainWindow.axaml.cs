@@ -252,13 +252,11 @@ public partial class MainWindow : Window
             WriteMogwaiConsoleLine(Environment.NewLine + (result.ToString() ?? string.Empty));
             WriteMogwaiConsoleLine(string.Empty);
 
-            /*
-            if (!AppGlobal.MogwaiEngine.IsRunning)
+            if (result.IsError)
             {
                 Editor.IsReadOnly = false;
                 ApplyEditorForeground(false);
             }
-            */
         });
 
         AppGlobal.EngineDelegate.ProgramStarted += (code, debugMode) => OnUiThread(() =>
