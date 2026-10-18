@@ -135,6 +135,15 @@ While the program is paused, you can type code in the NANO console and run it, t
 | `nano.name` | `nano.name` → `.string` | Reads the connected device's name |
 | `nano.name.set` | `"name" nano.name.set` | Sets the connected device's name, persisted on the device and reported as the `name` field in future `nano.scan`/`nano.user.select` results. Defaults to `"MogwaiNanoDevice"` — useful for telling multiple devices apart on the same network |
 
+## Onboard LED
+
+**ESP32 only.** Reads and sets the GPIO the board's built-in RGB LED is wired to. The runtime uses this LED as a status indicator, and scripts can drive it with the `onboard.led.*` primitives — see the [Device Primitives Reference](device-primitives.md).
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `nano.onboard.led` | `nano.onboard.led` → `.number` | Pushes the GPIO number currently configured on the connected device for the onboard LED. `-1`, the default, means the LED is disabled |
+| `nano.onboard.led.set` | `gpio nano.onboard.led.set` | Sets the GPIO the onboard LED is wired to, e.g. `48 nano.onboard.led.set`. The value is stored on the device, but only takes effect after a reboot (`nano.reboot`). The LED is disabled by default (`-1`), so this has to be done once to use it |
+
 ## Autorun management
 
 | Primitive | Signature | Description |

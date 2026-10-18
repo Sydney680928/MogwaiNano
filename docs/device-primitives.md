@@ -317,7 +317,7 @@ task 'TSK2' do
 | `flag.isSet` | 🔗 | `'name' flag.isSet` → `.boolean` | Tests whether a flag is active |
 | `flag.isClear` | 🔗 | `'name' flag.isClear` → `.boolean` | Tests whether a flag is inactive |
 
-**NANO-declared skills:** `'GPIO'`, `'I2C'`, `'SSD1306'` — reflecting which hardware subsystems are available on the running firmware.
+**NANO-declared skills:** `'GPIO'`, `'I2C'`, `'SSD1306'`, plus `'BLE-P'` and `'ONBOARD-LED'` on ESP32 — reflecting which hardware subsystems are available on the running firmware.
 
 **Flags are volatile on NANO** — reset on every new program run, not persisted across reboots.
 
@@ -588,6 +588,55 @@ Since nothing tears the peripheral down automatically on an abnormal exit, a goo
 
 ---
 
+## 18. Onboard LED
+
+⚙️ **NANO-only. ESP32 only** — lives entirely in its own `MogwaiNanoEsp32LED` assembly, referenced only by `MogwaiNanoEsp32` (kept out of `MogwaiNanoCore`). Raspberry Pi Pico 2 W has no equivalent. Declares the `'ONBOARD-LED'` skill — check with `hasSkill` before using.
+
+Many ESP32-S3 boards carry a built-in RGB LED (a WS2812) wired to a GPIO — GPIO 48 on some boards, but this varies with the board and its revision, and a few need a solder bridge to connect it. The runtime uses it as a status indicator, and a script can take it over. The GPIO is set from Studio with `nano.onboard.led.set` (see the [Studio Primitives Reference](studio-primitives.md)) and takes effect after a reboot. **The LED is disabled by default**: the GPIO is `-1` until it is configured, so it has to be set once before the LED is used.
+
+### Status colours
+
+The runtime shows its state with fixed colours — there is no blinking:
+
+| State | Colour | When |
+|---|---|---|
+| Initializing | orange | The application is starting: network, services... |
+| Idle | green | Initialization is complete and no program is running |
+| Running | blue | A program is running. In keepAlive mode, each command turns the LED from green to blue while it runs, then back to green |
+| Error | red | Initialization failed, a program failed to start, or a program stopped on an error — `mogwai.halt` included, since it raises `MW.2` |
+| Paused | orange | A debug session is paused. Back to blue on step or resume |
+
+Tasks don't change the colour: only the top-level program does.
+
+### Primitives
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `onboard.led.set` | `r g b onboard.led.set` | Sets the LED to the given colour — each value between `0` and `255`, otherwise `MW.22` is raised. The script takes control of the LED |
+| `onboard.led.off` | `onboard.led.off` | Turns the LED off. The script takes control of the LED |
+| `onboard.led.brightness` | `value onboard.led.brightness` | Sets the global brightness, `0`-`255` (`30` by default), applied to every colour, status colours included |
+| `onboard.led.release` | `onboard.led.release` | Gives the LED back to the runtime, which shows its current state again |
+| `onboard.led.red` | `onboard.led.red` | Shortcut for `255 0 0 onboard.led.set` |
+| `onboard.led.green` | `onboard.led.green` | Shortcut for `0 255 0 onboard.led.set` |
+| `onboard.led.blue` | `onboard.led.blue` | Shortcut for `0 0 255 onboard.led.set` |
+| `onboard.led.orange` | `onboard.led.orange` | Shortcut for `255 80 0 onboard.led.set` |
+| `onboard.led.purple` | `onboard.led.purple` | Shortcut for `160 0 255 onboard.led.set` |
+| `onboard.led.yellow` | `onboard.led.yellow` | Shortcut for `255 200 0 onboard.led.set` |
+
+The values of `orange`, `purple` and `yellow` are tuned for a WS2812, whose green is much brighter than its red and blue: the textbook values (`255 165 0` for orange, for instance) would look yellow.
+
+### Taking control from a script
+
+As soon as a script calls `onboard.led.set`, `onboard.led.off` or one of the colour shortcuts, it owns the LED: the status colours of the runtime are ignored, but remembered. The one exception is the orange of a paused debug session, which always wins so that a pause stays visible; the script's colour comes back when the program resumes. The runtime takes the LED back, and shows its current state, when the program ends, when it is paused in a debug session, or when the script calls `onboard.led.release`.
+
+While the LED is disabled (GPIO `-1`, the default) or unusable (a failed driver, for instance), all these primitives do nothing and raise no error, so the same script runs unchanged on any ESP32 board. A failure of the LED driver while a primitive is writing to it raises `LED.1`.
+
+### Implementation note: the driver and the garbage collector
+
+After a garbage-collection compaction (for instance a forced `GC.Run(true)`), the `Ws28xx` driver for ESP32 (`nanoFramework.Iot.Device.Ws28xx.Esp32`, version 3.0.1) sends wrong data to the LED, which then shows random colours instead of the requested one — probably because the driver keeps a native pointer to its managed image buffer, which the compaction has moved. To stay reliable whenever a collection happens, the runtime re-creates the driver on every colour change instead of keeping a single instance. Nothing is required from scripts.
+
+---
+
 ## Error codes
 
 MOGWAI uses structured `MW.xx` error codes.
@@ -610,4 +659,4 @@ MOGWAI uses structured `MW.xx` error codes.
 | `MW.590` | Platform not supported |
 | `MW.!!!` | Fatal |
 
-BLE Peripheral is the one exception: it defines its own `BLE.1` ("unable to create peripheral error"), in its own namespace rather than an `MW.5xx` sub-range — a deliberate choice, since it lives in its own assembly specifically to stay out of `MogwaiNanoCore` (whose own `Error.cs` is where every `MW.5xx` range above is actually defined, and is already close to its own metadata-table limit).
+BLE Peripheral is an exception: it defines its own `BLE.1` ("unable to create peripheral error"), in its own namespace rather than an `MW.5xx` sub-range — a deliberate choice, since it lives in its own assembly specifically to stay out of `MogwaiNanoCore` (whose own `Error.cs` is where every `MW.5xx` range above is actually defined, and is already close to its own metadata-table limit). The onboard LED is the other: its `LED.1` ("led operation error") is defined in its own assembly for the same reason.
