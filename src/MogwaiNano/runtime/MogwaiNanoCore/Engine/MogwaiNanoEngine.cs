@@ -455,6 +455,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("debug.halt", new PrimitiveDelegate(PrimitiveDebugHalt));
             Primitives.Add("¤", new PrimitiveDelegate(PrimitiveDebugHalt));
             Primitives.Add("debug.stack", new PrimitiveDelegate(PrimitiveDebugStack));
+            Primitives.Add("debug.resume", new PrimitiveDelegate(PrimitiveDebugResume));
 
             Primitives.Add("error.last", new PrimitiveDelegate(PrimitiveErrorLast));
             Primitives.Add("error.reset", new PrimitiveDelegate(PrimitiveErrorReset));
@@ -1397,6 +1398,14 @@ namespace MogwaiNano.Engine
             if (engine.DebugMode)
                 engine.PauseRequested = true;
             
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveDebugResume(MogwaiNanoEngine engine, string name)
+        {
+            if (engine.DebugMode)
+                engine.PauseRequested = false;
+
             return EvalResult.NoError;
         }
 
