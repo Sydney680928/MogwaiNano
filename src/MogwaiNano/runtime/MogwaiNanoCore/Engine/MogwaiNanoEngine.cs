@@ -359,6 +359,7 @@ namespace MogwaiNano.Engine
             Primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
             Primitives.Add("bcd->", new PrimitiveDelegate(PrimitiveBcdToDecimal));
             Primitives.Add("->utf8", new PrimitiveDelegate(PrimitiveToUtf8));
+            Primitives.Add("utf8->", new PrimitiveDelegate(PrimitiveUtf8ToString));
             Primitives.Add("->upper", new PrimitiveDelegate(PrimitiveToUpper));
             Primitives.Add("->lower", new PrimitiveDelegate(PrimitiveToLower));
             Primitives.Add("->hex", new PrimitiveDelegate(PrimitiveToHex));
@@ -3462,6 +3463,26 @@ namespace MogwaiNano.Engine
                 var data = engine.StackPop() as MOGData;
                 var str = System.Text.Encoding.UTF8.GetString(data.Items, 0, data.Items.Length);
                 engine.StackPush(new MOGString(engine, str));
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveUtf8ToString(MogwaiNanoEngine engine, string name)
+        {
+            // "string" ->utf8 ---> data
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+            
+            if (s[0] == typeof(MOGString))
+            {
+                var str = engine.StackPop() as MOGString;
+                var bytes = System.Text.Encoding.UTF8.GetBytes(str.Value);
+                engine.StackPush(new MOGData(engine, bytes));
                 return EvalResult.NoError;
             }
 
