@@ -22,6 +22,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using MOGWAI.Engine;
+using MOGWAI.Objects;
 using MogwaiNanoStudioGui.Classes;
 using System;
 using System.Collections.Generic;
@@ -36,7 +37,7 @@ public partial class MainWindow : Window
     // File filter for MOGWAI NANO scripts
     private static readonly FilePickerFileType MogFileType = new("MOGWAI NANO scripts")
     {
-        Patterns = new[] { "*.mog" }
+        Patterns = ["*.mog"]
     };
 
     // The currently open file, if any (null until something has been
@@ -105,6 +106,10 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        //var engine = new MogwaiEngine("XXX");
+        //var f = new MOGFunction(engine, "", 0, null);
+        //var s = f.ToSmartString();
+
         InitializeComponent();
         Icon = AppIcon.Icon;
         MogwaiDebugOutput.ItemsSource = _mogwaiDebugMessages;

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Avalonia.Controls.Templates;
 using Avalonia.Media;
 using HarfBuzzSharp;
 using MOGWAI;
@@ -271,6 +272,121 @@ namespace MogwaiNanoStudioGui.Classes
 
                 return obj.ToString();
             }
+        }
+
+        public static string ToSmartString(this MOGObject obj)
+        {
+            if (obj is MOGNumber number)
+            {
+                var size = number.Value.ToString().Length.ToString("X4");
+                return $"N{size}[{number.Value}]";
+            }
+            else if (obj is MOGString @string)
+            {
+                var size = @string.Value.ToString().Length.ToString("X4");
+                return $"S{size}[{@string.Value}]";
+            }
+            else if (obj is MOGName name)
+            {
+                var size = name.Value.ToString().Length.ToString("X4");
+                return $"n{size}[{name.Value}]";
+            }
+            else if (obj is MOGKey key)
+            {
+                var size = key.Value.ToString().Length.ToString("X4");
+                return $"K{size}[{key.Value}]";
+            }
+            else if (obj is MOGPrimitive primitive)
+            {
+                var size = primitive.Name.ToString().Length.ToString("X4");
+                return $"P{size}[{primitive.Name}]";
+            }
+            else if (obj is MOGWord word)
+            {
+                var size = word.Value.ToString().Length.ToString("X4");
+                return $"W{size}[{word.Value}]";
+            }
+            else if (obj is MOGRef reference)
+            {
+                var size = reference.Value.ToString().Length.ToString("X4");
+                return $"R{size}[{reference.Value}]";
+            }
+            else if (obj is MOGBoolean boolean)
+            {
+                return $"B[{(boolean.Value ? "1" : "0")}]";
+            }
+            else if (obj is MOGType type)
+            {
+                var size = type.Value.ToString().Length.ToString("X4");
+                return $"T{size}[{type.Value}]";
+            }
+            else if (obj is MOGNull @null)
+            {
+                return $"X0000[]";
+            }
+            else if (obj is MOGData data)
+            {
+                var sb = new StringBuilder();
+
+                for (int i = 0; i < data.Items.Count; i++)
+                    sb.Append((char)data.Items[i]);
+
+                var size = sb.Length.ToString("X4");
+                return $"D{size}[{sb}]";
+            }
+            else if (obj is MOGFunction function)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in function.Items)
+                    sb.Append(item.ToSmartString());
+
+                var size = sb.Length.ToString("X4");
+
+                return $"F{size}[{sb}]";
+            }
+            else if (obj is MOGCode code)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in code.Items)
+                    sb.Append(item.ToSmartString());
+
+                var size = sb.Length.ToString("X4");
+                var header = code.AutoEval ? "C" : "c";
+
+                return $"{header}{size}[{sb}]";
+            }
+            else if (obj is MOGList list)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in list.Items)
+                    sb.Append(item.ToSmartString());
+
+                var size = sb.Length.ToString("X4");
+                var header = list.AutoEval ? "L" : "l";
+
+                return $"{header}{size}[{sb}]";
+            }
+            else if (obj is MOGRecord record)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var k in record.Items.Keys)
+                {
+                    var mKey = new MOGKey(record.Engine, k);
+                    sb.Append(mKey.ToSmartString());
+                    sb.Append(record.Items[k].ToSmartString());
+                }
+
+                var size = sb.Length.ToString("X4");
+                var header = record.AutoEval ? "R" : "r";
+
+                return $"{header}{size}[{sb}]";
+            }
+
+            return obj.ToString();
         }
     }
 }
