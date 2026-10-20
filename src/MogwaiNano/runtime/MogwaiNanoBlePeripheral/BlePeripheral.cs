@@ -26,6 +26,12 @@ namespace MogwaiNanoBlePeripheral
     {
         public const string EVENT_BLE_PERIPHERAL_DID_START = "BLE_PERIPHERAL_DID_START";
         public const string EVENT_BLE_PERIPHERAL_DID_STOP = "BLE_PERIPHERAL_DID_STOP";
+
+        public const string EVENT_BLE_PERIPHERAL_CLIENT_DID_CONNECT = "BLE_PERIPHERAL_CLIENT_DID_CONNECT";
+        public const string EVENT_BLE_PERIPHERAL_CLIENT_DID_DISCONNECT = "BLE_PERIPHERAL_CLIENT_DID_DISCONNECT";
+
+        public const string EVENT_BLE_PERIPHERAL_SESSION_ERROR = "BLE_PERIPHERAL_SESSION_ERROR";
+
         public const string EVENT_BLE_PERIPHERAL_VALUE_DID_CHANGE = "BLE_PERIPHERAL_VALUE_DID_CHANGE";
 
         private static BlePeripheral _instance;
@@ -171,6 +177,8 @@ namespace MogwaiNanoBlePeripheral
         public void Reset()
         {
             Debug.WriteLine("BLE PERIPHERAL RESET");
+
+            BluetoothLEServer.Instance.Session.SessionStatusChanged -= Session_SessionStatusChanged;
 
             if (FirstService != null)
             {
@@ -413,6 +421,8 @@ namespace MogwaiNanoBlePeripheral
             if (Current.FirstService.ServiceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started)
                 return EvalResult.NoError;
 
+            BluetoothLEServer.Instance.Session.SessionStatusChanged += Session_SessionStatusChanged;
+
             var advParameters = new GattServiceProviderAdvertisingParameters
             {
                 IsDiscoverable = true,
@@ -426,9 +436,46 @@ namespace MogwaiNanoBlePeripheral
             return EvalResult.NoError;
         }
 
+        private static void Session_SessionStatusChanged(object sender, GattSessionStatusChangedEventArgs args)
+        {
+            if (args.Error == BluetoothError.Success)
+            {
+                switch (args.Status)
+                {
+                    case GattSessionStatus.Active:
+                        Debug.WriteLine("BLE session is active");
+
+                        foreach (ServiceDefinition serviceDefinition in Current.ServicesByName.Values)
+                            serviceDefinition.Engine.FireEvent(BlePeripheral.EVENT_BLE_PERIPHERAL_CLIENT_DID_CONNECT);
+
+                        break;
+
+                    case GattSessionStatus.Closed:
+                        Debug.WriteLine("BLE session is closed");
+                        
+                        foreach (ServiceDefinition serviceDefinition in Current.ServicesByName.Values)
+                            serviceDefinition.Engine.FireEvent(BlePeripheral.EVENT_BLE_PERIPHERAL_CLIENT_DID_DISCONNECT);
+
+                        break;
+                }
+            }
+            else
+            {             
+                Debug.WriteLine($"BLE session status changed with error: {args.Error}");
+
+                var error = args.Error.ToString();
+
+                foreach (ServiceDefinition serviceDefinition in Current.ServicesByName.Values)
+                {
+                    var p = new MOGString(serviceDefinition.Engine, error);
+                    serviceDefinition.Engine.FireEvent(BlePeripheral.EVENT_BLE_PERIPHERAL_CLIENT_DID_DISCONNECT, p);
+                }
+            }
+        }
+
         public static EvalResult PrimitiveBlePeripheralStop(MogwaiNanoEngine engine, string name)
         {
-            BlePeripheral.Current.Reset();
+            Current.Reset();
             return EvalResult.NoError;
         }
 

@@ -359,6 +359,9 @@ namespace MogwaiNano.Engine
             Primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
             Primitives.Add("bcd->", new PrimitiveDelegate(PrimitiveBcdToDecimal));
             Primitives.Add("->utf8", new PrimitiveDelegate(PrimitiveToUtf8));
+            Primitives.Add("->upper", new PrimitiveDelegate(PrimitiveToUpper));
+            Primitives.Add("->lower", new PrimitiveDelegate(PrimitiveToLower));
+            Primitives.Add("->hex", new PrimitiveDelegate(PrimitiveToHex));
 
             Primitives.Add("->vars", new PrimitiveDelegate(PrimitiveStackToVars));
             Primitives.Add("->safeVars", new PrimitiveDelegate(PrimitiveStackToSafeVars));
@@ -3459,6 +3462,72 @@ namespace MogwaiNano.Engine
                 var data = engine.StackPop() as MOGData;
                 var str = System.Text.Encoding.UTF8.GetString(data.Items, 0, data.Items.Length);
                 engine.StackPush(new MOGString(engine, str));
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveToUpper(MogwaiNanoEngine engine, string name)
+        {
+            // "aaa" ->upper ---> "AAA"
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGString))
+            {
+                var str = engine.StackPop() as MOGString;
+                engine.StackPush(new MOGString(engine, str.Value.ToUpper()));
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveToLower(MogwaiNanoEngine engine, string name)
+        {
+            // "AAA" ->lower ---> "aaa"
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGString))
+            {
+                var str = engine.StackPop() as MOGString;
+                engine.StackPush(new MOGString(engine, str.Value.ToLower()));
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        private static EvalResult PrimitiveToHex(MogwaiNanoEngine engine, string name)
+        {
+            // 255 2 ->hex ---> "FF"
+            // 255 4 ->hex ---> "00FF"
+
+            var s = engine.StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var width = engine.StackPop() as MOGNumber;
+                var number = engine.StackPop() as MOGNumber;
+
+                if (width.Value < 1 || width.Value > 64)
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "width must be between 1 and 64.");
+
+                var @string = ((int)(number.Value)).ToString("X" + width.Value);
+
+                engine.StackPush(new MOGString(engine, @string));
+                
                 return EvalResult.NoError;
             }
 
