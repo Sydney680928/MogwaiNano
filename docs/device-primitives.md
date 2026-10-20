@@ -334,7 +334,8 @@ task 'TSK2' do
 | `debug.vs.write` | ⚙️ | `v debug.vs.write` | Like `debug.write`, but writes through `Debug.WriteLine` — into the debugger's output window (Visual Studio) — instead of over the network channel to a connected Studio. Meant for testing the runtime, or a plugin, in isolation, from a test project with no Studio connected |
 | `console.clear` | ⚙️ | `console.clear` | Sends `CONSOLE.CLEAR` to a connected Studio, clearing its Console NANO output |
 | `debug.clear` | ⚙️ | `debug.clear` | Sends `DEBUG.CLEAR` to a connected Studio, clearing its Debug NANO output |
-| `debug.halt` / `¤` | 🔗 | `debug.halt` | Debug mode only: requests a pause before the next instruction that can be paused on — a breakpoint. `¤` is a shorter way of writing `debug.halt`. No effect outside debug mode. Resuming is done from Studio — see [Debugging](#debugging-a-program) below |
+| `debug.halt` / `¤` | 🔗 | `debug.halt` | Debug mode only: requests a pause before the next instruction that can be paused on — a breakpoint. `¤` is a shorter way of writing `debug.halt`. No effect outside debug mode. Resuming is done from Studio, or from the script itself with `debug.resume` — see [Debugging](#debugging-a-program) below |
+| `debug.resume` | ⚙️ | `debug.resume` | Debug mode only: leaves the paused / step-by-step state and lets the program carry on running normally. The counterpart of `debug.halt`, usable from inside the script — for example placed on the 5th iteration of a loop, to pause at the start, step through the first iterations, then run freely once the user steps onto it. Only leaves the pause: it doesn't change the trace setting (`debug.tron`/`debug.troff`). Ignored outside debug mode. NANO-only: not present in the desktop MOGWAI engine |
 | `debug.tron` | 🔗 | `delay debug.tron` | Debug mode only: waits `delay` milliseconds between each instruction and shows the current instruction in the Studio editor, like a trace. No effect outside debug mode |
 | `debug.troff` | 🔗 | `debug.troff` | Debug mode only: turns the trace off — equivalent to `0 debug.tron`. No effect outside debug mode |
 | `debug.stack` | ⚙️ | `debug.stack` → `.string` | Pushes a string representing the stack as it was when the primitive was called, the top of the stack first (`0:`), one item per line, under a `STACK` heading — see the example below. Works in a normal run as well as in debug mode. Studio's `nano.stack` asks the device for this same representation and displays it |
@@ -368,7 +369,20 @@ Before executing an instruction that can be paused on, the device checks what it
 
 Which instructions can be paused on depends on the command used: with `nano.debug`, primitives, words and auto-evaluated lists and records; with `nano.debugall`, every token, literals included. Blocks never are.
 
-`debug.resume` and `debug.step` are **not** primitives: they only exist as messages sent by Studio to the device, through `nano.debug.resume`, `nano.debug.step` or the buttons of the debug panel. A script can therefore pause itself with `¤`, but cannot resume itself.
+A script can pause itself with `¤` (`debug.halt`) and resume itself with `debug.resume`. For example, to step through the first iterations of a loop and then let the rest run normally:
+
+```
+¤
+1 10 for 'i' do
+{
+    i ?
+    if (i 5 ==) then { debug.resume }
+}
+```
+
+The program pauses at the start; the user steps with `nano.debug.step` (or the debug panel's Step button) through the first iterations, and when the program reaches `debug.resume` on the 5th one, the next step executes it and the program carries on running normally.
+
+`debug.step` is **not** a primitive: it only exists as a message sent by Studio to the device, through `nano.debug.step` or the Step button of the debug panel — stepping makes no sense from inside the script itself. `debug.resume` exists both ways: as the primitive above, and as a message sent by Studio through `nano.debug.resume` or the Resume button.
 
 Limitations for now: stepping is *step-into* only (no step-over or step-out); tasks can't be run in debug mode; units are loaded without debug information, so they can't be stepped through. An event handler, on the other hand, can be stepped through like a function of the source code.
 

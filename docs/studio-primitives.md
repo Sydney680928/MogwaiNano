@@ -97,7 +97,7 @@ STACK
 5: 50
 ```
 
-Inside the code itself, `debug.halt` (or `¤`), `debug.tron` and `debug.troff` are also available as ordinary primitives — see the [Shared Primitives Reference](shared-primitives.md). So is `debug.stack`, the device-side counterpart of `nano.stack` — see the [Device Primitives Reference](device-primitives.md). `resume` and `step` have no such primitive for now: they are only available from Studio.
+Inside the code itself, `debug.halt` (or `¤`), `debug.tron` and `debug.troff` are also available as ordinary primitives — see the [Shared Primitives Reference](shared-primitives.md). So are `debug.stack`, the device-side counterpart of `nano.stack`, and `debug.resume`, the script-side counterpart of `nano.debug.resume` — both NANO-only, see the [Device Primitives Reference](device-primitives.md). `debug.resume` ignores the trace setting: it leaves the pause without changing `debug.tron`/`debug.troff`. `step` has no such primitive, since stepping makes no sense from inside the script: it is only available from Studio.
 
 ### The debug panel
 
