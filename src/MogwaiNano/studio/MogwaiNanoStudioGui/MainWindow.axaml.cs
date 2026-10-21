@@ -106,9 +106,11 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
-        //var engine = new MogwaiEngine("XXX");
-        //var f = new MOGFunction(engine, "", 0, null);
-        //var s = f.ToSmartString();
+        var engine = new MogwaiEngine("XXX");
+        var f = new MOGFunction(engine, "1 10 for 'i' do { i ? }", 0, null);
+        var s = f.ToSmartString();
+        var items = MogwaiExtensions.SmartParse(engine, s);
+        items = MogwaiExtensions.SmartParse(engine, items[0]);
 
         InitializeComponent();
         Icon = AppIcon.Icon;

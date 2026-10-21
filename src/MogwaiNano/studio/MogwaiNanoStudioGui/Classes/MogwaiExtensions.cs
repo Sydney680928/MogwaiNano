@@ -16,7 +16,10 @@ using Avalonia.Controls.Templates;
 using Avalonia.Media;
 using HarfBuzzSharp;
 using MOGWAI;
+using MOGWAI.Engine;
 using MOGWAI.Objects;
+using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace MogwaiNanoStudioGui.Classes
@@ -278,51 +281,52 @@ namespace MogwaiNanoStudioGui.Classes
         {
             if (obj is MOGNumber number)
             {
-                var size = number.Value.ToString().Length.ToString("X4");
-                return $"N{size}[{number.Value}]";
+                var s = number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var size = s.Length.ToString("X2");
+                return $"N{size}{s}";
             }
             else if (obj is MOGString @string)
             {
                 var size = @string.Value.ToString().Length.ToString("X4");
-                return $"S{size}[{@string.Value}]";
+                return $"S{size}{@string.Value}";
             }
             else if (obj is MOGName name)
             {
-                var size = name.Value.ToString().Length.ToString("X4");
-                return $"n{size}[{name.Value}]";
+                var size = name.Value.ToString().Length.ToString("X2");
+                return $"n{size}{name.Value}";
             }
             else if (obj is MOGKey key)
             {
-                var size = key.Value.ToString().Length.ToString("X4");
-                return $"K{size}[{key.Value}]";
+                var size = key.Value.ToString().Length.ToString("X2");
+                return $"K{size}{key.Value}";
             }
             else if (obj is MOGPrimitive primitive)
             {
-                var size = primitive.Name.ToString().Length.ToString("X4");
-                return $"P{size}[{primitive.Name}]";
+                var size = primitive.Name.ToString().Length.ToString("X2");
+                return $"P{size}{primitive.Name}";
             }
             else if (obj is MOGWord word)
             {
-                var size = word.Value.ToString().Length.ToString("X4");
-                return $"W{size}[{word.Value}]";
+                var size = word.Value.ToString().Length.ToString("X2");
+                return $"W{size}{word.Value}";
             }
             else if (obj is MOGRef reference)
             {
-                var size = reference.Value.ToString().Length.ToString("X4");
-                return $"R{size}[{reference.Value}]";
+                var size = reference.Value.ToString().Length.ToString("X2");
+                return $"&{size}{reference.Value}";
             }
             else if (obj is MOGBoolean boolean)
             {
-                return $"B[{(boolean.Value ? "1" : "0")}]";
+                return $"B{(boolean.Value ? "1" : "0")}";
             }
             else if (obj is MOGType type)
             {
-                var size = type.Value.ToString().Length.ToString("X4");
-                return $"T{size}[{type.Value}]";
+                var size = type.Value.ToString().Length.ToString("X2");
+                return $"T{size}{type.Value}";
             }
             else if (obj is MOGNull @null)
             {
-                return $"X0000[]";
+                return "X";
             }
             else if (obj is MOGData data)
             {
@@ -332,7 +336,7 @@ namespace MogwaiNanoStudioGui.Classes
                     sb.Append((char)data.Items[i]);
 
                 var size = sb.Length.ToString("X4");
-                return $"D{size}[{sb}]";
+                return $"D{size}{sb}";
             }
             else if (obj is MOGFunction function)
             {
@@ -343,7 +347,7 @@ namespace MogwaiNanoStudioGui.Classes
 
                 var size = sb.Length.ToString("X4");
 
-                return $"F{size}[{sb}]";
+                return $"F{size}{sb}";
             }
             else if (obj is MOGCode code)
             {
@@ -355,7 +359,7 @@ namespace MogwaiNanoStudioGui.Classes
                 var size = sb.Length.ToString("X4");
                 var header = code.AutoEval ? "C" : "c";
 
-                return $"{header}{size}[{sb}]";
+                return $"{header}{size}{sb}";
             }
             else if (obj is MOGList list)
             {
@@ -367,7 +371,7 @@ namespace MogwaiNanoStudioGui.Classes
                 var size = sb.Length.ToString("X4");
                 var header = list.AutoEval ? "L" : "l";
 
-                return $"{header}{size}[{sb}]";
+                return $"{header}{size}{sb}";
             }
             else if (obj is MOGRecord record)
             {
@@ -383,10 +387,152 @@ namespace MogwaiNanoStudioGui.Classes
                 var size = sb.Length.ToString("X4");
                 var header = record.AutoEval ? "R" : "r";
 
-                return $"{header}{size}[{sb}]";
+                return $"{header}{size}{sb}";
             }
 
             return obj.ToString();
+        }
+
+        public static List<string> SmartParse(MogwaiEngine engine, string code)
+        {
+            int _index = 0;
+            var _items = new List<string>();
+            int _size = 0;
+            string _content = string.Empty;
+
+            while (_index < code.Length)
+            {
+                switch (code[_index])
+                {
+                    case 'N':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
+                        _content = code.Substring(_index + 3, _size);
+                        _index += 3 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'S':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'n':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
+                        _content = code.Substring(_index + 3, _size);
+                        _index += 3 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'K':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
+                        _content = code.Substring(_index + 3, _size);
+                        _index += 3 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'P':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
+                        _content = code.Substring(_index + 3, _size);
+                        _index += 3 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'W':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
+                        _content = code.Substring(_index + 3, _size);
+                        _index += 3 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'B':
+                        _content = code.Substring(_index + 1, 1);
+                        _index += 2;
+                        _items.Add(_content);
+                        break;
+
+                    case 'T':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
+                        _content = code.Substring(_index + 3, _size);
+                        _index += 3 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'X':
+                        _index += 1;
+                        _items.Add("null");
+                        break;
+
+                    case 'D':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'F':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'C':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'c':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'L':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'l':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'R':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case 'r':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
+                        _content = code.Substring(_index + 5, _size);
+                        _index += 5 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    case '&':
+                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
+                        _content = code.Substring(_index + 3, _size);
+                        _index += 3 + _size;
+                        _items.Add(_content);
+                        break;
+
+                    default:
+                        throw new Exception($"Unexpected character '{code[_index]}' at index {_index}.");
+                }
+            }
+
+            return _items;
         }
     }
 }
