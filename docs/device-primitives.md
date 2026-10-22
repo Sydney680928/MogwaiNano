@@ -322,7 +322,7 @@ task 'TSK2' do
 | `flag.isSet` | 🔗 | `'name' flag.isSet` → `.boolean` | Tests whether a flag is active |
 | `flag.isClear` | 🔗 | `'name' flag.isClear` → `.boolean` | Tests whether a flag is inactive |
 
-**NANO-declared skills:** `'GPIO'`, `'I2C'`, `'SSD1306'`, plus `'BLE-P'` and `'ONBOARD-LED'` on ESP32 — reflecting which hardware subsystems are available on the running firmware.
+**NANO-declared skills:** `'GPIO'`, `'I2C'`, `'SSD1306'`, plus `'BLE-P'`, `'ONBOARD-LED'`, `'TFT'` and `'TOUCH'` on ESP32 — reflecting which hardware subsystems are available on the running firmware.
 
 **Flags are volatile on NANO** — reset on every new program run, not persisted across reboots.
 
@@ -406,7 +406,7 @@ All ⚙️ **NANO-only** (though most have a conceptual desktop equivalent).
 | `mogwai.reboot` | `mogwai.reboot` | Reboots the device. Runs `MOGWAI.onReboot` first if defined (unlike the Studio-side `nano.reboot`, which bypasses it), waits 1 second, then reboots |
 | `mogwai.info` | `mogwai.info` → `.record` | Returns a record with `name`, `mogwai` (NANO runtime version), `ip`, `session`, `platform`, `target`, `oem`, `system`, `memory` (free RAM, non-forcing), `skills` (list), `units` (list of stored unit names), `usings` (list of library names currently *installed* on flash — not necessarily loaded, see `mogwai.using`), `primitives` (list of every primitive name currently usable, at this exact instant — grows as `mogwai.using` calls succeed, since a loaded library's primitives merge into this same list), `frugalMode` (current mode), and `keepAlive` (`true`/`false` — see `mogwai.keepAlive`) |
 | `mogwai.frugalMode` | `enabled mogwai.frugalMode` | Enables (`true`) or disables (`false`) frugal mode for subsequent execution |
-| `mogwai.keepAlive` | `enabled mogwai.keepAlive` | Enables (`true`) or disables (`false`) keepAlive mode, a REPL-style mode where state carries over from one run to the next instead of every run starting from a clean slate. **Preserved between runs:** global variables, declared functions, the stack, stopwatches, frugal mode, the interrupt state (`DI`/`EI`), the GPIO pins and the I2C/SPI/PWM/ADC/SSD1306 resources opened by earlier runs, and whatever loaded usings keep on the engine's behalf (for instance the channels they opened) — the libraries themselves stay loaded in either mode. **Not preserved:** tasks, timers and events. Since the interrupt state is preserved too, a `DI` can deliberately span several runs (handy to test a timing-sensitive sequence step by step) — and one left without its `EI` keeps callbacks from being delivered until an `EI` or a `mogwai.reset`. Off by default — it must be turned on explicitly. It takes effect from the next run, not the current one, and `mogwai.halt`/`nano.halt` don't change how it works: everything that is preserved stays preserved. `mogwai.reset` still performs a full reset in this mode — the way to start over from a clean slate without switching keepAlive off. Studio-side counterpart: `nano.keepAlive` (Studio GUI only) |
+| `mogwai.keepAlive` | `enabled mogwai.keepAlive` | Enables (`true`) or disables (`false`) keepAlive mode, a REPL-style mode where state carries over from one run to the next instead of every run starting from a clean slate. **Preserved between runs:** global variables, declared functions, the stack, stopwatches, frugal mode, the interrupt state (`DI`/`EI`), the GPIO pins and the I2C/SPI/PWM/ADC/SSD1306 resources opened by earlier runs (and the TFT screen and touch panel, if open), and whatever loaded usings keep on the engine's behalf (for instance the channels they opened) — the libraries themselves stay loaded in either mode. **Not preserved:** tasks, timers and events. Since the interrupt state is preserved too, a `DI` can deliberately span several runs (handy to test a timing-sensitive sequence step by step) — and one left without its `EI` keeps callbacks from being delivered until an `EI` or a `mogwai.reset`. Off by default — it must be turned on explicitly. It takes effect from the next run, not the current one, and `mogwai.halt`/`nano.halt` don't change how it works: everything that is preserved stays preserved. `mogwai.reset` still performs a full reset in this mode — the way to start over from a clean slate without switching keepAlive off. Studio-side counterpart: `nano.keepAlive` (Studio GUI only) |
 | `mogwai.sendMessage` | `"message" mogwai.sendMessage` | Sends an arbitrary string to Studio (device → Studio direction) — the counterpart to the Studio-side `nano.send` (Studio → device) |
 | `mogwai.units` | `mogwai.units` → `.list` | Returns the names of all units currently stored on the device, from within a running program |
 | `mogwai.units.run` | `'unit' mogwai.units.run` | Executes a stored unit's code — typically used to load the functions it declares (e.g. a RTC helper library) into the current program's context, once, near the start of a script |
@@ -680,6 +680,275 @@ After a garbage-collection compaction (for instance a forced `GC.Run(true)`), th
 
 ---
 
+## 19. TFT display
+
+⚙️ **NANO-only. ESP32 only** — lives entirely in its own `MogwaiNanoTft` assembly, referenced only by `MogwaiNanoEsp32` (kept out of `MogwaiNanoCore`, which has reached the limit of the CLR's 16-bit internal identifiers). Raspberry Pi Pico 2 W has no equivalent yet. Declares the `'TFT'` skill — check with `hasSkill` before using.
+
+Drives a colour display wired over SPI. Every drawing primitive writes into a RGB565 canvas held in RAM, and **nothing is visible until `tft.refresh`** sends it to the display (or until `true tft.autoRefresh` makes every drawing call refresh its own area). `tft.refresh` only sends the rectangle modified since the previous refresh: a full-screen refresh of a 240×320 ST7789 at 40 MHz takes about 80 ms, while refreshing a small area is almost instant. Batch several drawing calls before a single `tft.refresh`.
+
+**The SPI pins are set by the runtime**, from the pins given to `tft.init` — `esp32.setPinFunction` isn't needed (SPI bus 1 only). **The canvas takes `width × height × 2` bytes** — 150 KB for a 240×320 display — which makes the library practical on an ESP32-S3 with PSRAM only; `tft.init` raises `TFT.1` if the buffer can't be allocated.
+
+**One screen per device.** The screen is shared by the main program and every task: any of them can call the `tft.*` primitives, and a lock serializes the calls so that two tasks never modify the canvas at the same time. `tft.init` on a screen that is already open raises `TFT.3`, whichever engine opened it; `tft.close` can be called from any engine. At the end of a program the backlight is switched off and the screen is released, so the next program has to call `tft.init` again — unless keepAlive mode is on (see `mogwai.keepAlive`), in which case the screen stays open, and displayed, from one run to the next.
+
+### Primitives
+
+Names and argument order follow the `ssd1306.*` family where they overlap, with a colour in place of the on/off flag. A **colour** is a `.number` in RGB565 (`0`-`65535`), produced by `tft.color`.
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `tft.init` | `record tft.init` | Opens the screen described by the record (see below), clears it to black and switches the backlight on. Raises `TFT.3` if a screen is already open, `TFT.1` if the initialization fails |
+| `tft.close` | `tft.close` | Switches the backlight off and releases the screen. Does nothing if no screen is open |
+| `tft.setRotation` | `n tft.setRotation` | Sets the rotation: `0` is the display's native orientation (portrait for a 240×320 panel), `1` to `3` turn it by 90° steps. **Clears the canvas to black** |
+| `tft.width` | `tft.width` → `.number` | Width in pixels in the current rotation |
+| `tft.height` | `tft.height` → `.number` | Height in pixels in the current rotation |
+| `tft.backlight` | `on tft.backlight` | Switches the backlight on (`true`) or off (`false`). Does nothing if the record has no `backlight:` pin |
+| `tft.refresh` | `tft.refresh` | Sends the area modified since the previous refresh to the display |
+| `tft.autoRefresh` | `on tft.autoRefresh` | When `true`, every drawing call refreshes its own area immediately. Off by default |
+| `tft.color` | `r g b tft.color` → `.number` | Builds a RGB565 colour from three values between `0` and `255` |
+| `tft.clear` | `color tft.clear` | Fills the whole canvas with a colour |
+| `tft.drawPixel` | `x y color tft.drawPixel` | Sets one pixel |
+| `tft.getPixel` | `x y tft.getPixel` → `.number` | Reads one pixel of the canvas (`0` outside the canvas) |
+| `tft.drawHorizontalLine` | `x y length color tft.drawHorizontalLine` | Draws a horizontal line |
+| `tft.drawVerticalLine` | `x y length color tft.drawVerticalLine` | Draws a vertical line |
+| `tft.drawLine` | `x1 y1 x2 y2 color tft.drawLine` | Draws a line between two points |
+| `tft.drawRectangle` | `x y width height color tft.drawRectangle` | Draws a rectangle outline |
+| `tft.drawFilledRectangle` | `x y width height color tft.drawFilledRectangle` | Draws a filled rectangle |
+| `tft.drawRoundRectangle` | `x y width height radius color tft.drawRoundRectangle` | Draws a rounded rectangle outline |
+| `tft.drawFilledRoundRectangle` | `x y width height radius color tft.drawFilledRoundRectangle` | Draws a filled rounded rectangle |
+| `tft.drawCircle` | `x y radius color tft.drawCircle` | Draws a circle outline |
+| `tft.drawFilledCircle` | `x y radius color tft.drawFilledCircle` | Draws a filled circle |
+| `tft.drawTriangle` | `x1 y1 x2 y2 x3 y3 color tft.drawTriangle` | Draws a triangle outline |
+| `tft.drawBitmap` | `x y width height data tft.drawBitmap` | Draws an image from a `MOGData` buffer of RGB565 pixels, two bytes per pixel, high byte first. Raises `TFT.4` if the buffer is smaller than `width × height × 2` |
+| `tft.drawString` | `x y "text" size foreground background tft.drawString` | Draws a text with the built-in 8×8 font, `size` being an integer scale factor (`1`, `2`, `3`...): each character is `8 × size` pixels wide. A `background` of `-1` leaves the background untouched (transparent); `\n` starts a new line |
+| `tft.measureString` | `"text" size tft.measureString` → `.number` | Width in pixels of the longest line of the text — to centre it, for instance |
+
+Everything drawn outside the canvas is clipped.
+
+The font covers ASCII and the characters used in French: `é è ê ë à â ä î ï ô ö ù û ü ÿ ç`, their capitals, `œ` `Œ`, `«` `»`, `€`, `°` and a few more (`á í ó ú`, `·`, the typographic apostrophe, the en dash). An accented capital is drawn one pixel lower than the other letters, to leave room for the accent. A character the font doesn't have is drawn as `?`.
+
+### The configuration record
+
+```
+[
+    controller: "st7789"
+    width: 240
+    height: 320
+    sclk: 39
+    mosi: 38
+    miso: 40
+    dc: 42
+    cs: 45
+    rst: -1
+    backlight: 1
+    invert: true
+]
+```
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `width:`, `height:` | number | — (mandatory) | Size of the display in its native orientation |
+| `sclk:`, `mosi:`, `dc:`, `cs:` | number | — (mandatory) | Pins: SPI clock, SPI data out, data/command select and chip select |
+| `miso:` | number | `-1` | SPI data in, if the display has it wired |
+| `rst:` | number | `-1` | Hardware reset pin. `-1` means none: the initialization table then starts with a software reset |
+| `backlight:` | number | `-1` | Backlight pin, driven high when the screen is on. `-1` means none |
+| `spiBus:` | number | `1` | SPI bus. Only bus `1` is supported |
+| `clock:` | number | `40000000` | SPI clock frequency in Hz |
+| `controller:` | string | — | A built-in controller profile. `"st7789"` is the only one for now |
+| `init:` | `MOGData` | — | A custom initialization table (see below). Replaces the profile's one when both are given |
+| `rotations:` | list | — | Four numbers: the memory-access-control value of rotations `0` to `3`. Replaces the profile's one when both are given |
+| `invert:` | boolean | `false` | Colour inversion, **for the built-in profile only** (IPS panels such as the one of the Waveshare ESP32-S3-Touch-LCD-2 need `true`). With a custom `init:`, put the inversion command in the table |
+| `bgr:` | boolean | `false` | Red and blue swapped, for the panels that need it. Applies with any initialization |
+| `xOffset:`, `yOffset:` | number | `0` | Added to the position of the window sent to the display, for a panel smaller than the controller's memory (such as a 240×240 or 135×240 ST7789). Applied as given in every rotation, which some panels don't want |
+| `casetCommand:`, `rasetCommand:`, `ramwrCommand:`, `madctlCommand:` | number | `42`, `43`, `44`, `54` | Command codes for the column address, row address, memory write and memory access control, for a controller that doesn't use the usual ones (`0x2A`, `0x2B`, `0x2C`, `0x36`) |
+
+A missing or invalid key raises `MW.22`, naming the key. Either `controller:`, or both `init:` and `rotations:`, must be given.
+
+### Controllers and custom initialization
+
+`controller: "st7789"` fills in both the initialization table and the four rotation values of an ST7789, so that pins and size are all the record needs. The table it runs is a software reset, sleep out, 16-bit colour (RGB565), colour inversion (`invert:`), normal display mode, then display on. The rotation values are `0`, `96`, `192` and `160`.
+
+For any other controller of the same command-based SPI family (ST7735, ILI9341, GC9A01...) — whose chip-specific part is essentially its initialization sequence — give `init:` and `rotations:` instead of `controller:`. The table is run once, by `tft.init`, after the hardware reset if `rst:` is set. Each entry is:
+
+```
+command   number-of-arguments   argument 1 ... argument N   delay
+```
+
+with the delay in units of 10 ms (`15` is 150 ms, `0` is no wait). The table of the built-in ST7789 profile, written as a `MOGData`, is:
+
+```
+D:01000F11000C3A01550021000013000129000A
+```
+
+that is: `01 00 0F` software reset and wait 150 ms, `11 00 0C` sleep out and wait 120 ms, `3A 01 55 00` 16-bit colour, `21 00 00` inversion on, `13 00 01` normal mode and wait 10 ms, `29 00 0A` display on and wait 100 ms. A malformed table raises `TFT.1`.
+
+> Only the ST7789 has been tried on real hardware. A custom `init:` for another controller is written from its datasheet and may need adjusting.
+
+### Example
+
+The whole configuration of the Waveshare ESP32-S3-Touch-LCD-2, then a few drawings:
+
+```
+[ controller: "st7789" width: 240 height: 320
+  sclk: 39 mosi: 38 miso: 40 dc: 42 cs: 45 rst: -1 backlight: 1
+  invert: true ] tft.init
+
+0 0 0 tft.color tft.clear
+
+8 8 "Écran prêt" 2 0 255 255 tft.color -1 tft.drawString
+8 40 100 50 255 0 0 tft.color tft.drawRectangle
+130 60 100 50 8 0 255 0 tft.color tft.drawFilledRoundRectangle
+60 160 30 255 255 0 tft.color tft.drawFilledCircle
+
+tft.refresh
+```
+
+### Errors
+
+| Code | Message | Raised when |
+|---|---|---|
+| `TFT.1` | tft init error | `tft.init` fails: malformed initialization table, SPI or GPIO failure, SPI bus other than `1`, not enough memory for the canvas |
+| `TFT.2` | tft already closed error | a `tft.*` primitive that needs the screen is called while it isn't open |
+| `TFT.3` | tft already opened error | `tft.init` is called while a screen is already open |
+| `TFT.4` | tft operation error | a drawing or refresh call fails (the display or the SPI bus fails, a bitmap buffer is too small...) |
+
+Wrong arguments raise the usual `MW.20` (too few arguments), `MW.21` (wrong type) and `MW.22` (wrong value).
+
+**Tested on** the Waveshare ESP32-S3-Touch-LCD-2 (ST7789, 240×320), in the four rotations. Other ST7789 panels should work given the right size and rotation values. Other controllers, and panels that need `xOffset:`/`yOffset:`, have not been tried.
+
+---
+
+## 20. Touch panel
+
+⚙️ **NANO-only. ESP32 only** — lives entirely in its own `MogwaiNanoTouch` assembly, referenced only by `MogwaiNanoEsp32` (kept out of `MogwaiNanoCore`). Raspberry Pi Pico 2 W has no equivalent yet. Declares the `'TOUCH'` skill — check with `hasSkill` before using.
+
+Reads a capacitive touch panel wired over I2C, either on demand (`touch.read`) or through events fired by a polling thread (`touch.start`). The panel is independent of the TFT display — it can be used without one — but when a TFT display is open, **the coordinates follow its rotation**, so that touching a point of the screen gives that point's coordinates whatever the rotation.
+
+**The I2C pins are set by the runtime**, from the pins given to `touch.init` — `esp32.setPinFunction` isn't needed (I2C bus 1 only).
+
+**One panel per device**, shared by the main program and every task, with the same rules as the TFT screen: `touch.init` on a panel already open raises `TOUCH.3`, and the panel is released at the end of a program unless keepAlive mode is on.
+
+### Primitives
+
+| Primitive | Signature | Description |
+|---|---|---|
+| `touch.init` | `record touch.init` | Opens the panel described by the record (see below). Raises `TOUCH.3` if a panel is already open, `TOUCH.1` if the controller can't be reached |
+| `touch.close` | `touch.close` | Stops the polling thread, if any, and releases the panel. Does nothing if no panel is open |
+| `touch.start` | `touch.start` | Starts the polling thread. The `TOUCH_DID_*` events are fired on the engine that called it. A no-op if it is already running |
+| `touch.stop` | `touch.stop` | Stops the polling thread |
+| `touch.count` | `touch.count` → `.number` | The number of fingers currently on the panel |
+| `touch.read` | `touch.read` → `.number .number` | `x y` of the followed finger (see below) — or of the first finger when the polling thread isn't running — in the frame of the screen. `-1 -1` when nobody touches the panel |
+| `touch.readPoint` | `n touch.readPoint` → `.number .number` | `x y` of the finger of rank `n` in the controller's list (`0` is the first), in the frame of the screen. `-1 -1` if there is no such finger |
+
+While the polling thread isn't running, `touch.count`, `touch.read` and `touch.readPoint` read the controller each time they are called, so a script can poll the panel itself. While it is running, they use the latest reading of the thread.
+
+### Events
+
+Fired on the engine that called `touch.start`, with the usual `eventData` local variable holding a record.
+
+| Event | `eventData` | Fired when |
+|---|---|---|
+| `TOUCH_DID_PRESS` | `[x: y: count:]` | The followed finger touches the panel |
+| `TOUCH_DID_MOVE` | `[x: y: count:]` | The followed finger has moved |
+| `TOUCH_DID_RELEASE` | `[x: y: count:]` | The followed finger is lifted. `x` and `y` are its last position |
+
+`count` is the number of fingers **still down once the event has happened**.
+
+**The events follow one finger.** The followed finger is the one that touched the panel first, identified by the controller's own finger number: it keeps being followed while other fingers come and go, instead of the events jumping from one finger to another. A second finger putting down fires nothing by itself — `count` goes up in the next events — and `touch.readPoint` gives access to it.
+
+**Hand-over.** When the followed finger is lifted while other fingers remain, `TOUCH_DID_RELEASE` is fired at its last position **with a `count` above `0`**, and the finger that remains becomes the followed one, with a new `TOUCH_DID_PRESS` on the next reading (20 ms later by default). A script that draws strokes can therefore tell the real end of a stroke (`count` is `0`) from a hand-over to another finger (`count` is not `0`).
+
+### The configuration record
+
+```
+[
+    controller: "gt911"
+    i2cBus: 1
+    sda: 8
+    scl: 9
+    width: 800
+    height: 480
+]
+```
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `sda:`, `scl:` | number | — (mandatory) | I2C data and clock pins |
+| `width:`, `height:` | number | — (mandatory) | Size of the panel in its native orientation (used to flip and to follow the screen's rotation) |
+| `controller:` | string | — | `"cst816"`, `"gt911"` or `"ft6x36"`. Without it, the record describes a custom controller (see below) |
+| `i2cBus:` | number | `1` | I2C bus. Only bus `1` is supported |
+| `address:` | number | the controller's own | I2C address of the controller. `"gt911"` without `address:` is searched at `93` (`0x5D`) then `20` (`0x14`) and recognized by its product identifier |
+| `pollMs:` | number | `20` | Polling period of the thread, in milliseconds (`5` at least) |
+| `swapXY:`, `flipX:`, `flipY:` | boolean | `false` | For a panel mounted rotated or mirrored relative to the display, applied in that order to the panel's native coordinates |
+| `debug:` | boolean | `false` | Writes each event to the debugger output (`Debug.WriteLine`, like `debug.vs.write`) |
+
+A missing or invalid key raises `MW.22`, naming the key.
+
+### Controllers
+
+| `controller:` | Chip | Fingers | Default address | State |
+|---|---|---|---|---|
+| `"cst816"` | CST816S / CST816D | 1 | `0x15` (`21`) | Tested on the Waveshare ESP32-S3-Touch-LCD-2 |
+| `"gt911"` | Goodix GT911 | 5 | `0x5D` or `0x14`, searched | Tested on the Waveshare ESP32-S3-Touch-LCD-7 (found at `0x14`), over its full 800×480 area |
+| `"ft6x36"` | FT6206 / FT6336 | 5 | `0x38` (`56`) | **Not tried on real hardware** |
+| *(none)* | custom register layout | up to 5 | `address:` (mandatory) | **Not tried on real hardware** |
+
+A controller that exposes its fingers in one register block (as the CST816 and the FT6x36 do) can be described by the record itself, without `controller:` — `address:` is then mandatory, along with the keys marked as such below:
+
+| Key | Default | Description |
+|---|---|---|
+| `readReg:` | — (mandatory) | Register the block is read from (8 bits) |
+| `readLen:` | — (mandatory) | Number of bytes read |
+| `countIndex:` | — (mandatory) | Index, in the block, of the byte holding the number of fingers |
+| `countMask:` | `15` | Mask applied to that byte |
+| `pointBase:` | `0` | Index of the first finger's data |
+| `pointStride:` | `0` | Distance between two fingers' data |
+| `maxPoints:` | `1` | Number of fingers to read |
+| `xHi:`, `xLo:`, `yHi:`, `yLo:` | — (mandatory) | Offsets, inside one finger's data, of the high and low bytes of `x` and `y` |
+| `hiMask:` | `15` | Mask applied to the high bytes |
+| `idByte:`, `idShift:`, `idMask:` | `-1`, `0`, `15` | Where the finger's own number is, if the chip gives one (used to follow a finger while others come and go). Without `idByte:`, a finger's rank in the list is used instead |
+
+### Example
+
+The touch panel of a Waveshare ESP32-S3-Touch-LCD-7 (GT911), logging the events:
+
+```
+[ controller: "gt911" i2cBus: 1 sda: 8 scl: 9 width: 800 height: 480 ] touch.init
+
+onEvent 'TOUCH_DID_PRESS' do { "PRESS" ? eventData ? }
+onEvent 'TOUCH_DID_RELEASE' do { "RELEASE" ? eventData ? }
+
+touch.start
+```
+
+On the Waveshare ESP32-S3-Touch-LCD-2, together with its display, drawing under the finger:
+
+```
+[ controller: "cst816" i2cBus: 1 sda: 48 scl: 47 width: 240 height: 320 ] touch.init
+
+onEvent 'TOUCH_DID_MOVE' do
+{
+    eventData->x: eventData->y: 3 255 255 255 tft.color tft.drawFilledCircle
+    tft.refresh
+}
+
+touch.start
+```
+
+### Errors
+
+| Code | Message | Raised when |
+|---|---|---|
+| `TOUCH.1` | touch init error | `touch.init` fails: unknown controller, controller not answering or not found, I2C bus other than `1`, invalid register layout |
+| `TOUCH.2` | touch already closed error | a `touch.*` primitive that needs the panel is called while it isn't open |
+| `TOUCH.3` | touch already opened error | `touch.init` is called while a panel is already open |
+| `TOUCH.4` | touch operation error | reading the controller fails in `touch.count`, `touch.read` or `touch.readPoint` |
+
+Wrong arguments raise the usual `MW.20`, `MW.21` and `MW.22`.
+
+**Tested on** the Waveshare ESP32-S3-Touch-LCD-2 (CST816D, with the four rotations of its TFT display) and the Waveshare ESP32-S3-Touch-LCD-7 (GT911, two fingers, with the hand-over described above). `"ft6x36"` and the custom register layout have not been tried on real hardware.
+
+---
+
 ## Error codes
 
 MOGWAI uses structured `MW.xx` error codes.
@@ -702,4 +971,4 @@ MOGWAI uses structured `MW.xx` error codes.
 | `MW.590` | Platform not supported |
 | `MW.!!!` | Fatal |
 
-BLE Peripheral is an exception: it defines its own `BLE.1` ("unable to create peripheral error"), in its own namespace rather than an `MW.5xx` sub-range — a deliberate choice, since it lives in its own assembly specifically to stay out of `MogwaiNanoCore` (whose own `Error.cs` is where every `MW.5xx` range above is actually defined, and is already close to its own metadata-table limit). The onboard LED is the other: its `LED.1` ("led operation error") is defined in its own assembly for the same reason.
+BLE Peripheral is an exception: it defines its own `BLE.1` ("unable to create peripheral error"), in its own namespace rather than an `MW.5xx` sub-range — a deliberate choice, since it lives in its own assembly specifically to stay out of `MogwaiNanoCore` (whose own `Error.cs` is where every `MW.5xx` range above is actually defined, and is already close to its own metadata-table limit). The onboard LED, the TFT display and the touch panel are the others, for the same reason — each lives in its own assembly: `LED.1` ("led operation error"), `TFT.1` to `TFT.4` (see [TFT display](#19-tft-display)) and `TOUCH.1` to `TOUCH.4` (see [Touch panel](#20-touch-panel)).

@@ -39,7 +39,7 @@ The device only ever executes this minimal form — no complex parser, no syntac
 ## Why two runtimes?
 
 - **MOGWAI NANO Studio** (PC) — full syntactic sugar, an integrated editor, network device discovery, and orchestration logic written in regular MOGWAI.
-- **MOGWAI NANO** (device) — a minimal, rigorously disciplined RPN interpreter with GPIO, I2C (including a dedicated SSD1306 OLED display driver), SPI, PWM, ADC, BLE peripheral (ESP32 only), timers, event support, and real parallel execution via tasks.
+- **MOGWAI NANO** (device) — a minimal, rigorously disciplined RPN interpreter with GPIO, I2C (including a dedicated SSD1306 OLED display driver), SPI, PWM, ADC, BLE peripheral (ESP32 only), TFT colour displays and touch panels (ESP32 only), timers, event support, and real parallel execution via tasks.
 
 This separation means the device firmware stays small and stable, while the desktop side can evolve freely — including reusing the existing [MOGWAI VS Code extension](https://github.com/Sydney680928/mogwai) with zero modification, since from the editor's point of view, you're just writing MOGWAI.
 
@@ -55,7 +55,7 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 ## Key features
 
 - **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags, structured error handling (`trap`/`guard`)
-- **Hardware support** — GPIO, I2C, SPI, PWM, ADC, BLE peripheral (ESP32 only), and a dedicated SSD1306 OLED display driver
+- **Hardware support** — GPIO, I2C, SPI, PWM, ADC, BLE peripheral (ESP32 only), a dedicated SSD1306 OLED display driver, and — ESP32 only — SPI colour TFT displays (ST7789 built in, other controllers through a custom initialization table) with I2C capacitive touch panels (GT911, CST816, FT6x36), all configured from a single record
 - **Tasks** — real parallel execution, each on its own native thread with a fully isolated runtime instance, communicating with the parent only through events. Practical only on a PSRAM-equipped board (~10KB per task) — see [Memory considerations](#memory-considerations)
 - **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~40KB-RAM devices
 - **Reusable code libraries** — *units*, stored on flash and loaded on demand, for sharing functions (an RTC helper library, for example) across scripts without copy-pasting
@@ -91,6 +91,17 @@ None of this is a bug to "just fix" — it's a direct, measured consequence of r
 | Raspberry Pi Pico 2 W (`PICO2_RP2350_W`, RP2350) | ⚠️ Boots and runs the shared runtime, deploys successfully — but WiFi doesn't currently connect (see note in [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below), so it can't yet talk to a Studio. Not usable end-to-end yet. The original Pico W (RP2040) hasn't been tried |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
+
+### Tested display boards
+
+The TFT and touch primitives ([TFT display](docs/device-primitives.md#19-tft-display), [Touch panel](docs/device-primitives.md#20-touch-panel)) are configured by a record, so they aren't tied to one board — these are the ones they have been validated on, both on an ESP32-S3 with PSRAM (`ESP32_S3_OCTAL`):
+
+| Board | Display | Touch | Status |
+|---|---|---|---|
+| Waveshare ESP32-S3-Touch-LCD-2 | ST7789, 240×320 (SPI) | CST816D (I2C) | ✅ Tested — display and touch, in the four rotations |
+| Waveshare ESP32-S3-Touch-LCD-7 | 800×480 RGB display (parallel RGB interface) | GT911 (I2C) | ⚠️ Touch panel tested (full area, multi-touch). The display isn't supported: the RGB interface isn't available |
+
+Other ST7789 displays should work with the right size and rotation values; other SPI controllers can be described with a custom initialization table, and the FT6x36 and custom touch layouts are written but untried. We'd like to hear how it goes on other boards.
 
 ## MOGWAI NANO Studio
 
@@ -245,6 +256,7 @@ src/MogwaiNano/
 
 - [x] I2C support
 - [x] SSD1306 OLED display support (128x64, I2C Fast Mode)
+- [x] TFT colour display and touch panel support (ESP32 only) — `tft.*` and `touch.*`, each in its own assembly, configured by a record. ST7789 built in and other SPI controllers through a custom initialization table; GT911 and CST816 touch controllers validated on real boards (Waveshare ESP32-S3-Touch-LCD-2 and -7), FT6x36 written but untried
 - [x] PWM and ADC helper primitives — building on the same pattern already validated with I2C
 - [x] SPI — `spi.open`/`close`/`write`/`transfer`, same by-name pattern as I2C/PWM/ADC. Validated against real hardware: a full MFRC522 RFID reader driver (register read/write, CRC coprocessor, card detection, UID/SAK retrieval) was written entirely in MOGWAI NANO script on top of it, with no additional C# needed
 - [ ] `.binary`/`B:` support on NANO — for register-level bit manipulation
