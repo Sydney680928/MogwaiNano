@@ -19,7 +19,6 @@ using System;
 using System.Collections;
 using System.Device.Adc;
 using System.Device.I2c;
-using System.Device.Pwm;
 using System.Device.Spi;
 using System.Diagnostics;
 using System.IO;
@@ -116,9 +115,7 @@ namespace MogwaiNano.Engine
         public Hashtable Stopwatches { get; } = new(2);
 
         public Hashtable I2cDevices { get; } = new(2);
-
-        public Hashtable PwmChannels { get; } = new(2);
-
+        
         public Hashtable AdcChannels { get; } = new(2);
 
         public AdcController AdcController { get; } = new();
@@ -341,6 +338,8 @@ namespace MogwaiNano.Engine
                 throw new InvalidOperationException($"A primitive with the name '{name}' is already registered.");
 
             Primitives[name] = primitive;
+
+            Debug.WriteLine($"Registering primitive: {name}");
         }
 
         private static void RegisterPrimitives()
@@ -487,11 +486,6 @@ namespace MogwaiNano.Engine
             Primitives.Add("i2c.read", new PrimitiveDelegate(PrimitiveI2cRead));
             Primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
             Primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
-
-            Primitives.Add("pwm.open", new PrimitiveDelegate(PrimitivePwmOpen));
-            Primitives.Add("pwm.close", new PrimitiveDelegate(PrimitivePwmClose));
-            Primitives.Add("pwm.start", new PrimitiveDelegate(PrimitivePwmStart));
-            Primitives.Add("pwm.stop", new PrimitiveDelegate(PrimitivePwmStop));
 
             Primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));
             Primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
@@ -876,7 +870,6 @@ namespace MogwaiNano.Engine
 
                 CleanupI2cDevices();
                 CleanupSpiDevices();
-                CleanupPwmChannels();
                 CleanupAdcChannels();
 
                 _stacks.Clear();
@@ -5237,135 +5230,6 @@ namespace MogwaiNano.Engine
 
         #endregion
 
-        #region PWM
-
-        private static EvalResult PrimitivePwmOpen(MogwaiNanoEngine engine, string name)
-        {
-            // 'name' pin frequency dutyCycle pwm.open
-
-            var s = engine.StackSign(4);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber) && s[2] == typeof(MOGNumber) && s[3] == typeof(MOGName))
-            {
-                var dutyCycle = engine.StackPop() as MOGNumber;
-                var frequency = engine.StackPop() as MOGNumber;
-                var pin = engine.StackPop() as MOGNumber;
-                var pwmName = engine.StackPop() as MOGName;
-
-                if (dutyCycle.Value < 0 || dutyCycle.Value > 100)
-                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "PWM duty cycle must be between 0 and 100");
-
-                if (frequency.Value <= 0)
-                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "PWM frequency must be greater than 0");
-
-                if (engine.PwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(engine, Error.PwmAlreadyOpenedError, name);
-
-                int nPin = (int)pin.Value;
-
-                try
-                {
-                    var pwmChannel = PwmChannel.CreateFromPin(nPin, (int)frequency.Value, dutyCycle.Value / 100.0);
-
-                    if (pwmChannel == null)
-                        return EvalResult.Failure(engine, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}");
-
-                    engine.PwmChannels.Add(pwmName.Value, pwmChannel);
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.PwmOpenError, name, $"failed to open PWM on pin {nPin}", ex.Message);
-                }
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitivePwmClose(MogwaiNanoEngine engine, string name)
-        {
-            // 'name' pwm.close
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGName))
-            {
-                var pwmName = engine.StackPop() as MOGName;
-
-                if (!engine.PwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(engine, Error.PwmUnknownNameError, name);
-
-                var pwmChannel = engine.PwmChannels[pwmName.Value] as PwmChannel;
-                pwmChannel.Stop();
-                pwmChannel.Dispose();
-
-                engine.PwmChannels.Remove(pwmName.Value);
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitivePwmStart(MogwaiNanoEngine engine, string name)
-        {
-            // name pwm.start
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGName))
-            {
-                var pwmName = engine.StackPop() as MOGName;
-
-                if (!engine.PwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(engine, Error.PwmUnknownNameError, name);
-
-                var pwmChannel = engine.PwmChannels[pwmName.Value] as PwmChannel;
-                pwmChannel.Start();
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitivePwmStop(MogwaiNanoEngine engine, string name)
-        {
-            // name pwm.stop
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGName))
-            {
-                var pwmName = engine.StackPop() as MOGName;
-
-                if (!engine.PwmChannels.Contains(pwmName.Value))
-                    return EvalResult.Failure(engine, Error.PwmUnknownNameError, name);
-
-                var pwmChannel = engine.PwmChannels[pwmName.Value] as PwmChannel;
-                pwmChannel.Stop();
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        #endregion
-
         #region ADC
 
         private static EvalResult PrimitiveAdcOpen(MogwaiNanoEngine engine, string name)
@@ -5702,7 +5566,6 @@ namespace MogwaiNano.Engine
 
             return EvalResult.NoError;
         }
-
 
         private static EvalResult PrimitiveSpiMaxClockFrequency(MogwaiNanoEngine engine, string name)
         {
@@ -6166,19 +6029,6 @@ namespace MogwaiNano.Engine
             }
 
             AdcChannels.Clear();
-        }
-
-        public void CleanupPwmChannels()
-        {
-            foreach (var key in PwmChannels.Keys)
-            {
-                var pwmChannel = PwmChannels[key] as PwmChannel;
-
-                pwmChannel.Stop();
-                pwmChannel.Dispose();
-            }
-
-            PwmChannels.Clear();
         }
 
         #endregion

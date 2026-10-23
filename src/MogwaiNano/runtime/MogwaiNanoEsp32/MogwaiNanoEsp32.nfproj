@@ -36,6 +36,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\MogaiNanoPwm\MogaiNanoPwm.nfproj" />
     <ProjectReference Include="..\MogwaiNanoBlePeripheral\MogwaiNanoBlePeripheral.nfproj" />
     <ProjectReference Include="..\MogwaiNanoCore\MogwaiNanoCore.nfproj" />
     <ProjectReference Include="..\MogwaiNanoEsp32LED\MogwaiNanoEsp32LED.nfproj" />

@@ -93,9 +93,6 @@
     <Reference Include="System.Device.I2c">
       <HintPath>..\..\packages\nanoFramework.System.Device.I2c.1.1.29\lib\System.Device.I2c.dll</HintPath>
     </Reference>
-    <Reference Include="System.Device.Pwm">
-      <HintPath>..\..\packages\nanoFramework.System.Device.Pwm.1.1.23\lib\System.Device.Pwm.dll</HintPath>
-    </Reference>
     <Reference Include="System.Device.Spi">
       <HintPath>..\..\packages\nanoFramework.System.Device.Spi.1.3.90\lib\System.Device.Spi.dll</HintPath>
     </Reference>

@@ -39,6 +39,8 @@ Project("{11A8DD76-328B-46DF-9F39-F559912D0360}") = "MogwaiNanoTft", "runtime\Mo
 EndProject
 Project("{11A8DD76-328B-46DF-9F39-F559912D0360}") = "MogwaiNanoTouch", "runtime\MogwaiNanoTouch\MogwaiNanoTouch.nfproj", "{AD818CD4-2320-455A-9164-E81DF6B58F96}"
 EndProject
+Project("{11A8DD76-328B-46DF-9F39-F559912D0360}") = "MogaiNanoPwm", "runtime\MogaiNanoPwm\MogaiNanoPwm.nfproj", "{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -121,6 +123,12 @@ Global
 		{AD818CD4-2320-455A-9164-E81DF6B58F96}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AD818CD4-2320-455A-9164-E81DF6B58F96}.Release|Any CPU.Build.0 = Release|Any CPU
 		{AD818CD4-2320-455A-9164-E81DF6B58F96}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -141,6 +149,7 @@ Global
 		{235EA71C-C342-4CF6-918C-3F70A52115A7} = {4F5A6B7C-2D3E-4F5A-8B9C-3D4E5F6A7B8C}
 		{82C1E9B7-4139-46B7-9534-ABF492446C11} = {4F5A6B7C-2D3E-4F5A-8B9C-3D4E5F6A7B8C}
 		{AD818CD4-2320-455A-9164-E81DF6B58F96} = {4F5A6B7C-2D3E-4F5A-8B9C-3D4E5F6A7B8C}
+		{DCF4A8A4-ADD4-4640-BBAD-57465C57F8FE} = {4F5A6B7C-2D3E-4F5A-8B9C-3D4E5F6A7B8C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {553C2E3A-5C5C-46B8-AE3C-3DDF69FB9E1E}

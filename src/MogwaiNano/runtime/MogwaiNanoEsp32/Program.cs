@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using MogaiNanoPwm;
 using MogwaiNano;
 using MogwaiNano.Engine;
 using MogwaiNano.Objects;
@@ -47,6 +48,19 @@ namespace MogwaiNanoEsp32
 
             MogwaiNanoEngine.Skills.Add("GPIO");
 
+            MogwaiNanoEngine.RegisterPrimitive("pwm.open", new (PwmManager.PrimitivePwmOpen));
+            MogwaiNanoEngine.RegisterPrimitive("pwm.close", new (PwmManager.PrimitivePwmClose));
+            MogwaiNanoEngine.RegisterPrimitive("pwm.start", new (PwmManager.PrimitivePwmStart));
+            MogwaiNanoEngine.RegisterPrimitive("pwm.stop", new (PwmManager.PrimitivePwmStop));
+
+            MogwaiNanoEngine.RegisterExternalError(PwmManager.PwmAlreadyOpenedError);
+            MogwaiNanoEngine.RegisterExternalError(PwmManager.PwmOpenError);
+            MogwaiNanoEngine.RegisterExternalError(PwmManager.PwmUnknownNameError);
+            MogwaiNanoEngine.RegisterExternalError(PwmManager.PwmStartError);
+            MogwaiNanoEngine.RegisterExternalError(PwmManager.PwmStopError);
+
+            // MogwaiNanoEngine.Skills.Add("PWM");
+
             MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.create", new(BlePeripheral.PrimitiveBlePeripheralCreate));
             MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.start", new(BlePeripheral.PrimitiveBlePeripheralStart));
             MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.stop", new(BlePeripheral.PrimitiveBlePeripheralStop));
@@ -72,9 +86,9 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterPrimitive("ssd1306.drawBitmap", new(SSD1306Manager.PrimitiveSsd1306DrawBitmap));
 
             MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306InitError);
-            MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306OperationError);
             MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306IsClosedError);
             MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306IsOpenedError);
+            MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306OperationError);
 
             MogwaiNanoEngine.Skills.Add("SSD1306");
 
@@ -184,6 +198,7 @@ namespace MogwaiNanoEsp32
                 {
                     SSD1306Manager.Cleanup(engine);
                     LedManager.Cleanup(engine);
+                    PwmManager.Cleanup(engine);
                 }
 
             };
