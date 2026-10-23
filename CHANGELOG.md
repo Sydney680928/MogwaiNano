@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+### Removed
+
+## [0.9.0] - 2026-10-23
+
+### Added
+
 - **TFT display support (ESP32 only)** — `tft.*` primitives to drive a colour display wired over SPI. Every drawing primitive writes into a RGB565 canvas held in RAM, and `tft.refresh` sends to the display only the rectangle modified since the previous refresh: on a 240×320 ST7789 at 40 MHz, a full-screen refresh takes about 80 ms, while refreshing a small area is almost instant. Nothing is visible until `tft.refresh` is called (or `true tft.autoRefresh` is set, which refreshes after every drawing call). Lives in its own `MogwaiNanoTft` assembly, referenced only by `MogwaiNanoEsp32` — not part of `MogwaiNanoCore`, which has reached the limit of the CLR's 16-bit internal identifiers. The assembly depends on no ESP32-specific package: the SPI pin functions are set by `MogwaiNanoEsp32` from the pins given to `tft.init`, so `esp32.setPinFunction` isn't needed (SPI bus 1 only). Declares the `'TFT'` skill. See the [Device Primitives Reference](docs/device-primitives.md#19-tft-display)
   - **One record describes the display** — `tft.init` takes a record: the pins (`sclk:`, `mosi:`, `dc:`, `cs:`, and optionally `miso:`, `rst:` for a hardware reset, and `backlight:`), the size (`width:`, `height:`), the SPI `clock:` in Hz (`40000000` by default), and either a `controller:` or a custom `init:`. `"st7789"` is built in: with it, pins and size are all that is needed — `[ controller: "st7789" width: 240 height: 320 sclk: 39 mosi: 38 miso: 40 dc: 42 cs: 45 backlight: 1 invert: true ] tft.init` is the whole configuration of the Waveshare ESP32-S3-Touch-LCD-2. Further optional keys: `invert:` (colour inversion of the built-in ST7789 profile, needed by IPS panels), `bgr:` (red and blue swapped), `xOffset:` and `yOffset:` (panels smaller than the controller's memory) and the window and memory-access command codes
   - **Other controllers, without recompiling** — instead of `controller:`, give `init:` (a `MOGData` table run once when the display is initialized) and `rotations:` (a list of four numbers: the memory-access-control value of rotations 0 to 3). Each entry of the table is `command`, `number of arguments`, the arguments, then a delay in units of 10 ms — for example `01 00 0F` is a software reset followed by a 150 ms wait. This is meant for the controllers of the same command-based SPI family as the ST7789 (ST7735, ILI9341, GC9A01...), whose chip-specific part is entirely their initialization sequence. Not tried on real hardware other than the ST7789
@@ -36,12 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Workaround for a driver bug** — after a garbage-collection compaction (for instance a forced `GC.Run(true)`), the `Ws28xx` driver for ESP32 (`nanoFramework.Iot.Device.Ws28xx.Esp32`, version 3.0.1) sends wrong data to the LED, which then shows random colours instead of the requested one — probably because the driver keeps a native pointer to its managed image buffer, which the compaction has moved. The runtime therefore re-creates the driver on every colour change instead of keeping a single instance, which makes the LED reliable whenever a collection happens
 - **BLE Peripheral: client connection events** — three new events let a script follow what happens to the client connected to its BLE peripheral: `BLE_PERIPHERAL_CLIENT_DID_CONNECT` and `BLE_PERIPHERAL_CLIENT_DID_DISCONNECT` fire when a client connects to or disconnects from the peripheral (the session becoming active or closed), and `BLE_PERIPHERAL_SESSION_ERROR` fires when the BLE session reports an error other than `Success`. The first two carry no data (`eventData` is `null`); `BLE_PERIPHERAL_SESSION_ERROR` delivers the error as a string holding the name of the matching value of the C# `BluetoothError` enumeration (`"RadioNotAvailable"`, `"ResourceInUse"`, `"DeviceNotConnected"`, `"OtherError"`, `"DisabledByPolicy"`, `"NotSupported"`, `"DisabledByUser"`, `"ConsentRequired"` or `"TransportNotSupported"`). Until now a script could only learn about write activity (`BLE_PERIPHERAL_VALUE_DID_CHANGE`) and about its own `ble.peripheral.start`/`stop`. Like the other BLE Peripheral events, they are fired on the engine that created the peripheral. ESP32 only. See the [Device Primitives Reference](docs/device-primitives.md)
 - **Five new conversion primitives** — `->utf8` converts a `MOGData` buffer to a string, decoding its bytes as UTF-8; `utf8->` does the opposite, converting a string to a `MOGData` buffer encoded as UTF-8. `->upper` and `->lower` convert a string to upper or lower case. These four exist identically in the desktop MOGWAI engine. `->hex` converts a number to an upper-case hexadecimal string of a given size, padded with leading zeros (`255 4 ->hex` → `"00FF"`, like the `X4` format specifier). The desktop engine's `->hex` takes no size (`255 ->hex` → `"FF"`), so the NANO version is the more flexible of the two. See the [Device Primitives Reference](docs/device-primitives.md)
-
-### Updated
-
-### Fixed
-
-### Removed
 
 ## [0.8.0] - 2026-10-14
 
@@ -328,7 +332,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.6.0
