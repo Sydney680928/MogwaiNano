@@ -4,7 +4,7 @@ using System;
 using System.Collections;
 using System.Device.Pwm;
 
-namespace MogaiNanoPwm
+namespace MowgaiNanoPwm
 {
     public class PwmManager
     {

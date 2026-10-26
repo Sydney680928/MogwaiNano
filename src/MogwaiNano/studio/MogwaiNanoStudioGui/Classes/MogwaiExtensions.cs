@@ -292,27 +292,32 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else if (obj is MOGName name)
             {
-                var size = name.Value.ToString().Length.ToString("X2");
-                return $"n{size}{name.Value}";
+                var size = name.Value.Length.ToString("X2");
+                return $"A{size}{name.Value}";
             }
             else if (obj is MOGKey key)
             {
-                var size = key.Value.ToString().Length.ToString("X2");
+                var size = key.Value.Length.ToString("X2");
                 return $"K{size}{key.Value}";
             }
             else if (obj is MOGPrimitive primitive)
             {
-                var size = primitive.Name.ToString().Length.ToString("X2");
+                var size = primitive.Name.Length.ToString("X2");
                 return $"P{size}{primitive.Name}";
             }
             else if (obj is MOGWord word)
             {
-                var size = word.Value.ToString().Length.ToString("X2");
+                var size = word.Value.Length.ToString("X2");
                 return $"W{size}{word.Value}";
+            }
+            else if (obj is MOGHostFunction hostFunction)
+            {
+                var size = hostFunction.Value.Length.ToString("X2");
+                return $"W{size}{hostFunction.Value}";
             }
             else if (obj is MOGRef reference)
             {
-                var size = reference.Value.ToString().Length.ToString("X2");
+                var size = reference.Value.Length.ToString("X2");
                 return $"&{size}{reference.Value}";
             }
             else if (obj is MOGBoolean boolean)
@@ -321,7 +326,7 @@ namespace MogwaiNanoStudioGui.Classes
             }
             else if (obj is MOGType type)
             {
-                var size = type.Value.ToString().Length.ToString("X2");
+                var size = type.Value.Length.ToString("X2");
                 return $"T{size}{type.Value}";
             }
             else if (obj is MOGNull @null)
@@ -333,7 +338,7 @@ namespace MogwaiNanoStudioGui.Classes
                 var sb = new StringBuilder();
 
                 for (int i = 0; i < data.Items.Count; i++)
-                    sb.Append((char)data.Items[i]);
+                    sb.Append((data.Items[i].ToString("X2")));
 
                 var size = sb.Length.ToString("X4");
                 return $"D{size}{sb}";
@@ -393,146 +398,278 @@ namespace MogwaiNanoStudioGui.Classes
             return obj.ToString();
         }
 
-        public static List<string> SmartParse(MogwaiEngine engine, string code)
+        public static string ToSmartDebugAllString(this MOGObject obj)
         {
-            int _index = 0;
-            var _items = new List<string>();
-            int _size = 0;
-            string _content = string.Empty;
+            string debugString;
 
-            while (_index < code.Length)
+            if (obj.StartPos == -1)
             {
-                switch (code[_index])
-                {
-                    case 'N':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
-                        _content = code.Substring(_index + 3, _size);
-                        _index += 3 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'S':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'n':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
-                        _content = code.Substring(_index + 3, _size);
-                        _index += 3 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'K':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
-                        _content = code.Substring(_index + 3, _size);
-                        _index += 3 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'P':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
-                        _content = code.Substring(_index + 3, _size);
-                        _index += 3 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'W':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
-                        _content = code.Substring(_index + 3, _size);
-                        _index += 3 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'B':
-                        _content = code.Substring(_index + 1, 1);
-                        _index += 2;
-                        _items.Add(_content);
-                        break;
-
-                    case 'T':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
-                        _content = code.Substring(_index + 3, _size);
-                        _index += 3 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'X':
-                        _index += 1;
-                        _items.Add("null");
-                        break;
-
-                    case 'D':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'F':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'C':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'c':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'L':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'l':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'R':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case 'r':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 4), 16);
-                        _content = code.Substring(_index + 5, _size);
-                        _index += 5 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    case '&':
-                        _size = Convert.ToInt32(code.Substring(_index + 1, 2), 16);
-                        _content = code.Substring(_index + 3, _size);
-                        _index += 3 + _size;
-                        _items.Add(_content);
-                        break;
-
-                    default:
-                        throw new Exception($"Unexpected character '{code[_index]}' at index {_index}.");
-                }
+                debugString = "FFFF0000";
+            }
+            else
+            {
+                debugString = obj.StartPos.ToString("X4") + obj.EndPos.ToString("X4");
             }
 
-            return _items;
+            if (obj is MOGNumber number)
+            {
+                var s = number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var size = s.Length.ToString("X2");
+                return $"N{size}{debugString}{s}";
+            }
+            else if (obj is MOGString @string)
+            {
+                var size = @string.Value.ToString().Length.ToString("X4");
+                return $"S{size}{debugString}{@string.Value}";
+            }
+            else if (obj is MOGName name)
+            {
+                var size = name.Value.Length.ToString("X2");
+                return $"A{size}{debugString}{name.Value}";
+            }
+            else if (obj is MOGKey key)
+            {
+                var size = key.Value.Length.ToString("X2");
+                return $"K{size}{debugString}{key.Value}";
+            }
+            else if (obj is MOGPrimitive primitive)
+            {
+                var size = primitive.Name.Length.ToString("X2");
+                return $"P{size}{debugString}{primitive.Name}";
+            }
+            else if (obj is MOGWord word)
+            {
+                var size = word.Value.Length.ToString("X2");
+                return $"W{size}{debugString}{word.Value}";
+            }
+            else if (obj is MOGHostFunction hostFunction)
+            {
+                var size = hostFunction.Value.Length.ToString("X2");
+                return $"W{size}{debugString}{hostFunction.Value}";
+            }
+            else if (obj is MOGRef reference)
+            {
+                var size = reference.Value.Length.ToString("X2");
+                return $"&{size}{debugString}{reference.Value}";
+            }
+            else if (obj is MOGBoolean boolean)
+            {
+                return $"B{debugString}{(boolean.Value ? "1" : "0")}";
+            }
+            else if (obj is MOGType type)
+            {
+                var size = type.Value.Length.ToString("X2");
+                return $"T{size}{debugString}{type.Value}";
+            }
+            else if (obj is MOGNull @null)
+            {
+                return $"X{debugString}";
+            }
+            else if (obj is MOGData data)
+            {
+                var sb = new StringBuilder();
+
+                for (int i = 0; i < data.Items.Count; i++)
+                    sb.Append((data.Items[i].ToString("X2")));
+
+                var size = sb.Length.ToString("X4");
+                return $"D{size}{debugString}{sb}";
+            }
+            else if (obj is MOGFunction function)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in function.Items)
+                    sb.Append(item.ToSmartDebugAllString());
+
+                var size = sb.Length.ToString("X4");
+
+                return $"F{size}{debugString}{sb}";
+            }
+            else if (obj is MOGCode code)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in code.Items)
+                    sb.Append(item.ToSmartDebugAllString());
+
+                var size = sb.Length.ToString("X4");
+                var header = code.AutoEval ? "C" : "c";
+
+                return $"{header}{size}{debugString}{sb}";
+            }
+            else if (obj is MOGList list)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in list.Items)
+                    sb.Append(item.ToSmartDebugAllString());
+
+                var size = sb.Length.ToString("X4");
+                var header = list.AutoEval ? "L" : "l";
+
+                return $"{header}{size}{debugString}{sb}";
+            }
+            else if (obj is MOGRecord record)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var k in record.Items.Keys)
+                {
+                    var mKey = new MOGKey(record.Engine, k);
+                    sb.Append(mKey.ToSmartDebugAllString());
+                    sb.Append(record.Items[k].ToSmartDebugAllString());
+                }
+
+                var size = sb.Length.ToString("X4");
+                var header = record.AutoEval ? "R" : "r";
+
+                return $"{header}{size}{debugString}{sb}";
+            }
+
+            return obj.ToString();
+        }
+
+        public static string ToSmartDebugString(this MOGObject obj)
+        {
+            string debugString;
+
+            if (obj.StartPos == -1)
+            {
+                debugString = "FFFF0000";
+            }
+            else
+            {
+                debugString = obj.StartPos.ToString("X4") + obj.EndPos.ToString("X4");
+            }
+
+            if (obj is MOGNumber number)
+            {
+                var s = number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var size = s.Length.ToString("X2");
+                return $"N{size}FFFF0000{s}";
+            }
+            else if (obj is MOGString @string)
+            {
+                var size = @string.Value.ToString().Length.ToString("X4");
+                return $"S{size}FFFF0000{@string.Value}";
+            }
+            else if (obj is MOGName name)
+            {
+                var size = name.Value.Length.ToString("X2");
+                return $"A{size}FFFF0000{name.Value}";
+            }
+            else if (obj is MOGKey key)
+            {
+                var size = key.Value.Length.ToString("X2");
+                return $"K{size}FFFF0000{key.Value}";
+            }
+            else if (obj is MOGPrimitive primitive)
+            {
+                var size = primitive.Name.Length.ToString("X2");
+                return $"P{size}{debugString}{primitive.Name}";
+            }
+            else if (obj is MOGWord word)
+            {
+                var size = word.Value.Length.ToString("X2");
+                return $"W{size}{debugString}{word.Value}";
+            }
+            else if (obj is MOGHostFunction hostFunction)
+            {
+                var size = hostFunction.Value.Length.ToString("X2");
+                return $"W{size}{debugString}{hostFunction.Value}";
+            }
+            else if (obj is MOGRef reference)
+            {
+                var size = reference.Value.Length.ToString("X2");
+                return $"&{size}{debugString}{reference.Value}";
+            }
+            else if (obj is MOGBoolean boolean)
+            {
+                return $"BFFFF0000{(boolean.Value ? "1" : "0")}";
+            }
+            else if (obj is MOGType type)
+            {
+                var size = type.Value.Length.ToString("X2");
+                return $"T{size}FFFF0000{type.Value}";
+            }
+            else if (obj is MOGNull)
+            {
+                return $"XFFFF0000";
+            }
+            else if (obj is MOGData data)
+            {
+                var sb = new StringBuilder();
+
+                for (int i = 0; i < data.Items.Count; i++)
+                    sb.Append((data.Items[i].ToString("X2")));
+
+                var size = sb.Length.ToString("X4");
+                return $"D{size}FFFF0000{sb}";
+            }
+            else if (obj is MOGFunction function)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in function.Items)
+                    sb.Append(item.ToSmartDebugString());
+
+                var size = sb.Length.ToString("X4");
+
+                if (function.PauseAllowed)
+                    return $"F{size}{debugString}{sb}";
+
+                return $"F{size}FFFF0000{sb}";
+            }
+            else if (obj is MOGCode code)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in code.Items)
+                    sb.Append(item.ToSmartDebugString());
+
+                var size = sb.Length.ToString("X4");
+                var header = code.AutoEval ? "C" : "c";
+
+                if (code.PauseAllowed)
+                    return $"{header}{size}{debugString}{sb}";
+
+                return $"{header}{size}FFFF0000{sb}";
+            }
+            else if (obj is MOGList list)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var item in list.Items)
+                    sb.Append(item.ToSmartDebugString());
+
+                var size = sb.Length.ToString("X4");
+
+                if (list.AutoEval)
+                    return $"L{size}{debugString}{sb}";
+
+                return $"l{size}FFFF0000{sb}";
+            }
+            else if (obj is MOGRecord record)
+            {
+                var sb = new StringBuilder();
+
+                foreach (var k in record.Items.Keys)
+                {
+                    var mKey = new MOGKey(record.Engine, k);
+                    sb.Append(mKey.ToSmartDebugString());
+                    sb.Append(record.Items[k].ToSmartDebugString());
+                }
+
+                var size = sb.Length.ToString("X4");
+                
+                if (record.AutoEval)
+                    return $"R{size}{debugString}{sb}"; 
+
+                return $"r{size}FFFF0000{sb}";
+            }
+
+            return "***???***";
         }
     }
 }

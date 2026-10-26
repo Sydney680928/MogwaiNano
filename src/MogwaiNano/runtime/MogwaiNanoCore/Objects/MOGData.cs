@@ -136,5 +136,16 @@ namespace MogwaiNano.Objects
         }
 
         public SpanByte ToSpanByte() => new SpanByte(Items);
+
+        public override string ToSmartString()
+        {
+            var sb = new StringBuilder();
+
+            for (int i = 0; i < Items.Length; i++)
+                sb.Append((Items[i].ToString("X2")));
+
+            var size = sb.Length.ToString("X4");
+            return $"D{size}{sb}";
+        }
     }
 }

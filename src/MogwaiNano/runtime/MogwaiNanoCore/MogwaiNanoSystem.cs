@@ -116,10 +116,15 @@ namespace MogwaiNanoCore
                 var code = message.Parameters[0];
                 AppGlobal.MogwaiNanoEngine.RunAsync(code);
             }
+            else if (message.Function == "RUN.CANONICAL")
+            {
+                var code = message.Parameters[0];
+                AppGlobal.MogwaiNanoEngine.RunAsync(code, codeIsCanonical: true);
+            }   
             else if (message.Function == "DEBUG")
             {
                 var code = message.Parameters[0];
-                AppGlobal.MogwaiNanoEngine.RunAsync(code, true);    
+                AppGlobal.MogwaiNanoEngine.RunAsync(code, true);
             }
             else if (message.Function == "AUTORUN.SET")
             {
@@ -634,7 +639,7 @@ namespace MogwaiNanoCore
             else if (message.Function == "STACK.GET")
             {
                 var stackInfo = AppGlobal.MogwaiNanoEngine.GetStack();
-                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "STACK.GET", stackInfo));   
+                AppGlobal.TcpServer.EnqueueMessage(new ServerMessage(AppGlobal.NanoParameters.Name, "STACK.GET", stackInfo));
             }
             else if (message.Function == "DEBUG.EXECUTE")
             {

@@ -184,7 +184,7 @@ namespace MogwaiNanoStudioGui.Classes
             }
         }
 
-        public async Task<EvalResult> RunAsync(string code)
+        public async Task<EvalResult> RunAsync(string code, bool isCanonical = false)
         {
             if (!AppGlobal.NanoClient.IsConnected)
                 return EvalResult.Failure(_engine, MogwaiNanoErrors.DeviceNotConnectedError);
@@ -202,7 +202,7 @@ namespace MogwaiNanoStudioGui.Classes
 
             try
             {
-                var message = new ServerMessage(SOURCE_NAME, "RUN", code);
+                var message = new ServerMessage(SOURCE_NAME, isCanonical ? "RUN.CANONICAL" : "RUN", code);
                 AppGlobal.NanoClient.SendMessage(message);
             }
             catch
@@ -265,7 +265,6 @@ namespace MogwaiNanoStudioGui.Classes
 
             try
             {
-                code = code.Substring(1, code.Length - 2);
                 var message = new ServerMessage(SOURCE_NAME, "DEBUG", code);
                 AppGlobal.NanoClient.SendMessage(message);
             }
@@ -329,23 +328,8 @@ namespace MogwaiNanoStudioGui.Classes
 
             var code = response.Parameters[0] ?? "";
 
-            var allowPrivatePrimitives = _engine.AllowPrivatePrimitives;
-            _engine.AllowPrivatePrimitives = true;
-
-            try
-            {
-                var mogCode = new MOGCode(_engine, code, 0, null);
-                _engine.StackPush(mogCode);
-                return EvalResult.NoError;
-            }
-            catch (Exception ex)
-            {
-                return EvalResult.Failure(_engine, Error.ParseError, word, ex.Message);
-            }
-            finally
-            {
-                _engine.AllowPrivatePrimitives = allowPrivatePrimitives;
-            }
+            _engine.StackPushString(code);
+            return EvalResult.NoError;
         }
 
         public async Task<EvalResult> GetState(string word)

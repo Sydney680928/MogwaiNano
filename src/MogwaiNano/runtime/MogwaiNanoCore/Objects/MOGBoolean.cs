@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using MogwaiNano.Engine;
+using System;
 
 namespace MogwaiNano.Objects
 {
@@ -35,7 +36,11 @@ namespace MogwaiNano.Objects
             return obj;
         }
 
-        public override string ToString() => Value ? "true" : "false";    
+        public override string ToString() => Value ? "true" : "false";
 
+        public override string ToSmartString()
+        {
+            return $"B{(Value ? "1" : "0")}";
+        }
     }
 }

@@ -73,6 +73,7 @@ namespace MogwaiNano.Engine
         private AutoResetEvent _runSignal = new(false);
         private string _pendingRunCode;
         private bool _pendingDebugMode;
+        private bool _pendingCodeIsCanonical;   
         private Thread _runThread;
         private EvalResult _lastResult;
         private Error _lastError;
@@ -114,11 +115,7 @@ namespace MogwaiNano.Engine
 
         public Hashtable Stopwatches { get; } = new(2);
 
-        public Hashtable I2cDevices { get; } = new(2);
-        
-        public Hashtable AdcChannels { get; } = new(2);
-
-        public AdcController AdcController { get; } = new();
+        public Hashtable I2cDevices { get; } = new(2);     
 
         public Hashtable SpiDevices { get; } = new(2);
 
@@ -200,7 +197,7 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public static ArrayList Skills { get; set; } = new ArrayList { "I2C", "PWM", "ADC", "SPI", "UNITS", "TASKS", "EVENTS", "TIMERS" };
+        public static ArrayList Skills { get; set; } = new ArrayList { "I2C", "SPI", "UNITS", "TASKS", "EVENTS", "TIMERS" };
 
         public bool FrugalMode { get; set; } = false;
 
@@ -218,8 +215,6 @@ namespace MogwaiNano.Engine
         public MogwaiNanoEngine(string name, MogwaiNanoEngine motherEngine = null)
         {
             EngineId = Interlocked.Increment(ref _engineIdCounter);
-            Debug.WriteLine($"Engine Name={name} / ID={EngineId}");
-
             Name = name;
             TaskResult = new MOGNull(this);
 
@@ -285,12 +280,8 @@ namespace MogwaiNano.Engine
 
         ~MogwaiNanoEngine()
         {
-            Debug.WriteLine($"MogwaiNanoEngine '{Name}' is being finalized.");
-
             foreach (var plugin in Usings.Values)
-            {
                 (plugin as IPlugin)?.CleanUp(EngineId);
-            }
 
             if (_runThread != null)
             {
@@ -303,6 +294,8 @@ namespace MogwaiNano.Engine
         }
 
         public ArrayList Parse(string code) => _parser.Parse(code);
+
+        public ArrayList ParseFromCanonicalCode(string code) => _parser.ParseFromCanonicalCode(code);
 
         public bool IsPrimitive(string name) => Primitives.Contains(name);
 
@@ -338,8 +331,6 @@ namespace MogwaiNano.Engine
                 throw new InvalidOperationException($"A primitive with the name '{name}' is already registered.");
 
             Primitives[name] = primitive;
-
-            Debug.WriteLine($"Registering primitive: {name}");
         }
 
         private static void RegisterPrimitives()
@@ -487,12 +478,6 @@ namespace MogwaiNano.Engine
             Primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
             Primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
 
-            Primitives.Add("adc.open", new PrimitiveDelegate(PrimitiveAdcOpen));
-            Primitives.Add("adc.close", new PrimitiveDelegate(PrimitiveAdcClose));
-            Primitives.Add("adc.read", new PrimitiveDelegate(PrimitiveAdcReadValue));
-            Primitives.Add("adc.resolutionInBits", new PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
-            Primitives.Add("adc.maxValue", new PrimitiveDelegate(PrimitiveAdcGetMaxValue));
-
             Primitives.Add("spi.open", new PrimitiveDelegate(PrimitiveSpiOpen));
             Primitives.Add("spi.close", new PrimitiveDelegate(PrimitiveSpiClose));
             Primitives.Add("spi.read", new PrimitiveDelegate(PrimitiveSpiRead));
@@ -538,10 +523,11 @@ namespace MogwaiNano.Engine
                 {
                     var code = _pendingRunCode;
                     var debugMode = _pendingDebugMode;
+                    var codeIsCanonical = _pendingCodeIsCanonical;
 
                     _pendingRunCode = null;
 
-                    var executionThread = new Thread(() => Run(code, debugMode));
+                    var executionThread = new Thread(() => Run(code, debugMode, codeIsCanonical));
                     executionThread.Start();
                 }
             }
@@ -575,7 +561,7 @@ namespace MogwaiNano.Engine
             return name.IndexOfAny(_invalidChars) == -1;
         }
 
-        public EvalResult Run(string code, bool debugMode = false)
+        public EvalResult Run(string code, bool debugMode = false, bool codeIsCanonical = false)
         {
             try
             {
@@ -599,9 +585,11 @@ namespace MogwaiNano.Engine
 
                 try
                 {
+                    ArrayList items;
+
                     if (debugMode)
                     {
-                        Delegate?.DebugMessage(this, "EXECUTING IN DEBUG MODE");           
+                        Delegate?.DebugMessage(this, "EXECUTING IN DEBUG MODE");
                     }
                     else
                     {
@@ -609,15 +597,35 @@ namespace MogwaiNano.Engine
                     }
 
                     Delegate?.DebugMessage(this, "Parsing...");
-       
-                    program = new MOGFunction(this, code, withProgressInformations: true);
-                    code = null;
 
-                    Debug.WriteLine(program.ToString());
-                    Debug.WriteLine();
+                    var parseStopwatch = Stopwatch.StartNew();
+
+                    if (IsTask || codeIsCanonical)
+                    {
+                        program = new MOGFunction(this, code, canonical: true);
+                    }
+                    else
+                    {
+                        items = Parse(code);
+
+                        parseStopwatch.Stop();
+
+                        if (items.Count > 0 && items[0] is MOGFunction firstFunction)
+                        {
+                            program = firstFunction;
+                        }
+                        else
+                        {
+                            throw new Exception("No MOGFunction found in the parsed items.");
+                        }
+                    }
+
+                    Delegate?.DebugMessage(this, $"Parsed in {parseStopwatch.ElapsedMilliseconds}ms");
+
+                    code = null;
                 }
                 catch (Exception ex)
-                {
+                {            
                     stopwatch.Stop();
 
                     LastResult = EvalResult.ParseFailure(this, ex.Message);
@@ -649,6 +657,8 @@ namespace MogwaiNano.Engine
                 EvalResult result = program.Execute();
                 program = null;
 
+                var lastEvalObject = CurrentEvalObject;
+
                 StopTasks();
 
                 HaltRequested = false;
@@ -672,6 +682,7 @@ namespace MogwaiNano.Engine
                         {
                             Delegate?.DebugMessage(this, $"Error {result2.Error}");
                             result = result2;
+                            lastEvalObject = CurrentEvalObject;
                         }
                     }
                 }
@@ -688,6 +699,7 @@ namespace MogwaiNano.Engine
                         {
                             Delegate?.DebugMessage(this, $"Error {result2.Error}");
                             result = result2;
+                            lastEvalObject = CurrentEvalObject;
                         }
                     }
                 }
@@ -717,6 +729,15 @@ namespace MogwaiNano.Engine
 
                         MotherEngine.FireEvent(MOGTask.EVENT_TASK_DID_FAIL, failureInformations);
                     }
+                    else
+                    {
+                        if (lastEvalObject != null && lastEvalObject.DebugInfo != null)
+                        {
+                            var debugInfo = lastEvalObject.DebugInfo;
+                            var msg = new ServerMessage(AppGlobal.NanoParameters.Name, "DEBUG.INFO", debugInfo.StartPos.ToString(), debugInfo.EndPos.ToString(), PauseRequested.ToString(), NextStepRequested.ToString());
+                            AppGlobal.TcpServer.EnqueueMessage(msg);
+                        }
+                    }
                 }
                 else
                 {
@@ -740,13 +761,14 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public bool RunAsync(string code, bool debugMode = false)
+        public bool RunAsync(string code, bool debugMode = false, bool codeIsCanonical = false)
         {
             if (IsRunning)
                 return false;
 
             _pendingRunCode = code;
             _pendingDebugMode = debugMode;
+            _pendingCodeIsCanonical = codeIsCanonical;
 
             _runSignal.Set();
 
@@ -870,7 +892,6 @@ namespace MogwaiNano.Engine
 
                 CleanupI2cDevices();
                 CleanupSpiDevices();
-                CleanupAdcChannels();
 
                 _stacks.Clear();
                 _currentStack = new MOGStack();
@@ -1393,7 +1414,7 @@ namespace MogwaiNano.Engine
 
         private static EvalResult PrimitiveDebugHalt(MogwaiNanoEngine engine, string name)
         {
-            if (engine.DebugMode)
+            if (!engine.IsTask && engine.DebugMode)
                 engine.PauseRequested = true;
             
             return EvalResult.NoError;
@@ -4526,24 +4547,19 @@ namespace MogwaiNano.Engine
                     return EvalResult.Failure(engine, Error.UnableToReadUnitError, name, unitName.Value, ex.Message);
                 }
 
-                MOGFunction function;
+                MOGFunction program;
+                ArrayList items = engine.Parse(unitCode);
 
-                try
+                if (items.Count > 0 && items[0] is MOGFunction firstFunction)
                 {
-                    function = new MOGFunction(engine, unitCode);
+                    program = firstFunction;
                 }
-                catch (Exception ex)
+                else
                 {
-                    return EvalResult.Failure(engine, Error.ParseError, name, unitName.Value, ex.Message);
+                    throw new Exception("No MOGFunction found in the parsed items.");
                 }
 
-                var r = function.Execute();
-                function = null;
-
-                if (r.IsError)
-                    return r;
-
-                return EvalResult.NoError;
+                return program.Execute();
             }
             else
             {
@@ -5230,119 +5246,6 @@ namespace MogwaiNano.Engine
 
         #endregion
 
-        #region ADC
-
-        private static EvalResult PrimitiveAdcOpen(MogwaiNanoEngine engine, string name)
-        {
-            // 'name' channel adc.open
-
-            var s = engine.StackSign(2);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGName))
-            {
-                var channel = engine.StackPop() as MOGNumber;
-                var adcName = engine.StackPop() as MOGName;
-
-                if (engine.AdcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(engine, Error.AdcAlreadyOpenedError, name);
-
-                int nChannel = (int)channel.Value;
-
-                try
-                {
-                    var adcChannel = engine.AdcController.OpenChannel(nChannel);
-                    engine.AdcChannels.Add(adcName.Value, adcChannel);
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.AdcOpenError, name, $"failed to open ADC channel {nChannel}", ex.Message);
-                }
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveAdcClose(MogwaiNanoEngine engine, string name)
-        {
-            // 'name' adc.close
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGName))
-            {
-                var adcName = engine.StackPop() as MOGName;
-
-                if (!engine.AdcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(engine, Error.AdcUnknownNameError, name);
-
-                var adcChannel = engine.AdcChannels[adcName.Value] as AdcChannel;
-                adcChannel.Dispose();
-
-                engine.AdcChannels.Remove(adcName.Value);
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveAdcReadValue(MogwaiNanoEngine engine, string name)
-        {
-            // name adc.readValue
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGName))
-            {
-                var adcName = engine.StackPop() as MOGName;
-
-                if (!engine.AdcChannels.Contains(adcName.Value))
-                    return EvalResult.Failure(engine, Error.AdcUnknownNameError, name);
-
-                var adcChannel = engine.AdcChannels[adcName.Value] as AdcChannel;
-                var value = adcChannel.ReadValue();
-
-                engine.StackPush(new MOGNumber(engine, value));
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveAdcGetMaxValue(MogwaiNanoEngine engine, string name)
-        {
-            // adc.maxValue
-
-            var maxValue = engine.AdcController.MaxValue;
-            engine.StackPush(new MOGNumber(engine, maxValue));
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveAdcGetResolutionInBits(MogwaiNanoEngine engine, string name)
-        {
-            // adc.resolutionInBits
-
-            var resolutionInBits = engine.AdcController.ResolutionInBits;
-            engine.StackPush(new MOGNumber(engine, resolutionInBits));
-
-            return EvalResult.NoError;
-        }
-
-        #endregion
-
         #region SPI
 
         private static EvalResult PrimitiveSpiOpen(MogwaiNanoEngine engine, string name)
@@ -6020,17 +5923,6 @@ namespace MogwaiNano.Engine
             I2cDevices.Clear();
         }
 
-        public void CleanupAdcChannels()
-        {
-            foreach (var key in AdcChannels.Keys)
-            {
-                var adcChannel = AdcChannels[key] as AdcChannel;
-                adcChannel.Dispose();
-            }
-
-            AdcChannels.Clear();
-        }
-
         #endregion
 
         #region SPI
@@ -6210,7 +6102,7 @@ namespace MogwaiNano.Engine
                     {
                         // L'assembly n'est pas encore chargé, on la charge
 
-                        Debug.WriteLine($"LOAD ASSEMBLY : {filename}");
+                        Debug.WriteLine($"LOAD ASSEMBLY: {filename}");
 
                         try
                         {
@@ -6232,7 +6124,7 @@ namespace MogwaiNano.Engine
                     }
                     else
                     {
-                        Debug.WriteLine($"ASSEMBLY ALREADY LOADED : {filename}");
+                        Debug.WriteLine($"ASSEMBLY ALREADY LOADED: {filename}");
                     }
 
                     if (i == lines.Length - 1)
@@ -6260,7 +6152,7 @@ namespace MogwaiNano.Engine
 
                             if (typeof(IPlugin).IsInstanceOfType(instance))
                             {
-                                Debug.WriteLine($"PLUGIN FOUND : {type.FullName}");
+                                Debug.WriteLine($"PLUGIN FOUND: {type.FullName}");
 
                                 var plugin = (IPlugin)instance;
 
@@ -6284,11 +6176,11 @@ namespace MogwaiNano.Engine
                                             var @delegate = plugin.Primitives[primitive] as PrimitiveDelegate;
                                             Primitives.Add(primitive, @delegate);
 
-                                            Debug.WriteLine($"ADD PRIMITIVE : {primitive} from plugin '{plugin.Name}'");
+                                            Debug.WriteLine($"ADD PRIMITIVE: {primitive} from plugin '{plugin.Name}'");
                                         }
                                         else
                                         {
-                                            Debug.WriteLine($"PRIMITIVE ALREADY EXISTS : {primitive} from plugin '{plugin.Name}'");
+                                            Debug.WriteLine($"PRIMITIVE ALREADY EXISTS: {primitive} from plugin '{plugin.Name}'");
                                         }
                                     }
                                 }

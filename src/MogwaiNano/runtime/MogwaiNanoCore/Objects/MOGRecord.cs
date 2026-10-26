@@ -29,10 +29,19 @@ namespace MogwaiNano.Objects
 
         }   
 
-        public MOGRecord(MogwaiNanoEngine engine, string content) : this(engine)
+        public MOGRecord(MogwaiNanoEngine engine, string content, bool canonical = false) : this(engine)
         {
             var parser = new Parser(engine);
-            var items = parser.Parse(content);
+            ArrayList items;
+
+            if (canonical)
+            {
+                items = parser.ParseFromCanonicalCode(content);
+            }
+            else
+            {
+                items = parser.Parse(content);
+            }
 
             if (items.Count > 0 && items[0] is MOGWord word && word.Value == "!")
             {
@@ -175,6 +184,25 @@ namespace MogwaiNano.Objects
             }
 
             return $"[{sb}]";
+        }
+
+        public override string ToSmartString()
+        {
+            var sb = new StringBuilder();
+
+            foreach (string k in Keys)
+            {
+                var mKey = new MOGKey(Engine, k);
+                sb.Append(mKey.ToSmartString());
+
+                MOGObject value = Items[k] as MOGObject;
+                sb.Append(value.ToSmartString());
+            }
+
+            var size = sb.Length.ToString("X4");
+            var header = AutoEval ? "R" : "r";
+
+            return $"{header}{size}{sb}";
         }
     }
 }

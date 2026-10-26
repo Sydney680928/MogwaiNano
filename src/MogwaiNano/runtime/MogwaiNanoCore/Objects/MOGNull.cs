@@ -37,5 +37,10 @@ namespace MogwaiNano.Objects
         {
             return "null";
         }
+
+        public override string ToSmartString()
+        {
+            return "X";
+        }
     }
 }

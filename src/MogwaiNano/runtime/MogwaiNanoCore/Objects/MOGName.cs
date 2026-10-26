@@ -40,5 +40,11 @@ namespace MogwaiNano.Objects
         {
             return $"'{Value}'";
         }
+
+        public override string ToSmartString()
+        {
+            var size = Value.Length.ToString("X2");
+            return $"A{size}{Value}";
+        }
     }
 }

@@ -29,6 +29,8 @@ namespace MogwaiNano.Objects
 
         public string Content { get; protected set; }
 
+        public bool ContentIsCanonical { get; protected set; }
+
         public MOGCode(MogwaiNanoEngine engine) : base(engine, engine.TypeCode)
         {
 
@@ -46,10 +48,13 @@ namespace MogwaiNano.Objects
             }
         }
 
-        public MOGCode(MogwaiNanoEngine engine, string content, bool automaticMode = true, bool withProgressInformation = false) : this(engine)
+        public MOGCode(MogwaiNanoEngine engine, string content, bool automaticMode = true, bool withProgressInformation = false, bool canonical = false) : this(engine)
         {
             Content = content;
-            AutoEval = Content.StartsWith("!");
+            ContentIsCanonical = canonical;
+
+            if (canonical)
+                AutoEval = Content.StartsWith("!");
 
             if (automaticMode)
                 Parse(withProgressInformation);
@@ -63,10 +68,19 @@ namespace MogwaiNano.Objects
                     return false;
 
                 var parser = new Parser(Engine);
-                Items = parser.Parse(Content, withProgressInformations);
+
+                if (ContentIsCanonical)
+                {
+                    Items = parser.ParseFromCanonicalCode(Content, withProgressInformations);
+                }
+                else
+                {
+                    Items = parser.Parse(Content, withProgressInformations);
+                }
+                
                 parser = null;
 
-                if (Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
+                if (ContentIsCanonical && Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
                 {
                     AutoEval = true;
                     Items.RemoveAt(0);
@@ -76,8 +90,6 @@ namespace MogwaiNano.Objects
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(Content);
-
                 if (withProgressInformations)
                     Engine.Delegate?.DebugMessage(Engine, ex.Message);
 
@@ -162,7 +174,7 @@ namespace MogwaiNano.Objects
                                     {
                                         if (Engine.DebugCommand != null)
                                         {
-                                            var code = new MOGCode(Engine, Engine.DebugCommand, false);
+                                            var code = new MOGCode(Engine, Engine.DebugCommand, false, canonical: true);
 
                                             Engine.DebugCommand = null;
 
@@ -242,11 +254,16 @@ namespace MogwaiNano.Objects
 
         public override MOGObject Clone()
         {
-            var obj = new MOGCode(Engine, Content, false);
+            var obj = new MOGCode(Engine, Content, false, canonical: ContentIsCanonical);
+
+            obj.AutoEval = AutoEval;
 
             if (Engine.FrugalMode)
             {
-                obj.AutoEval = Content.StartsWith("!");
+                /*
+                if (ContentIsCanonical)
+                    obj.AutoEval = Content.StartsWith("!");
+                */
             }
             else
             {
@@ -269,7 +286,7 @@ namespace MogwaiNano.Objects
         {
             if (Engine.FrugalMode)
             {
-                var obj = new MOGFunction(Engine, Content);
+                var obj = new MOGFunction(Engine, Content, canonical: ContentIsCanonical);
                 return obj;
             }
             else
@@ -280,6 +297,7 @@ namespace MogwaiNano.Objects
                 {                   
                     obj.AutoEval = AutoEval;
                     obj.Content = Content;
+                    obj.ContentIsCanonical = ContentIsCanonical;
                 }
 
                 return obj;
@@ -330,5 +348,18 @@ namespace MogwaiNano.Objects
         }
 
         public override string ToString() => "{" + ToStringCode() + "}";
+
+        public override string ToSmartString()
+        {
+            var sb = new StringBuilder();
+
+            foreach (MOGObject item in Items)
+                sb.Append(item.ToSmartString());
+
+            var size = sb.Length.ToString("X4");
+            var header = AutoEval ? "C" : "c";
+
+            return $"{header}{size}{sb}";
+        }
     }
 }

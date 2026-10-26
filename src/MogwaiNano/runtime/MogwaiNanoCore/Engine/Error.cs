@@ -71,10 +71,6 @@ namespace MogwaiNano.Engine
             _ssd1306IsOpenedError,
             _ssd1306OperationError,
 
-            _pwmAlreadyOpenedError,
-            _pwmOpenError,
-            _pwmUnknownNameError,
-
             _adcAlreadyOpenedError,
             _adcOpenError,
             _adcUnknownNameError,
@@ -147,10 +143,6 @@ namespace MogwaiNano.Engine
             _ssd1306IsOpenedError = RegisterError("MW.522", "ssd1306 already opened error");
             _ssd1306OperationError = RegisterError("MW.523", "ssd1306 operation error");
 
-            _pwmAlreadyOpenedError = RegisterError("MW.530", "pwm already opened error");  
-            _pwmOpenError = RegisterError("MW.531", "pwm open error");  
-            _pwmUnknownNameError = RegisterError("MW.532", "pwm unknown name error");
-
             _adcAlreadyOpenedError = RegisterError("MW.540", "adc already opened error");
             _adcOpenError = RegisterError("MW.541", "adc open error");
             _adcUnknownNameError = RegisterError("MW.542", "adc unknown name error");
@@ -179,13 +171,7 @@ namespace MogwaiNano.Engine
         {
             EnsureInitialized();
 
-            if (_errors.Contains(error.Code))
-            {
-                Debug.WriteLine($"Error code {error.Code} already registered. Ignoring external error registration.");
-                return;   // déjà enregistrée (par ce plugin ou un autre) — on ignore plutôt que planter
-            }
-
-            Debug.WriteLine($"Registering external error: {error.Code} - {error.Message}");
+            if (!_errors.Contains(error.Code))
             _errors[error.Code] = error;
         }
 
@@ -262,12 +248,6 @@ namespace MogwaiNano.Engine
         public static Error Ssd1306IsOpenedError { get { EnsureInitialized(); return _ssd1306IsOpenedError; } }
 
         public static Error Ssd1306OperationError { get { EnsureInitialized(); return _ssd1306OperationError; } }
-
-        public static Error PwmAlreadyOpenedError { get { EnsureInitialized(); return _pwmAlreadyOpenedError; } }
-
-        public static Error PwmOpenError { get { EnsureInitialized(); return _pwmOpenError; } }
-
-        public static Error PwmUnknownNameError { get { EnsureInitialized(); return _pwmUnknownNameError; } }
 
         public static Error AdcAlreadyOpenedError { get { EnsureInitialized(); return _adcAlreadyOpenedError; } }
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using MogaiNanoPwm;
+using MowgaiNanoPwm;
 using MogwaiNano;
 using MogwaiNano.Engine;
 using MogwaiNano.Objects;
@@ -27,6 +27,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using static MogwaiNano.Engine.MogwaiNanoEngine;
+using MogwaiNanoAdc;
 
 namespace MogwaiNanoEsp32
 {
@@ -35,6 +36,8 @@ namespace MogwaiNanoEsp32
         public static void Main()
         {
             MogwaiNanoEngine.RegisterPrimitive("esp32.setPinFunction", new(PrimitiveDeviceSetPinFunction), true);
+
+            #region GPIO
 
             MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.input", new(GpioManager.PrimitiveGpioModeInput));
             MogwaiNanoEngine.RegisterPrimitive("gpio.setMode.inputPullDown", new(GpioManager.PrimitiveGpioSetModeInputPullDown));
@@ -48,6 +51,10 @@ namespace MogwaiNanoEsp32
 
             MogwaiNanoEngine.Skills.Add("GPIO");
 
+            #endregion
+
+            #region PWM
+
             MogwaiNanoEngine.RegisterPrimitive("pwm.open", new (PwmManager.PrimitivePwmOpen));
             MogwaiNanoEngine.RegisterPrimitive("pwm.close", new (PwmManager.PrimitivePwmClose));
             MogwaiNanoEngine.RegisterPrimitive("pwm.start", new (PwmManager.PrimitivePwmStart));
@@ -59,7 +66,27 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterExternalError(PwmManager.PwmStartError);
             MogwaiNanoEngine.RegisterExternalError(PwmManager.PwmStopError);
 
-            // MogwaiNanoEngine.Skills.Add("PWM");
+            MogwaiNanoEngine.Skills.Add("PWM");
+
+            #endregion
+
+            #region ADC
+
+            MogwaiNanoEngine.RegisterPrimitive("adc.open", new (AdcManager.PrimitiveAdcOpen));
+            MogwaiNanoEngine.RegisterPrimitive("adc.close", new (AdcManager.PrimitiveAdcClose));
+            MogwaiNanoEngine.RegisterPrimitive("adc.read", new (AdcManager.PrimitiveAdcReadValue));
+            MogwaiNanoEngine.RegisterPrimitive("adc.resolutionInBits", new (AdcManager.PrimitiveAdcGetResolutionInBits));
+            MogwaiNanoEngine.RegisterPrimitive("adc.maxValue", new (AdcManager.PrimitiveAdcGetMaxValue));
+
+            MogwaiNanoEngine.RegisterExternalError(AdcManager.AdcAlreadyOpenedError);   
+            MogwaiNanoEngine.RegisterExternalError(AdcManager.AdcOpenError);    
+            MogwaiNanoEngine.RegisterExternalError(AdcManager.AdcUnknownNameError);
+
+            MogwaiNanoEngine.Skills.Add("ADC");
+
+            #endregion
+
+            #region BLE PERIPHERAL
 
             MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.create", new(BlePeripheral.PrimitiveBlePeripheralCreate));
             MogwaiNanoEngine.RegisterPrimitive("ble.peripheral.start", new(BlePeripheral.PrimitiveBlePeripheralStart));
@@ -71,6 +98,10 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterExternalError(BlePeripheral.BlePeripheralUnableToCreateError);
 
             MogwaiNanoEngine.Skills.Add("BLE-P");
+
+            #endregion
+
+            #region SSD1306
 
             MogwaiNanoEngine.RegisterPrimitive("ssd1306.init", new(SSD1306Manager.PrimitiveSsd1306Init));
             MogwaiNanoEngine.RegisterPrimitive("ssd1306.close", new(SSD1306Manager.PrimitiveSsd1306Close));
@@ -92,7 +123,12 @@ namespace MogwaiNanoEsp32
 
             MogwaiNanoEngine.Skills.Add("SSD1306");
 
+            #endregion
+
+            #region TFT
+
             // SPI pins are set from here so that the TFT library stays platform independent.
+
             TftManager.ConfigureSpiPins = (bus, sclk, mosi, miso) =>
             {
                 if (bus != 1)
@@ -139,7 +175,12 @@ namespace MogwaiNanoEsp32
 
             MogwaiNanoEngine.Skills.Add("TFT");
 
+            #endregion
+
+            #region TOUCH
+
             // I2C pins are set from here so that the touch library stays platform independent.
+
             TouchManager.ConfigureI2cPins = (bus, sda, scl) =>
             {
                 if (bus != 1)
@@ -167,6 +208,10 @@ namespace MogwaiNanoEsp32
 
             MogwaiNanoEngine.Skills.Add("TOUCH");
 
+            #endregion
+
+            #region ONBOARD LED
+
             MogwaiNanoEngine.RegisterPrimitive("onboard.led.set", new(LedManager.PrimitiveLedSet));
             MogwaiNanoEngine.RegisterPrimitive("onboard.led.off", new(LedManager.PrimitiveLedOff));
             MogwaiNanoEngine.RegisterPrimitive("onboard.led.green", new(LedManager.PrimitiveLedGreen));
@@ -181,6 +226,8 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterExternalError(LedManager.LedOperationError);
 
             MogwaiNanoEngine.Skills.Add("ONBOARD-LED");
+
+            #endregion
 
             MogwaiNanoEngine.ResetDidExecute += (engine) =>
             {
@@ -199,6 +246,7 @@ namespace MogwaiNanoEsp32
                     SSD1306Manager.Cleanup(engine);
                     LedManager.Cleanup(engine);
                     PwmManager.Cleanup(engine);
+                    AdcManager.Cleanup(engine);
                 }
 
             };

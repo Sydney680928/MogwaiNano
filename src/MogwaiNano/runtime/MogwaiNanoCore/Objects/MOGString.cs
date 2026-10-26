@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using MogwaiNano.Engine;
+using System;
 using System.Collections;
 using System.Text;
 
@@ -127,6 +128,8 @@ namespace MogwaiNano.Objects
             StringBuilder currentItem = new();
             bool inCode = false;
 
+            var parser = new Parser(Engine);
+
             while (index < Value.Length)
             {
                 var c = Value[index++];
@@ -150,11 +153,20 @@ namespace MogwaiNano.Objects
                     if (!inCode)
                         return null;
 
-                    var code = new MOGCode(Engine, currentItem.ToString());
+                    var ci = currentItem.ToString();
 
-                    items.Add(code);
-                    currentItem.Clear();
-                    inCode = false;
+                    try
+                    {
+                        var code = new MOGCode(Engine, ci, canonical: true);
+
+                        items.Add(code);
+                        currentItem.Clear();
+                        inCode = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        return null;
+                    }
                 }
                 else
                 {
@@ -256,6 +268,12 @@ namespace MogwaiNano.Objects
         public override string ToString()
         {
             return $"\"{Value}\"";
+        }
+
+        public override string ToSmartString()
+        {
+            var size = Value.ToString().Length.ToString("X4");
+            return $"S{size}{Value}";
         }
     }
 }

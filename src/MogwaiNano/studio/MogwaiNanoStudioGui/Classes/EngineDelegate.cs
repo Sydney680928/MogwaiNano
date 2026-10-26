@@ -292,7 +292,8 @@ namespace MogwaiNanoStudioGui.Classes
                         if (!string.IsNullOrEmpty(code))
                         {
                             var function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
-                            return await AppGlobal.NanoRuntime.RunAsync(function.ToStringCode());
+                            var c = function.ToSmartString();
+                            return await AppGlobal.NanoRuntime.RunAsync(c);
                         }
                         else
                         {
@@ -309,7 +310,8 @@ namespace MogwaiNanoStudioGui.Classes
                     // run { ... }
 
                     var code = engine.StackPopCode();
-                    return await AppGlobal.NanoRuntime.RunAsync(code.ToStringCode());
+                    var c = code.ToFunction().ToSmartString();  
+                    return await AppGlobal.NanoRuntime.RunAsync(c);
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
@@ -342,11 +344,11 @@ namespace MogwaiNanoStudioGui.Classes
 
                             if (word == "nano.debugall")
                             {
-                                debugCode = function.ToDebugAllString();
+                                debugCode = function.ToSmartDebugAllString();
                             }
                             else
                             {
-                                debugCode = function.ToDebugString();
+                                debugCode = function.ToSmartDebugString();
                             }
 
                             UseNewCodeFile?.Invoke(filename.Value, code);
@@ -373,11 +375,11 @@ namespace MogwaiNanoStudioGui.Classes
 
                     if (word == "nano.debugall")
                     {
-                        debugCode = code.ToDebugAllString();
+                        debugCode = code.ToFunction().ToSmartDebugAllString();
                     }
                     else
                     {
-                        debugCode = code.ToDebugString();
+                        debugCode = code.ToFunction().ToSmartDebugString();
                     }
 
                     return await AppGlobal.NanoRuntime.DebugAsync(debugCode);
@@ -623,7 +625,7 @@ namespace MogwaiNanoStudioGui.Classes
                         if (!string.IsNullOrEmpty(code))
                         {
                             var function = new MOGFunction(AppGlobal.MogwaiEngine, code, 0, null);
-                            return await AppGlobal.NanoRuntime.SetAutorunAsync(function.ToStringCode());
+                            return await AppGlobal.NanoRuntime.SetAutorunAsync(function.ToSmartString());
                         }
                         else
                         {
@@ -640,7 +642,7 @@ namespace MogwaiNanoStudioGui.Classes
                     // { ... }
 
                     var code = engine.StackPopCode();
-                    return await AppGlobal.NanoRuntime.SetAutorunAsync(code.ToStringCode());
+                    return await AppGlobal.NanoRuntime.SetAutorunAsync(code.ToFunction().ToSmartString());
                 }
 
                 return EvalResult.Failure(engine, Error.BadArgumentTypeError, word);
@@ -752,7 +754,7 @@ namespace MogwaiNanoStudioGui.Classes
                             return EvalResult.NoError;
                         }
 
-                        var r = await AppGlobal.NanoRuntime.InstallUnitAsync(unitName, function.ToStringCode());
+                        var r = await AppGlobal.NanoRuntime.InstallUnitAsync(unitName, function.ToSmartString());
 
                         engine.StackPushBoolean(r.IsSuccess);
                         return EvalResult.NoError;

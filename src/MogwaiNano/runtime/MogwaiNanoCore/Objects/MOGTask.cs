@@ -84,8 +84,6 @@ namespace MogwaiNano.Objects
 
         ~MOGTask()
         {
-            Debug.WriteLine($"MOGTask '{Name}' is being finalized.");
-
             Stop();
 
             Result = null; 
@@ -106,7 +104,7 @@ namespace MogwaiNano.Objects
 
                 try
                 {
-                    items = TaskEngine.Parse(parameter);
+                    items = TaskEngine.ParseFromCanonicalCode(parameter);
                 }
                 catch (Exception ex)
                 {

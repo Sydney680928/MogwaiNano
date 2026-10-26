@@ -32,10 +32,18 @@ namespace MogwaiNano.Objects
             Items = items;
         }
 
-        public MOGList(MogwaiNanoEngine engine, string content) : this(engine)
+        public MOGList(MogwaiNanoEngine engine, string content, bool canonical = false) : this(engine)
         {
             var parser = new Parser(engine);
-            Items = parser.Parse(content);
+
+            if (canonical)
+            {
+                Items = parser.ParseFromCanonicalCode(content);
+            }
+            else
+            {
+                Items = parser.Parse(content);
+            }
 
             if (Items.Count > 0 && Items[0] is MOGWord word && word.Value == "!")
             {
@@ -146,6 +154,19 @@ namespace MogwaiNano.Objects
             sb.Append(")");
 
             return sb.ToString();
+        }
+
+        override public string ToSmartString()
+        {
+            var sb = new StringBuilder();
+
+            foreach (MOGObject item in Items)
+                sb.Append(item.ToSmartString());
+
+            var size = sb.Length.ToString("X4");
+            var header = AutoEval ? "L" : "l";
+
+            return $"{header}{size}{sb}";
         }
     }
 }

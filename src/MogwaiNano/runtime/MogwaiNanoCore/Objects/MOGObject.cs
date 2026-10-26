@@ -49,6 +49,11 @@ namespace MogwaiNano.Objects
         public virtual string ToStringCode()
         {
             return ToString();
-        }   
+        } 
+        
+        public virtual string ToSmartString()
+        {
+            return ToString();
+        }
     }
 }

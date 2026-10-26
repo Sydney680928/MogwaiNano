@@ -36,7 +36,7 @@ namespace MogwaiNano.Objects
         }
 
 
-        public MOGFunction(MogwaiNanoEngine engine, string content, bool automaticMode = true, bool withProgressInformations = false) : base(engine, content, automaticMode, withProgressInformations)
+        public MOGFunction(MogwaiNanoEngine engine, string content, bool automaticMode = true, bool withProgressInformations = false, bool canonical = false) : base(engine, content, automaticMode, withProgressInformations, canonical)
         {
 
         }
@@ -65,11 +65,14 @@ namespace MogwaiNano.Objects
 
         public override MOGObject Clone()
         {
-            var obj = new MOGFunction(Engine, Content, false);
+            var obj = new MOGFunction(Engine, Content, false, canonical: ContentIsCanonical);
 
             if (Engine.FrugalMode)
             {
-                obj.AutoEval = Content.StartsWith("!");
+                /*
+                if (ContentIsCanonical)
+                    obj.AutoEval = Content.StartsWith("!");
+                */
             }
             else
             {
@@ -88,5 +91,17 @@ namespace MogwaiNano.Objects
             return obj;
         }
         public override string ToString() => $"«{ToStringCode()}»";
+
+        public override string ToSmartString()
+        {
+            var sb = new StringBuilder();
+
+            foreach (MOGObject item in Items)
+                sb.Append(item.ToSmartString());
+
+            var size = sb.Length.ToString("X4");
+
+            return $"F{size}{sb}";
+        }
     }
 }
