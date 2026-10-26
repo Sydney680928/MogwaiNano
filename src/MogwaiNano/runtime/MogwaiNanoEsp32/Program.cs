@@ -28,6 +28,7 @@ using System.Diagnostics;
 using System.Threading;
 using static MogwaiNano.Engine.MogwaiNanoEngine;
 using MogwaiNanoAdc;
+using MogwaiNanoDateTime;
 
 namespace MogwaiNanoEsp32
 {
@@ -226,6 +227,17 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterExternalError(LedManager.LedOperationError);
 
             MogwaiNanoEngine.Skills.Add("ONBOARD-LED");
+
+            #endregion
+
+            #region DATE TIME
+
+            MogwaiNanoEngine.RegisterPrimitive("setDateTime", new(DateTimeManager.PrimitiveSetDateTime));
+            MogwaiNanoEngine.RegisterPrimitive("now", new(DateTimeManager.PrimitiveNow));
+            MogwaiNanoEngine.RegisterPrimitive("date->", new(DateTimeManager.PrimitiveDateToRecord));
+            MogwaiNanoEngine.RegisterPrimitive("->date", new(DateTimeManager.PrimitiveRecordToDate));
+
+            MogwaiNanoEngine.Skills.Add("DATE-TIME");
 
             #endregion
 
