@@ -306,7 +306,7 @@ public partial class MainWindow : Window
 
             if (debugMode)
             {
-                DebugPauseButton.IsEnabled = false;
+                DebugPauseButton.IsEnabled = true;
                 DebugResumeButton.IsEnabled = false;
                 DebugStepButton.IsEnabled = false;
 
@@ -506,6 +506,12 @@ public partial class MainWindow : Window
 
     private async void OnDebugResumeClick(object? sender, RoutedEventArgs e)
     {
+        DebugPauseButton.IsEnabled = true;
+        DebugResumeButton.IsEnabled = false;
+        DebugStepButton.IsEnabled = false;
+
+        Editor.SelectionEnd = Editor.SelectionStart;
+
         await AppGlobal.NanoRuntime.DebugResume("debug.resume");
     }
 
