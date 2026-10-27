@@ -47,172 +47,165 @@ namespace MogwaiNano.Engine
             string content = string.Empty;
             MOGObject obj;
 
-            try
+            while (index < code.Length)
             {
-                while (index < code.Length)
+                switch (code[index])
                 {
-                    switch (code[index])
-                    {
-                        case 'A':
-                            // MOGName
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            content = code.Substring(index + 3, size);
-                            index += 3 + size;
-                            items.Add(new MOGName(_engine, content));
-                            break;
+                    case 'A':
+                        // MOGName
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        content = code.Substring(index + 3, size);
+                        index += 3 + size;
+                        items.Add(new MOGName(_engine, content));
+                        break;
 
-                        case 'S':
-                            // MOGString
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            items.Add(new MOGString(_engine, content));
-                            break;
+                    case 'S':
+                        // MOGString
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        items.Add(new MOGString(_engine, content));
+                        break;
 
-                        case 'N':
-                            // MOGNumber
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            content = code.Substring(index + 3, size);
-                            float value = float.Parse(content);
-                            index += 3 + size;
-                            items.Add(new MOGNumber(_engine, value));
-                            break;
+                    case 'N':
+                        // MOGNumber
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        content = code.Substring(index + 3, size);
+                        float value = float.Parse(content);
+                        index += 3 + size;
+                        items.Add(new MOGNumber(_engine, value));
+                        break;
 
-                        case 'K':
-                            // MOGKey
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            content = code.Substring(index + 3, size);
-                            index += 3 + size;
-                            items.Add(new MOGKey(_engine, content));
-                            break;
+                    case 'K':
+                        // MOGKey
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        content = code.Substring(index + 3, size);
+                        index += 3 + size;
+                        items.Add(new MOGKey(_engine, content));
+                        break;
 
-                        case 'P':
-                            // MOGPrimitive
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            content = code.Substring(index + 3, size);
-                            index += 3 + size;
-                            items.Add(new MOGPrimitive(_engine, content));
-                            break;
+                    case 'P':
+                        // MOGPrimitive
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        content = code.Substring(index + 3, size);
+                        index += 3 + size;
+                        items.Add(new MOGPrimitive(_engine, content));
+                        break;
 
-                        case 'W':
-                            // MOGWord
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            content = code.Substring(index + 3, size);
-                            index += 3 + size;
-                            items.Add(new MOGWord(_engine, content));
-                            break;
+                    case 'W':
+                        // MOGWord
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        content = code.Substring(index + 3, size);
+                        index += 3 + size;
+                        items.Add(new MOGWord(_engine, content));
+                        break;
 
-                        case 'B':
-                            // MOGBoolean
-                            content = code.Substring(index + 1, 1);
-                            index += 2;
-                            items.Add(new MOGBoolean(_engine, content == "1"));
-                            break;
+                    case 'B':
+                        // MOGBoolean
+                        content = code.Substring(index + 1, 1);
+                        index += 2;
+                        items.Add(new MOGBoolean(_engine, content == "1"));
+                        break;
 
-                        case 'T':
-                            // MOGType
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            content = code.Substring(index + 3, size);
-                            index += 3 + size;
-                            items.Add(new MOGType(_engine, content));
-                            break;
+                    case 'T':
+                        // MOGType
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        content = code.Substring(index + 3, size);
+                        index += 3 + size;
+                        items.Add(new MOGType(_engine, content));
+                        break;
 
-                        case 'X':
-                            // MOGNull
-                            index += 1;
-                            items.Add(new MOGNull(_engine));
-                            break;
+                    case 'X':
+                        // MOGNull
+                        index += 1;
+                        items.Add(new MOGNull(_engine));
+                        break;
 
-                        case 'D':
-                            // MOGData
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
+                    case 'D':
+                        // MOGData
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
 
-                            items.Add(new MOGData(_engine, content));
-                            break;
+                        items.Add(new MOGData(_engine, content));
+                        break;
 
-                        case 'F':
-                            // MOGFunction
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            items.Add(new MOGFunction(_engine, content));
-                            break;
+                    case 'F':
+                        // MOGFunction
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        items.Add(new MOGFunction(_engine, content));
+                        break;
 
-                        case 'C':
-                            // MOGCode autoEval=true
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            obj = new MOGCode(_engine, content);
-                            obj.AutoEval = true;
-                            items.Add(obj);
-                            break;
+                    case 'C':
+                        // MOGCode autoEval=true
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        obj = new MOGCode(_engine, content);
+                        obj.AutoEval = true;
+                        items.Add(obj);
+                        break;
 
-                        case 'c':
-                            // MOGCode autoEval=false
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            items.Add(new MOGCode(_engine, content));
-                            break;
+                    case 'c':
+                        // MOGCode autoEval=false
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        items.Add(new MOGCode(_engine, content));
+                        break;
 
-                        case 'L':
-                            // MOGList autoEval=true
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            obj = new MOGList(_engine, content);
-                            obj.AutoEval = true;
-                            items.Add(obj);
-                            break;
+                    case 'L':
+                        // MOGList autoEval=true
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        obj = new MOGList(_engine, content);
+                        obj.AutoEval = true;
+                        items.Add(obj);
+                        break;
 
-                        case 'l':
-                            // MOGList autoEval=false
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            items.Add(new MOGList(_engine, content));
-                            break;
+                    case 'l':
+                        // MOGList autoEval=false
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        items.Add(new MOGList(_engine, content));
+                        break;
 
-                        case 'R':
-                            // MOGRecord autoEval=true
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            obj = new MOGRecord(_engine, content);
-                            obj.AutoEval = true;
-                            items.Add(obj);
-                            break;
+                    case 'R':
+                        // MOGRecord autoEval=true
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        obj = new MOGRecord(_engine, content);
+                        obj.AutoEval = true;
+                        items.Add(obj);
+                        break;
 
-                        case 'r':
-                            // MOGRecord autoEval=false 
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            content = code.Substring(index + 5, size);
-                            index += 5 + size;
-                            items.Add(new MOGRecord(_engine, content));
-                            break;
+                    case 'r':
+                        // MOGRecord autoEval=false 
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        content = code.Substring(index + 5, size);
+                        index += 5 + size;
+                        items.Add(new MOGRecord(_engine, content));
+                        break;
 
-                        case '&':
-                            // MOGRef
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            content = code.Substring(index + 3, size);
-                            index += 3 + size;
-                            items.Add(new MOGRef(_engine, content));
-                            break;
+                    case '&':
+                        // MOGRef
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        content = code.Substring(index + 3, size);
+                        index += 3 + size;
+                        items.Add(new MOGRef(_engine, content));
+                        break;
 
-                        default:
-                            throw new Exception($"Unexpected character '{code[index]}' at index {index}.");
-                    }
+                    default:
+                        throw new Exception($"Unexpected character '{code[index]}' at index {index}.");
                 }
+            }
 
-                return items;
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            return items;
         }
 
         private ArrayList ParseDebug(string code, bool withProgressInformations = false)
@@ -225,213 +218,202 @@ namespace MogwaiNano.Engine
             string content = string.Empty;
             MOGObject obj;
 
-            Debug.WriteLine(code);
-
-            try
+            while (index < code.Length)
             {
-                while (index < code.Length)
+                switch (code[index])
                 {
-                    switch (code[index])
-                    {
-                        case 'A':
-                            // MOGName
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
-                            content = code.Substring(index + 11, size);
-                            index += 11 + size;
-                            obj = new MOGName(_engine, content);
-                            break;
+                    case 'A':
+                        // MOGName
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
+                        content = code.Substring(index + 11, size);
+                        index += 11 + size;
+                        obj = new MOGName(_engine, content);
+                        break;
 
-                        case 'S':
-                            // MOGString
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGString(_engine, content);
-                            break;
+                    case 'S':
+                        // MOGString
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGString(_engine, content);
+                        break;
 
-                        case 'N':
-                            // MOGNumber
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
-                            content = code.Substring(index + 11, size);
-                            float value = float.Parse(content);
-                            index += 11 + size;
-                            obj = new MOGNumber(_engine, value);
-                            break;
+                    case 'N':
+                        // MOGNumber
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
+                        content = code.Substring(index + 11, size);
+                        float value = float.Parse(content);
+                        index += 11 + size;
+                        obj = new MOGNumber(_engine, value);
+                        break;
 
-                        case 'K':
-                            // MOGKey
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
-                            content = code.Substring(index + 11, size);
-                            index += 11 + size;
-                            obj = new MOGKey(_engine, content);
-                            break;
+                    case 'K':
+                        // MOGKey
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
+                        content = code.Substring(index + 11, size);
+                        index += 11 + size;
+                        obj = new MOGKey(_engine, content);
+                        break;
 
-                        case 'P':
-                            // MOGPrimitive
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
-                            content = code.Substring(index + 11, size);
-                            index += 11 + size;
-                            obj = new MOGPrimitive(_engine, content);
-                            break;
+                    case 'P':
+                        // MOGPrimitive
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
+                        content = code.Substring(index + 11, size);
+                        index += 11 + size;
+                        obj = new MOGPrimitive(_engine, content);
+                        break;
 
-                        case 'W':
-                            // MOGWord
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
-                            content = code.Substring(index + 11, size);
-                            index += 11 + size;
-                            obj = new MOGWord(_engine, content);
-                            break;
+                    case 'W':
+                        // MOGWord
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
+                        content = code.Substring(index + 11, size);
+                        index += 11 + size;
+                        obj = new MOGWord(_engine, content);
+                        break;
 
-                        case 'B':
-                            // MOGBoolean                       
-                            startPos = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            content = code.Substring(index + 9, 1);
-                            index += 10;
-                            obj = new MOGBoolean(_engine, content == "1");
-                            break;
+                    case 'B':
+                        // MOGBoolean                       
+                        startPos = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        content = code.Substring(index + 9, 1);
+                        index += 10;
+                        obj = new MOGBoolean(_engine, content == "1");
+                        break;
 
-                        case 'T':
-                            // MOGType
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
-                            content = code.Substring(index + 11, size);
-                            index += 11 + size;
-                            obj = new MOGType(_engine, content);
-                            break;
+                    case 'T':
+                        // MOGType
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
+                        content = code.Substring(index + 11, size);
+                        index += 11 + size;
+                        obj = new MOGType(_engine, content);
+                        break;
 
-                        case 'X':
-                            // MOGNull
-                            startPos = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            index += 9;
-                            obj = new MOGNull(_engine);
-                            break;
+                    case 'X':
+                        // MOGNull
+                        startPos = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        index += 9;
+                        obj = new MOGNull(_engine);
+                        break;
 
-                        case 'D':
-                            // MOGData
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGData(_engine, content);
-                            break;
+                    case 'D':
+                        // MOGData
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGData(_engine, content);
+                        break;
 
-                        case 'F':
-                            // MOGFunction
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGFunction(_engine, content);
-                            break;
+                    case 'F':
+                        // MOGFunction
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGFunction(_engine, content);
+                        break;
 
-                        case 'C':
-                            // MOGCode autoEval=true
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGCode(_engine, content);
-                            obj.AutoEval = true;
-                            break;
+                    case 'C':
+                        // MOGCode autoEval=true
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGCode(_engine, content);
+                        obj.AutoEval = true;
+                        break;
 
-                        case 'c':
-                            // MOGCode autoEval=false
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGCode(_engine, content);
-                            break;
+                    case 'c':
+                        // MOGCode autoEval=false
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGCode(_engine, content);
+                        break;
 
-                        case 'L':
-                            // MOGList autoEval=true
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGList(_engine, content);
-                            obj.AutoEval = true;
-                            break;
+                    case 'L':
+                        // MOGList autoEval=true
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGList(_engine, content);
+                        obj.AutoEval = true;
+                        break;
 
-                        case 'l':
-                            // MOGList autoEval=false
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGList(_engine, content);
-                            break;
+                    case 'l':
+                        // MOGList autoEval=false
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGList(_engine, content);
+                        break;
 
-                        case 'R':
-                            // MOGRecord autoEval=true
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGRecord(_engine, content);
-                            obj.AutoEval = true;
-                            break;
+                    case 'R':
+                        // MOGRecord autoEval=true
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGRecord(_engine, content);
+                        obj.AutoEval = true;
+                        break;
 
-                        case 'r':
-                            // MOGRecord autoEval=false 
-                            size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
-                            content = code.Substring(index + 13, size);
-                            index += 13 + size;
-                            obj = new MOGRecord(_engine, content);
-                            break;
+                    case 'r':
+                        // MOGRecord autoEval=false 
+                        size = Convert.ToInt32(code.Substring(index + 1, 4), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 5, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 9, 4), 16);
+                        content = code.Substring(index + 13, size);
+                        index += 13 + size;
+                        obj = new MOGRecord(_engine, content);
+                        break;
 
-                        case '&':
-                            // MOGRef
-                            size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
-                            startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
-                            endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
-                            content = code.Substring(index + 11, size);
-                            index += 11 + size;
-                            obj = new MOGRef(_engine, content);
-                            break;
+                    case '&':
+                        // MOGRef
+                        size = Convert.ToInt32(code.Substring(index + 1, 2), 16);
+                        startPos = Convert.ToInt32(code.Substring(index + 3, 4), 16);
+                        endPos = Convert.ToInt32(code.Substring(index + 7, 4), 16);
+                        content = code.Substring(index + 11, size);
+                        index += 11 + size;
+                        obj = new MOGRef(_engine, content);
+                        break;
 
-                        default:
-                            throw new Exception($"Unexpected character '{code[index]}' at index {index}.");
-                    }
-
-                    if (startPos != 0xFFFF)
-                        obj.DebugInfo = new DebugInformations(startPos, endPos);
-
-                    items.Add(obj);
+                    default:
+                        throw new Exception($"Unexpected character '{code[index]}' at index {index}.");
                 }
 
-                return items;
+                if (startPos != 0xFFFF)
+                    obj.DebugInfo = new DebugInformations(startPos, endPos);
+
+                items.Add(obj);
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("ERROR !");
-                Debug.WriteLine(code.Substring(index));
-                throw;
-            }   
+
+            return items;
         }
 
         public ArrayList ParseFromCanonicalCode(string code, bool withProgressInformations = false)
