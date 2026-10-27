@@ -14,6 +14,7 @@
 
 using MogwaiNano.Engine;
 using MogwaiNanoAdc;
+using MogwaiNanoDateTime;
 using MogwaiNanoGpio;
 using MogwaiNanoSsd1306;
 using MowgaiNanoPwm;
@@ -95,6 +96,17 @@ namespace MogwaiNanoPicoW
             MogwaiNanoEngine.RegisterExternalError(SSD1306Manager.SSD1306OperationError);
 
             MogwaiNanoEngine.Skills.Add("SSD1306");
+
+            #endregion
+
+            #region DATE TIME
+
+            MogwaiNanoEngine.RegisterPrimitive("setDateTime", new(DateTimeManager.PrimitiveSetDateTime));
+            MogwaiNanoEngine.RegisterPrimitive("now", new(DateTimeManager.PrimitiveNow));
+            MogwaiNanoEngine.RegisterPrimitive("date->", new(DateTimeManager.PrimitiveDateToRecord));
+            MogwaiNanoEngine.RegisterPrimitive("->date", new(DateTimeManager.PrimitiveRecordToDate));
+
+            MogwaiNanoEngine.Skills.Add("DATE-TIME");
 
             #endregion
 

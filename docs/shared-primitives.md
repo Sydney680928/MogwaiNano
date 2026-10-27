@@ -254,6 +254,16 @@ isTask:              false
 
 Resuming or stepping is not done from the code: on MOGWAI NANO it is done from MOGWAI NANO Studio, with the debug panel or the `nano.debug.resume` and `nano.debug.step` commands — see the [Studio Primitives Reference](studio-primitives.md). There is no `debug.resume` or `debug.step` primitive.
 
+## Date and time
+
+| Primitive | Description |
+|---|---|
+| `now` | Pushes the current date and time, as a number of ticks |
+| `date->` | Converts a number of ticks (such as the value returned by `now`) into a record with the keys `year:`, `month:`, `day:`, `hour:`, `minute:`, `second:`, `dayOfWeek:` and `dayOfYear:` — e.g. `now date-> ?d` |
+| `->date` | The opposite of `date->`: converts a record in that same format into a number of ticks |
+
+A point in time is a plain `.number`, so it can be stored, compared and subtracted like any other. On desktop MOGWAI a number is always a `double`; on NANO, these primitives use the `double` value of the number, so they behave identically on both (see the *Types* section below); `setDateTime`, which sets the device's clock, is NANO-only and is described in the [Device Primitives Reference](device-primitives.md#6-stopwatch-and-datetime).
+
 ## System primitives
 
 | Primitive | Description |
@@ -280,7 +290,7 @@ Only the matching hook runs for a given program end — never more than one.
 
 | Type | Type literal | Description |
 |---|---|---|
-| `MOGNumber` | `.number` | Numeric value. Can be written in decimal or hexadecimal (`0xFF`). On NANO, backed by `float` rather than `double`, to take advantage of the ESP32's hardware FPU |
+| `MOGNumber` | `.number` | Numeric value. Can be written in decimal or hexadecimal (`0xFF`). On desktop MOGWAI, a number is a `double`. On NANO, a number carries both a `float` and a `double` value: most primitives use the `float`, to take advantage of the ESP32's hardware FPU, while the date and time primitives use the `double`, which has the precision a number of ticks requires and is what a desktop number holds (see the [Device Primitives Reference](device-primitives.md#6-stopwatch-and-datetime)) |
 | `MOGString` | `.string` | Text, delimited with `"..."` |
 | `MOGBoolean` | `.boolean` | `true`/`false` |
 | `MOGName` | `.name` | An identifier/name value, delimited with `'...'` — used for variable names, function names, timer names |

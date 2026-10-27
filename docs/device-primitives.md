@@ -294,7 +294,9 @@ task 'TSK2' do
 
 `TSK1` toggles GPIO 4 every second (10 times), `TSK2` toggles GPIO 5 every 200ms (50 times) — both run genuinely in parallel, each on its own thread. `task.join` blocks until both finish, while every `onEvent` handler above still fires live as each task starts, ends, or publishes — not just after `join` returns.
 
-## 6. Stopwatch
+## 6. Stopwatch and date/time
+
+### Stopwatch
 
 ⚙️ **NANO-only.** Named timers for measuring elapsed time, following the same by-name management pattern as I2C/PWM/ADC.
 
@@ -308,6 +310,26 @@ task 'TSK2' do
 | `stopwatch.restart` | `'name' stopwatch.restart` | Equivalent to `reset` followed immediately by `start` |
 | `stopwatch.isRunning` | `'name' stopwatch.isRunning` → `.boolean` | Tests whether the stopwatch is currently running |
 | `stopwatch.elapsed` | `'name' stopwatch.elapsed` → `.number` | Elapsed time in milliseconds |
+
+### Date and time
+
+Primitives to read and set the device's date and time. `now`, `date->` and `->date` are 🔗 **Shared** with the desktop MOGWAI engine and work the same way; `setDateTime` is ⚙️ **NANO-only**. A point in time is represented as a **number of ticks** — a plain `.number`, so it can be stored, compared and subtracted like any other.
+
+A `.number` carries both a `float` and a `double` value. Most primitives use the `float` one, which suits the ESP32's hardware FPU; **every time primitive uses the `double` one**, which has the precision a number of ticks requires. Nothing has to be done in a script for this: the choice is made by the primitive being called.
+
+| Primitive | Origin | Signature | Description |
+|---|---|---|---|
+| `now` | 🔗 | `now` → `.number` | Pushes the current date and time, as a number of ticks |
+| `date->` | 🔗 | `ticks date->` → `.record` | Converts a number of ticks (such as the value returned by `now`) into a record with the keys `year:`, `month:`, `day:`, `hour:`, `minute:`, `second:`, `dayOfWeek:` and `dayOfYear:` |
+| `->date` | 🔗 | `record ->date` → `.number` | The opposite of `date->`: converts a record in that same format into a number of ticks |
+| `setDateTime` | ⚙️ | `record setDateTime` | Sets the device's date and time from a record. The keys `year:`, `month:` and `day:` are required; `hour:`, `minute:` and `second:` are optional and are `0` when missing |
+
+```
+[ year: 2026 month: 10 day: 27 hour: 14 minute: 30 ] setDateTime
+
+now date-> ?d          # the current date and time, one key per line
+now date-> ->date ?    # back to a number of ticks
+```
 
 ---
 

@@ -33,6 +33,7 @@
     <ProjectReference Include="..\MogaiNanoPwm\MogaiNanoPwm.nfproj" />
     <ProjectReference Include="..\MogwaiNanoAdc\MogwaiNanoAdc.nfproj" />
     <ProjectReference Include="..\MogwaiNanoCore\MogwaiNanoCore.nfproj" />
+    <ProjectReference Include="..\MogwaiNanoDateTime\MogwaiNanoDateTime.nfproj" />
     <ProjectReference Include="..\MogwaiNanoGpio\MogwaiNanoGpio.nfproj" />
     <ProjectReference Include="..\MogwaiNanoSsd1306\MogwaiNanoSsd1306.nfproj" />
   </ItemGroup>

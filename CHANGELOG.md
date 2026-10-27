@@ -9,7 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Date and time primitives** — a first set of primitives to work with the current date and time. A point in time is represented as a number of ticks (a plain number, so it can be stored, compared and subtracted like any other). `now`, `date->` and `->date` also exist in the desktop MOGWAI engine and work the same way; `setDateTime` is NANO-only. See the [Device Primitives Reference](docs/device-primitives.md#6-stopwatch-and-datetime) and the [Shared Primitives Reference](docs/shared-primitives.md)
+  - `now` — pushes the current date and time, as a number of ticks
+  - `date->` — converts a number of ticks (such as the value returned by `now`) into a record with the keys `year:`, `month:`, `day:`, `hour:`, `minute:`, `second:`, `dayOfWeek:` and `dayOfYear:`: `now date->`
+  - `->date` — the opposite of `date->`: converts a record in that same format back into a number of ticks
+  - `setDateTime` — NANO-only: sets the device's clock from a record. The keys `year:`, `month:` and `day:` are required; `hour:`, `minute:` and `second:` are optional and default to `0` when missing: `[ year: 2026 month: 10 day: 27 hour: 14 minute: 30 ] setDateTime`
+
 ### Updated
+
+- **Faster parser** — parsing a program is now between 5 and 10 times faster than before. Nothing changes in how programs are written or behave: the gain is most noticeable on large programs and when running in debug mode (`nano.debug` / `nano.debugall`), where parsing used to take the longest
+- **`.number` now carries both a `double` and a `float` value** — all the time primitives use the `double` value, which has the precision that a number of ticks requires, while every other primitive keeps working on the `float` value exactly as before, so existing programs are unaffected
 
 ### Fixed
 
