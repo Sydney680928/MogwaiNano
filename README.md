@@ -9,7 +9,7 @@
 
 **Give your ESP32 a scripting engine.** MOGWAI NANO brings the [MOGWAI](https://github.com/Sydney680928/mogwai) engine to embedded devices — write comfortable, sugared code on your PC, and run it remotely on real hardware over WiFi.
 
-> **Target hardware: boards with real memory headroom.** MOGWAI NANO is built and tested primarily for microcontrollers with several megabytes of RAM available — an ESP32-S3 with PSRAM being our validated reference platform (a classic ESP32/WROVER with PSRAM, flashed with nanoFramework's `ESP32_PSRAM_REV3` target, should work comparably too, though we haven't tested that combination ourselves yet). A plain ESP32 (~40KB free RAM, no PSRAM) works for the simplest single-purpose scripts, but quickly runs into real, confirmed limits the moment a project combines more than one or two things — and some newer features (like [tasks](docs/device-primitives.md#5-tasks)) simply aren't practical on it at all. If you're picking hardware for this project, start with a PSRAM-equipped board rather than the cheapest ESP32 you can find. See [Memory considerations](#memory-considerations) below for the full picture.
+> **Target hardware: an ESP32-S3 with PSRAM.** MOGWAI NANO is built and tested for microcontrollers with several megabytes of RAM available, and the ESP32-S3 with PSRAM is the only ESP32 it supports. A classic ESP32 (about 40KB of free RAM, no PSRAM) ran into real, measured limits — memory fragmentation under sustained load, and no practical room for [tasks](docs/device-primitives.md#5-tasks) — and is not a supported target. If you're picking hardware for this project, pick an ESP32-S3 with PSRAM. See [Memory considerations](#memory-considerations) below for the measurements behind this.
 
 > If MOGWAI NANO looks useful to you, a ⭐ helps others discover it — thank you!
 
@@ -57,40 +57,38 @@ Once you're comfortable with the basics of the language itself, the [Getting Sta
 - **Full scripting language** — arithmetic, comparisons, control flow (`if...then...else`, `while...do`, `for...do`, `forever do`), user-defined functions, references (`&`), skills and flags, structured error handling (`trap`/`guard`)
 - **Hardware support** — GPIO, I2C, SPI, PWM, ADC, BLE peripheral (ESP32 only), a dedicated SSD1306 OLED display driver, and — ESP32 only — SPI colour TFT displays (ST7789 built in, other controllers through a custom initialization table) with I2C capacitive touch panels (GT911, CST816, FT6x36), all configured from a single record
 - **Tasks** — real parallel execution, each on its own native thread with a fully isolated runtime instance, communicating with the parent only through events. Practical only on a PSRAM-equipped board (~10KB per task) — see [Memory considerations](#memory-considerations)
-- **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on ~40KB-RAM devices
+- **Memory management** — a lazy-parsing execution model with two configurable modes (`mogwai.frugalMode`), trading CPU for a flat, predictable memory footprint on long-running or complex programs — a real constraint on devices with little RAM
 - **Reusable code libraries** — *units*, stored on flash and loaded on demand, for sharing functions (an RTC helper library, for example) across scripts without copy-pasting
 - **Integrated step-by-step debugger** — run a program in debug mode from MOGWAI NANO Studio and follow it instruction by instruction: the instruction about to run is highlighted in your original source, with Pause / Resume / Step controls, an optional trace delay, and the ability to run code in the console while paused to inspect or change variables and the stack. Parsing takes longer in debug mode, in exchange for being able to debug
 - **Timers & stopwatches** — one-shot and recurring timers running independently of your main program, plus named stopwatches for measuring elapsed time
 - **Events** — subscribe to hardware events (like GPIO changes) with data delivered through a `MOGRecord`
 - **Network protocol** — UDP discovery + reliable TCP communication, with automatic disconnection detection and clean recovery
 - **Persistent autorun** — store code to run automatically on every boot, for standalone production deployments
-- **ESP32 and Raspberry Pi Pico 2 W** — the runtime is built on a shared core plus per-platform pieces, with ESP32 fully usable end-to-end today; Pico 2 W boots and runs the same runtime, but isn't yet usable with a Studio — see [Supported platforms](#supported-platforms) below
+- **ESP32-S3 and Raspberry Pi Pico 2 W** — the runtime is built on a shared core plus per-platform pieces, with the ESP32-S3 fully usable end-to-end today; the Pico 2 W build is a minimal one, without the ESP32-specific features. It boots and runs the same runtime, but isn't yet usable with a Studio — see [Supported platforms](#supported-platforms) below
 
 ## Memory considerations
 
-A plain ESP32 gives MOGWAI NANO roughly 40KB of free RAM to work with once the firmware and networking stack are up. That's enough for straightforward scripts, but two things compound on this constrained platform:
+MOGWAI NANO needs memory headroom, which is why the ESP32-S3 with PSRAM is the target. Measurements on a classic ESP32, which gives MOGWAI NANO roughly 40KB of free RAM once the firmware and networking stack are up, showed two things that compound on a constrained platform:
 
 - **Long-running programs are prone to memory fragmentation.** Programs that allocate and release many objects over time (loops, repeated function calls, string building) can end up with free memory scattered across many small fragments rather than one usable block — so a script can fail to allocate even when the total "free" figure looks comfortable, even after forcing a garbage collection.
 - **Running several subsystems together compounds this quickly.** A display, I2C sensors, and sustained network traffic (Studio requests, background timers) all running in the same long session were measured to trigger real instability from this — not corrupted behavior, but outright allocation failures — well before the total memory looked exhausted.
 
 None of this is a bug to "just fix" — it's a direct, measured consequence of running an interpreted RPN language on top of a managed CLR, on top of a real-time OS, on a few tens of kilobytes of RAM. **An ESP32-S3 board with PSRAM changes this picture completely.** With several megabytes available instead of tens of kilobytes, the same fragmentation risk is structurally still there, but never gets anywhere close to being a practical problem — a composite project (display + sensors + long network sessions) that showed real instability on a plain ESP32 ran rock-solid for hours straight on an ESP32-S3 with PSRAM in side-by-side testing, with no configuration changes to the script itself.
 
-**Tasks (parallel execution) push this further still.** Each task costs roughly 10KB (its own engine instance plus its own native thread) — confirmed working smoothly on an ESP32-S3 with PSRAM, but confirmed genuinely too tight on a plain ESP32 (REV3, no PSRAM). To be precise about *why*: this isn't about the classic ESP32's Xtensa LX6 core being inherently incapable — it's specifically about PSRAM availability. This isn't a "might be an issue" caveat — it's a directly observed result. If your project needs tasks, a PSRAM-equipped board isn't optional.
+**Tasks (parallel execution) push this further still.** Each task costs roughly 10KB (its own engine instance plus its own native thread) — confirmed working smoothly on an ESP32-S3 with PSRAM, but confirmed genuinely too tight on a classic ESP32 (no PSRAM). To be precise about *why*: this isn't about the classic ESP32's Xtensa LX6 core being inherently incapable — it's specifically about PSRAM availability. This isn't a "might be an issue" caveat — it's a directly observed result. If your project needs tasks, a PSRAM-equipped board isn't optional.
 
-**PSRAM isn't exclusive to the S3 — nanoFramework supports it on classic ESP32 too, via dedicated firmware targets.** `ESP32_PSRAM_REV3` targets exactly the REV3 chip revision this project already uses, just paired with a PSRAM-equipped module (e.g. an ESP32-WROVER, which includes PSRAM directly on the module — as opposed to WROOM, which doesn't); `ESP32_PSRAM_REV0` covers other chip revisions with PSRAM the same way. **We haven't tested MOGWAI NANO on this specific target yet** — all our own measurements above were done on an S3 board — but the underlying mechanism (PSRAM exposed to the managed heap) is the same, so it should work comparably. If you go this route, we'd genuinely like to hear how it goes.
-
-**Recommendation:** a PSRAM-equipped board — whether an ESP32-S3 (our validated path) or a classic ESP32/WROVER flashed with a PSRAM-enabled target like `ESP32_PSRAM_REV3` (untested by us, but should work) — is what we'd point you toward for any real project. The peace of mind of not fighting memory fragmentation is worth it as soon as your script does more than one simple thing. As a rough, untested rule of thumb, at least 1MB of PSRAM should give the runtime enough breathing room — our own testing was done on a board with several megabytes available, so consider this an estimate rather than a validated minimum. We expect to refine this figure over time as the runtime evolves and its own memory footprint changes. A plain ESP32 without PSRAM remains fine for small, single-purpose scripts (a single sensor, basic GPIO) where the tighter memory budget is unlikely to ever be an issue — but treat that as the exception you're deliberately choosing, not the default starting point. See also `mogwai.frugalMode` above, which helps on constrained boards but doesn't eliminate this class of issue on its own.
+**Recommendation:** use an ESP32-S3 with PSRAM, our validated path. As a rough, untested rule of thumb, at least 1MB of PSRAM should give the runtime enough breathing room — our own testing was done on boards with several megabytes available, so consider this an estimate rather than a validated minimum. We expect to refine this figure over time as the runtime evolves and its own memory footprint changes. See also `mogwai.frugalMode` above, which helps on constrained boards but doesn't eliminate this class of issue on its own.
 
 ## Supported platforms
 
 | Platform | Status |
 |---|---|
-| ESP32 | ✅ Tested — usable for small, single-purpose scripts only (see [Memory considerations](#memory-considerations)); not recommended for anything more composite |
-| ESP32-S3 (with PSRAM) | ✅ Tested — recommended for composite projects (display, multiple sensors, long-running sessions) |
-| Classic ESP32/WROVER (with PSRAM, `ESP32_PSRAM_REV3` target) | 🔜 Should work comparably to ESP32-S3+PSRAM — not yet tested by us |
-| Raspberry Pi Pico 2 W (`PICO2_RP2350_W`, RP2350) | ⚠️ Boots and runs the shared runtime, deploys successfully — but WiFi doesn't currently connect (see note in [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below), so it can't yet talk to a Studio. Not usable end-to-end yet. The original Pico W (RP2040) hasn't been tried |
+| ESP32-S3 (with PSRAM, `ESP32_S3_OCTAL`) | ✅ Tested — the supported ESP32 target, recommended for composite projects (display, multiple sensors, long-running sessions) |
+| Raspberry Pi Pico 2 W (`PICO2_RP2350_W`, RP2350) | ⚠️ A minimal build of the runtime: the shared core plus GPIO, PWM, ADC, SSD1306 and date/time, without the ESP32-specific features (`esp32.setPinFunction`, the onboard LED, BLE peripheral, TFT and touch). It boots and runs, and deploys successfully — but WiFi doesn't currently connect (see note in [1b](#1b-flash-the-firmware--application-raspberry-pi-pico-2-w) below), so it can't yet talk to a Studio. Not usable end-to-end yet. About 250KB of RAM is left once the runtime is loaded, which is tight: expect small programs only. The original Pico W (RP2040) hasn't been tried |
 | STM32 | 🔜 Should work — nanoFramework supports it, not yet tested by us |
 | TI | 🔜 Should work — nanoFramework supports it, not yet tested by us |
+
+A classic ESP32 is not a supported target: see [Memory considerations](#memory-considerations) for the measurements behind that choice.
 
 ### Tested display boards
 
@@ -115,15 +113,15 @@ MOGWAI NANO Studio is the graphical companion app that talks to a device from yo
 
 Every [release](https://github.com/Sydney680928/MogwaiNano/releases) attaches everything below — same version number across the board, since the whole ecosystem ships together:
 
-- **`MogwaiNanoEsp32-<version>.bin`** — the device firmware/application for ESP32. This is the file used in [Quick start](#quick-start) below, deployed with `nanoff --deploy --image MogwaiNanoEsp32-<version>.bin`.
-- **`MogwaiNanoPicoW-<version>.bin`** — the same runtime, built for Raspberry Pi Pico 2 W. Deploys successfully (see [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below), but isn't yet usable end-to-end — WiFi doesn't currently connect.
+- **`MogwaiNanoEsp32-<version>.bin`** — the device firmware/application for ESP32-S3. This is the file used in [Quick start](#quick-start) below, deployed with `nanoff --deploy --image MogwaiNanoEsp32-<version>.bin`.
+- **`MogwaiNanoPicoW-<version>.bin`** — the minimal build of the runtime, without the ESP32-specific features, for Raspberry Pi Pico 2 W. Deploys successfully (see [1b](#1b-flash-the-firmware--application-raspberry-pi-pico-2-w) below), but isn't yet usable end-to-end — WiFi doesn't currently connect.
 - **`mogwai-nano-studio-gui-<version>-<platform>.zip`/`.tar.gz`** — the Studio, self-contained, one archive per platform (`win-x64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`). Pick the one matching your PC, extract, and run — no install, no .NET runtime required.
 
 You only need one of the two firmware binaries — whichever matches your device — and only the Studio archive matching your platform. You don't need every file in a release, just the ones matching your situation.
 
 ## Quick start
 
-### 1. Flash the firmware + application (ESP32-S3 with Octal PSRAM — recommended)
+### 1. Flash the firmware + application (ESP32-S3 with Octal PSRAM)
 
 Download the latest `MogwaiNanoEsp32-<version>.bin` from the [Releases](../../releases) page, then:
 
@@ -141,43 +139,18 @@ nanoff --target ESP32_S3_OCTAL --serialport COMx --masserase --update
 #    without power-cycling in between, has been unreliable. Confirmed
 #    consistently reliable with this power cycle in between.
 
-# 3. Deploy the application — unlike ESP32_REV3 below, no explicit
-# --address is needed here; confirmed across 4 different S3 boards
+# 3. Deploy the application — no explicit --address is needed here;
+# confirmed across 4 different S3 boards
 nanoff --target ESP32_S3_OCTAL --serialport COMx --deploy --image MogwaiNanoEsp32-<version>.bin
 ```
 
-> **Known S3 quirk:** flashing can take noticeably longer than on a classic ESP32 — several minutes rather than seconds is normal, not a sign of a hung process. Let it run.
+> **Known S3 quirk:** flashing can take several minutes rather than seconds — that is normal, not a sign of a hung process. Let it run.
 
-> **Raspberry Pi Pico W:** the original (RP2040) hasn't been tried. For the Pico 2 W (RP2350), see [1c](#1c-flash-the-firmware--application-raspberry-pi-pico-2-w) below — it deploys, but isn't usable end-to-end yet.
-
-### 1b. Flash the firmware + application (classic ESP32 / ESP32_REV3)
-
-If you're using a classic ESP32 (`ESP32_REV3`) instead (see [Memory considerations](#memory-considerations) for why ESP32-S3 above is the recommended path):
-
-```bash
-# ESP32 — two separate commands (see note below on why)
-
-# 1. Flash the firmware (--masserase avoids issues from leftover factory partitions on a brand-new board)
-nanoff --target ESP32_REV3 --serialport COMx --masserase --update
-
-# 2. Power-cycle the board now — unplug, wait ~2 seconds, plug back in.
-#    Required: deploying the application right after flashing the firmware,
-#    without power-cycling in between, has been unreliable. Confirmed
-#    consistently reliable with this power cycle in between.
-
-# 3. Deploy the application
-nanoff --target ESP32_REV3 --serialport COMx --deploy --image MogwaiNanoEsp32-<version>.bin --address 0x1E0000
-```
-
-> **Why two separate commands, and why `--address` is required:** on `ESP32_REV3`, `nanoff`'s automatic deployment address calculation is unreliable and consistently fails to match the device's actual partition layout — confirmed across three different boards, regardless of firmware version. Always pass `--address 0x1E0000` explicitly when deploying. It also needs to be in its own command, separate from `--update`: combining `--update` and `--deploy --address` in a single invocation causes `--address` to be silently ignored.
->
-> **Why `--masserase`:** on a board that was never flashed with nanoFramework before (or previously ran different firmware), leftover factory partition data can cause the deployment to fail — `--masserase` wipes the flash clean first, avoiding this entirely. Recommended on every first flash of a new board.
->
-> After deploying, check the device with `nanoff --devicedetails` or Device Explorer and look at the `Assemblies:` section to confirm success — `MogwaiNano` should be listed there with its dependencies. The `Deployment Map` field further down is unrelated to this (it reports on In-Field Update capability, which this target doesn't support) and will read `Empty` even on a fully successful deployment — don't use it to diagnose a failed deploy.
+> **Raspberry Pi Pico W:** the original (RP2040) hasn't been tried. For the Pico 2 W (RP2350), see [1b](#1b-flash-the-firmware--application-raspberry-pi-pico-2-w) below — it deploys, but isn't usable end-to-end yet.
 
 > On ESP32, you may be asked to hold the BOOT/FLASH button on the board during flashing.
 
-### 1c. Flash the firmware + application (Raspberry Pi Pico 2 W)
+### 1b. Flash the firmware + application (Raspberry Pi Pico 2 W)
 
 > **This target doesn't work end-to-end yet.** The steps below deploy successfully, but WiFi doesn't currently connect — the device boots and runs the runtime, but can't reach a Studio over the network, so there's no way to actually use it for anything yet. Configuring WiFi through Visual Studio's Device Explorer consistently freezes VS at the validation step; injecting a WiFi configuration programmatically instead does store the configuration (it's confirmed present on the device afterward), but the connection then fails anyway, with nothing pointing to whether that's a wrong configuration or a real connectivity problem. ESP32 devices on the same network connect without any issue. Documented here as a known limitation, not a guide to a working setup — we'll update this once it's resolved.
 
@@ -238,7 +211,7 @@ src/MogwaiNano/
 ├── runtime/
 │   ├── MogwaiNanoCore/     # Platform-independent device runtime — engine, language, hardware primitives
 │   ├── MogwaiNanoEsp32/    # ESP32 target: references Core + ESP32-specific pin configuration
-│   └── MogwaiNanoPicoW/    # Raspberry Pi Pico 2 W target: references Core (boots and runs; WiFi not yet working)
+│   └── MogwaiNanoPicoW/    # Raspberry Pi Pico 2 W target: references Core, minimal build without the ESP32-specific features (boots and runs; WiFi not yet working)
 ├── studio/
 │   └── MogwaiNanoStudioGui/    # Desktop companion app, GUI (Avalonia)
 └── usings/                 # Dynamically-loadable plugin libraries (experimental — see mogwai.using)

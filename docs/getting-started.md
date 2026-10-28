@@ -10,7 +10,7 @@ Here, we focus on what's specific to NANO: flashing a device, connecting to it, 
 
 ## 1. Flash and configure your device
 
-Follow the [Quick Start](../README.md#quick-start) in the main README to flash `MogwaiNano.bin` and configure WiFi. Once done, power-cycle the device — it will boot straight into MOGWAI NANO and start listening for connections.
+Follow the [Quick Start](../README.md#quick-start) in the main README to flash `MogwaiNanoEsp32-<version>.bin` and configure WiFi. Once done, power-cycle the device — it will boot straight into MOGWAI NANO and start listening for connections.
 
 ## 2. Start MOGWAI NANO Studio
 
@@ -292,14 +292,28 @@ nano.memory ?
 
 This is a lightweight, non-blocking query (it doesn't force a garbage collection on the device the way `mogwai.memory` does from within a running program) — safe to call frequently, even in a polling loop.
 
-If your program is running *on the device* itself (typically as a stored autorun program, with no Studio connection to fall back on), `mogwai.info` gives you everything in a single call — a record with the device's system version, IP, name, platform, session, free memory, target, MOGWAI NANO version, OEM build details, and the device's skills:
+If your program is running *on the device* itself (typically as a stored autorun program, with no Studio connection to fall back on), `mogwai.info` gives you everything in a single call — a record with the device's name, MOGWAI NANO version, IP, session, platform, target, OEM build details, system version, free memory, skills, loaded units, primitives and usings, and the `frugalMode` and `keepAlive` states. `?d` displays it one key per line (long values are cut short with `...`):
 
 ```
-{ mogwai.info ? } nano.run
+{ mogwai.info ?d } nano.run
 ```
 
 ```
-[system: "1.17.0.334" ip: "192.168.1.75" name: "DEVICE1" platform: "ESP32" session: "39122" memory: 49872 target: "ESP32_REV3" mogwai: "0.2.0.0" oem: "MinSizeRel build, chip rev. >= 3, without support for PSRAM" skills: ("GPIO" "I2C")]
+name:          "TFT-2"
+mogwai:        "0.10.0.0"
+ip:            "192.168.137.225"
+session:       "60039"
+platform:      "ESP32"
+target:        "ESP32_S3_OCTAL"
+oem:           "MinSizeRel build, chip rev. >= 0, support for PSR...
+system:        "1.18.0.30"
+memory:        7083912
+skills:        ('I2C' 'SPI' 'UNITS' 'TASKS' 'EVENTS' 'TIMERS' 'GP...
+units:         ()
+primitives:    ('ssd1306.clear' 'mogwai.units' 'tft.drawHorizonta...
+usings:        ()
+frugalMode:    false
+keepAlive:     false
 ```
 
 This shows up in the Console NANO tab the moment the device prints it — no extra step needed.

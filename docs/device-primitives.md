@@ -17,7 +17,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 
 ### Arithmetic
 
-> **Reference support:** `+`, `-`, `*`, `/` all accept a `MOGRef` (`&variable`) in place of their main operand — the reference is transparently dereferenced to the variable's actual value before the operation runs, with no difference in the result.
+> **Reference support:** `+`, `-`, `*`, `/` all accept a `MOGRef` (`&variable`) in place of their main operand. The variable's value is placed on the stack without being copied, the primitive does its work on it, and since the operand was a reference the result is not left on the stack: it is already in the variable. `&counter 8 +` therefore adds 8 to `counter` in place, leaving nothing on the stack.
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -741,8 +741,10 @@ Names and argument order follow the `ssd1306.*` family where they overlap, with 
 | `tft.drawFilledCircle` | `x y radius color tft.drawFilledCircle` | Draws a filled circle |
 | `tft.drawTriangle` | `x1 y1 x2 y2 x3 y3 color tft.drawTriangle` | Draws a triangle outline |
 | `tft.drawBitmap` | `x y width height data tft.drawBitmap` | Draws an image from a `MOGData` buffer of RGB565 pixels, two bytes per pixel, high byte first. Raises `TFT.4` if the buffer is smaller than `width × height × 2` |
+| `tft.scroll` | `x y width height dx dy color tft.scroll` | Moves the content of a rectangle of the canvas by `dx` pixels to the right and `dy` pixels down — negative values move it left and up. `0 0 240 320 0 -8 0 tft.scroll` scrolls a whole 240×320 screen up by 8 pixels, i.e. one line of text at `size` 1. What leaves the rectangle is lost, and the band that is freed is filled with `color`. The whole rectangle counts as modified, so the next `tft.refresh` sends all of it: about 80 ms for a full 240×320 screen, proportionally less for a smaller rectangle. A displacement larger than the rectangle simply fills it with `color` |
 | `tft.drawString` | `x y "text" size foreground background tft.drawString` | Draws a text with the built-in 8×8 font, `size` being an integer scale factor (`1`, `2`, `3`...): each character is `8 × size` pixels wide. A `background` of `-1` leaves the background untouched (transparent); `\n` starts a new line |
 | `tft.measureString` | `"text" size tft.measureString` → `.number` | Width in pixels of the longest line of the text — to centre it, for instance |
+| `tft.smooth` | `on tft.smooth` | When `true`, text drawn with a `size` of 2 or more is anti-aliased: only the stair steps of diagonal edges are smoothed, while straight edges and corners stay sharp. The smoothing blends with what is already on the canvas, so it also works with a transparent background (`-1`). It has no effect at `size` 1. Off by default, and back to off each time a screen is opened with `tft.init` |
 
 Everything drawn outside the canvas is clipped.
 
@@ -822,6 +824,47 @@ The whole configuration of the Waveshare ESP32-S3-Touch-LCD-2, then a few drawin
 60 160 30 255 255 0 tft.color tft.drawFilledCircle
 
 tft.refresh
+```
+
+A text console that scrolls like an 8-bit home computer, under a fixed title. Each new line is written at the bottom of the screen; once the screen is full, `tft.scroll` moves the area below the title up by one line (8 pixels at `size` 1) first. `&curY 8 +` adds 8 to `curY` in place:
+
+```
+# Works unmodified on a Waveshare ESP32-S3-Touch-LCD-2
+
+[ controller: "st7789" width: 240 height: 320
+  sclk: 39 mosi: 38 miso: 40 dc: 42 cs: 45 rst: -1 backlight: 1
+  invert: true ] tft.init
+
+0 0 0 tft.color tft.clear
+255 255 255 tft.color -> 'white'
+0 255 0 tft.color -> 'green'
+true tft.smooth
+
+# Fixed title (outside the scrolling area)
+0 0 "CONSOLE" 2 white 0 tft.drawString
+
+# The text lines (size 1, 8 pixels high) run from y=16 to y=312
+16 -> 'curY'
+
+1 80 for 'n' do
+{
+    # The line no longer fits: scroll the area below the title up by one line
+    if (curY 312 >) then
+    {
+        0 16 240 304 0 -8 0 tft.scroll
+        312 -> 'curY'
+    }
+
+    # Every fifth line in green
+    if (n 5 mod 0 ==) then { green -> 'fg' } else { white -> 'fg' }
+
+    0 curY "Line number " n ->str + 1 fg 0 tft.drawString
+    &curY 8 +
+
+    tft.refresh
+}
+
+5000 wait
 ```
 
 ### Errors

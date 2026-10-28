@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Stéphane Sibué
+// Copyright 2026 Stéphane Sibué
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@ namespace MogwaiNanoTft
         private const int OpCircle = 10;
         private const int OpFillCircle = 11;
         private const int OpTriangle = 12;
+        private const int OpScroll = 13;
 
         // ------------------------------------------------------------------
         // Lifecycle
@@ -404,6 +405,7 @@ namespace MogwaiNanoTft
                         case OpCircle: _display.DrawCircle(v[0], v[1], v[2], (ushort)v[3]); break;
                         case OpFillCircle: _display.FillCircle(v[0], v[1], v[2], (ushort)v[3]); break;
                         case OpTriangle: _display.DrawTriangle(v[0], v[1], v[2], v[3], v[4], v[5], (ushort)v[6]); break;
+                        case OpScroll: _display.Scroll(v[0], v[1], v[2], v[3], v[4], v[5], (ushort)v[6]); break;
                     }
                 }
                 catch (Exception ex)
@@ -495,6 +497,14 @@ namespace MogwaiNanoTft
         {
             // x1 y1 x2 y2 x3 y3 color tft.drawTriangle
             return DrawNumbers(engine, name, 7, OpTriangle);
+        }
+
+        public static EvalResult PrimitiveTftScroll(MogwaiNanoEngine engine, string name)
+        {
+            // x y w h dx dy color tft.scroll
+            // Moves the content of the rectangle by (dx, dy) pixels; the freed band is filled with color.
+            // dy = -8 moves the content up by 8 pixels (text console).
+            return DrawNumbers(engine, name, 7, OpScroll);
         }
 
         public static EvalResult PrimitiveTftColor(MogwaiNanoEngine engine, string name)
@@ -604,6 +614,33 @@ namespace MogwaiNanoTft
                         return EvalResult.Failure(engine, TftIsClosedError, name);
 
                     _display.AutoFlush = on.Value;
+                }
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        public static EvalResult PrimitiveTftSmooth(MogwaiNanoEngine engine, string name)
+        {
+            // true tft.smooth   (anti-aliased text for sizes 2 and above)
+
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGBoolean))
+            {
+                var on = engine.StackPop() as MOGBoolean;
+
+                lock (_lock)
+                {
+                    if (_display == null)
+                        return EvalResult.Failure(engine, TftIsClosedError, name);
+
+                    _display.Smooth = on.Value;
                 }
 
                 return EvalResult.NoError;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace MogwaiNanoTft
 {
@@ -16,6 +16,7 @@ namespace MogwaiNanoTft
         private byte[] _fb;
         private byte[] _tx;
         private readonly byte[] _glyph = new byte[8];
+        private byte[] _rowTmp;     // temporary row, only allocated by horizontal scrolling
 
         private int _width;
         private int _height;
@@ -23,6 +24,9 @@ namespace MogwaiNanoTft
 
         private bool _dirty;
         private int _dx0, _dy0, _dx1, _dy1;
+
+        /// <summary>When true, text drawn with a size of 2 or more is anti-aliased (smoothed edges).</summary>
+        public bool Smooth;
 
         /// <summary>When true, every drawing call immediately sends its area to the screen.</summary>
         public bool AutoFlush;
@@ -529,8 +533,199 @@ namespace MogwaiNanoTft
         }
 
         // ------------------------------------------------------------------
+        // Scrolling
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Scrolls the content of a rectangle inside the canvas. dx and dy are the displacement of the content
+        /// (dy = -8: the content moves up by 8 pixels, like a text console). What scrolls out of the rectangle is lost,
+        /// the band that is freed is filled with color. The whole rectangle is marked as modified.
+        /// </summary>
+        public void Scroll(int x, int y, int w, int h, int dx, int dy, ushort color)
+        {
+            if (w <= 0 || h <= 0) return;
+
+            int x1 = x + w - 1;
+            int y1 = y + h - 1;
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+            if (x1 >= _width) x1 = _width - 1;
+            if (y1 >= _height) y1 = _height - 1;
+            if (x > x1 || y > y1) return;
+
+            if (dx == 0 && dy == 0) return;
+
+            int cw = x1 - x + 1;
+            int ch = y1 - y + 1;
+            int adx = dx < 0 ? -dx : dx;
+            int ady = dy < 0 ? -dy : dy;
+
+            if (adx >= cw || ady >= ch)
+            {
+                // everything scrolls out
+                FillRectRaw(x, y, cw, ch, color);
+                Done(x, y, x1, y1);
+                return;
+            }
+
+            int copyW = cw - adx;
+            int copyH = ch - ady;
+            int rowBytes = copyW * 2;
+            int srcX = dx < 0 ? x + adx : x;
+            int dstX = dx > 0 ? x + adx : x;
+            int srcY = dy < 0 ? y + ady : y;
+            int dstY = dy > 0 ? y + ady : y;
+            int stride = _width * 2;
+
+            // Rows are copied one by one so that no single copy overlaps itself,
+            // except when the content only moves sideways (dy == 0): a temporary row is used then.
+            if (dy == 0 && _rowTmp == null)
+            {
+                int max = _driver.NativeWidth > _driver.NativeHeight ? _driver.NativeWidth : _driver.NativeHeight;
+                _rowTmp = new byte[max * 2];
+            }
+
+            if (dy <= 0)
+            {
+                // content moves up (or stays on the same rows): the destination is before the source, go downwards
+                for (int r = 0; r < copyH; r++)
+                {
+                    CopyScrollRow((srcY + r) * stride + srcX * 2, (dstY + r) * stride + dstX * 2, rowBytes, dy == 0);
+                }
+            }
+            else
+            {
+                // content moves down: the destination is after the source, go upwards
+                for (int r = copyH - 1; r >= 0; r--)
+                {
+                    CopyScrollRow((srcY + r) * stride + srcX * 2, (dstY + r) * stride + dstX * 2, rowBytes, false);
+                }
+            }
+
+            // Band(s) freed by the move
+            if (dy < 0) FillRectRaw(x, y1 - ady + 1, cw, ady, color);
+            else if (dy > 0) FillRectRaw(x, y, cw, ady, color);
+
+            if (dx < 0) FillRectRaw(x1 - adx + 1, y, adx, ch, color);
+            else if (dx > 0) FillRectRaw(x, y, adx, ch, color);
+
+            Done(x, y, x1, y1);
+        }
+
+        private void CopyScrollRow(int src, int dst, int length, bool sameRow)
+        {
+            if (sameRow)
+            {
+                Array.Copy(_fb, src, _rowTmp, 0, length);
+                Array.Copy(_rowTmp, 0, _fb, dst, length);
+            }
+            else
+            {
+                Array.Copy(_fb, src, _fb, dst, length);
+            }
+        }
+
+        // ------------------------------------------------------------------
         // Text (8x8 font, scale factor 1, 2, 3...)
         // ------------------------------------------------------------------
+
+        // Glyph pixel (0 or 1), 0 outside the 8x8 cell.
+        private int GlyphBit(int col, int row)
+        {
+            if (col < 0 || col > 7 || row < 0 || row > 7) return 0;
+            return (_glyph[row] >> col) & 1;
+        }
+
+        // Blends fg over the pixel already in the canvas. alpha: 0 (nothing) to 256 (opaque).
+        private void BlendPixel(int x, int y, ushort fg, int alpha)
+        {
+            if (alpha <= 0) return;
+            if (x < 0 || y < 0 || x >= _width || y >= _height) return;
+
+            int i = (y * _width + x) * 2;
+
+            if (alpha >= 256)
+            {
+                _fb[i] = (byte)(fg >> 8);
+                _fb[i + 1] = (byte)(fg & 0xFF);
+                return;
+            }
+
+            int d = (_fb[i] << 8) | _fb[i + 1];
+            int inv = 256 - alpha;
+
+            int r = ((((fg >> 11) & 0x1F) * alpha) + (((d >> 11) & 0x1F) * inv)) >> 8;
+            int g = ((((fg >> 5) & 0x3F) * alpha) + (((d >> 5) & 0x3F) * inv)) >> 8;
+            int b = (((fg & 0x1F) * alpha) + ((d & 0x1F) * inv)) >> 8;
+
+            int v = (r << 11) | (g << 5) | b;
+            _fb[i] = (byte)(v >> 8);
+            _fb[i + 1] = (byte)(v & 0xFF);
+        }
+
+        // Anti-aliased glyph. Straight edges and corners stay sharp: only the stair steps of diagonal edges
+        // are smoothed. For each pixel, a corner (quadrant) is cut or filled along its diagonal when
+        // the two neighbours on that side are equal to each other and different from the pixel, while
+        // the two neighbours on the other side are equal to the pixel (the usual "Scale2x" rule).
+        private void DrawCharSmooth(int x, int y, ushort fg, int scale)
+        {
+            for (int row = 0; row < 8; row++)
+            {
+                for (int col = 0; col < 8; col++)
+                {
+                    int p = GlyphBit(col, row);
+                    int l = GlyphBit(col - 1, row);
+                    int r = GlyphBit(col + 1, row);
+                    int u = GlyphBit(col, row - 1);
+                    int d = GlyphBit(col, row + 1);
+
+                    bool ul = l == u && l != p && r == p && d == p;
+                    bool ur = r == u && r != p && l == p && d == p;
+                    bool dl = l == d && l != p && r == p && u == p;
+                    bool dr = r == d && r != p && l == p && u == p;
+
+                    if (p == 0 && !ul && !ur && !dl && !dr) continue;
+
+                    int bx = x + col * scale;
+                    int by = y + row * scale;
+
+                    if (!ul && !ur && !dl && !dr)
+                    {
+                        FillRectRaw(bx, by, scale, scale, fg);
+                        continue;
+                    }
+
+                    for (int oy = 0; oy < scale; oy++)
+                    {
+                        int uy = 2 * oy + 1 - scale;     // distance to the center of the block, in 1/(2*scale)
+                        bool top = uy < 0;
+                        int ay = top ? -uy : uy;
+
+                        for (int ox = 0; ox < scale; ox++)
+                        {
+                            int ux = 2 * ox + 1 - scale;
+                            bool left = ux < 0;
+                            int ax = left ? -ux : ux;
+
+                            bool flag = top ? (left ? ul : ur) : (left ? dl : dr);
+                            int alpha = p != 0 ? 256 : 0;
+
+                            if (flag)
+                            {
+                                // coverage of the corner triangle beyond the line qx + qy = 0.5 (ramp about one pixel wide)
+                                int a = 128 + (ax + ay - scale) * 90;
+                                if (a < 0) a = 0;
+                                if (a > 256) a = 256;
+
+                                alpha = p != 0 ? 256 - a : a;
+                            }
+
+                            BlendPixel(bx + ox, by + oy, fg, alpha);
+                        }
+                    }
+                }
+            }
+        }
 
         private void DrawCharRaw(int x, int y, char c, ushort fg, int bg, int scale)
         {
@@ -539,6 +734,12 @@ namespace MogwaiNanoTft
             if (bg >= 0)
             {
                 FillRectRaw(x, y, 8 * scale, 8 * scale, (ushort)bg);
+            }
+
+            if (Smooth && scale >= 2)
+            {
+                DrawCharSmooth(x, y, fg, scale);
+                return;
             }
 
             for (int row = 0; row < 8; row++)

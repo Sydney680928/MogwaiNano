@@ -165,7 +165,9 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterPrimitive("tft.drawCircle", new(TftManager.PrimitiveTftDrawCircle));
             MogwaiNanoEngine.RegisterPrimitive("tft.drawFilledCircle", new(TftManager.PrimitiveTftDrawFilledCircle));
             MogwaiNanoEngine.RegisterPrimitive("tft.drawTriangle", new(TftManager.PrimitiveTftDrawTriangle));
+            MogwaiNanoEngine.RegisterPrimitive("tft.scroll", new(TftManager.PrimitiveTftScroll));
             MogwaiNanoEngine.RegisterPrimitive("tft.drawBitmap", new(TftManager.PrimitiveTftDrawBitmap));
+            MogwaiNanoEngine.RegisterPrimitive("tft.smooth", new(TftManager.PrimitiveTftSmooth));
             MogwaiNanoEngine.RegisterPrimitive("tft.drawString", new(TftManager.PrimitiveTftDrawString));
             MogwaiNanoEngine.RegisterPrimitive("tft.measureString", new(TftManager.PrimitiveTftMeasureString));
 
