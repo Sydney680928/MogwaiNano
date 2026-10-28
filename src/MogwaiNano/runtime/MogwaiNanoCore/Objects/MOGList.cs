@@ -90,9 +90,7 @@ namespace MogwaiNano.Objects
                 obj.Items.Add(item.Clone());
 
             obj.AutoEval = AutoEval;
-
-            if (DebugInfo != null)
-                obj.DebugInfo = DebugInfo.Clone();
+            obj.DebugInfo = DebugInfo;
 
             return obj;
         }

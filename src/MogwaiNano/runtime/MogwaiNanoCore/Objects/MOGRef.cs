@@ -28,10 +28,7 @@ namespace MogwaiNano.Objects
         public override MOGObject Clone()
         {
             var obj = new MOGRef(Engine, Value);
-
-            if (DebugInfo != null)
-                obj.DebugInfo = DebugInfo.Clone();
-
+            obj.DebugInfo = DebugInfo;
             return obj;
         }
 

@@ -85,8 +85,7 @@ namespace MogwaiNano.Objects
                 }
             }
 
-            if (DebugInfo != null)
-                obj.DebugInfo = DebugInfo.Clone();
+            obj.DebugInfo = DebugInfo;
 
             return obj;
         }

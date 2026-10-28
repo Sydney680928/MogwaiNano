@@ -112,9 +112,7 @@ namespace MogwaiNano.Objects
                 obj.Keys.Add(key);
 
             obj.AutoEval = AutoEval;
-
-            if (DebugInfo != null)
-                obj.DebugInfo = DebugInfo.Clone();
+            obj.DebugInfo = DebugInfo;
 
             return obj;
         }

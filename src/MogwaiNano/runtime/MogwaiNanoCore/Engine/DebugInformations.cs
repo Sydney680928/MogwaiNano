@@ -53,7 +53,5 @@ namespace MogwaiNano.Engine
               
             }
         }
-
-        public DebugInformations Clone() => new DebugInformations(StartPos, EndPos);
     }
 }
