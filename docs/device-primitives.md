@@ -745,6 +745,8 @@ Names and argument order follow the `ssd1306.*` family where they overlap, with 
 | `tft.drawString` | `x y "text" size foreground background tft.drawString` | Draws a text with the built-in 8×8 font, `size` being an integer scale factor (`1`, `2`, `3`...): each character is `8 × size` pixels wide. A `background` of `-1` leaves the background untouched (transparent); `\n` starts a new line |
 | `tft.measureString` | `"text" size tft.measureString` → `.number` | Width in pixels of the longest line of the text — to centre it, for instance |
 | `tft.smooth` | `on tft.smooth` | When `true`, text drawn with a `size` of 2 or more is anti-aliased: only the stair steps of diagonal edges are smoothed, while straight edges and corners stay sharp. The smoothing blends with what is already on the canvas, so it also works with a transparent background (`-1`). It has no effect at `size` 1. Off by default, and back to off each time a screen is opened with `tft.init` |
+| `tft.setFont` | `font tft.setFont` | Chooses the font used by `tft.drawString` and `tft.measureString`: `0` is the built-in 8×8 font (the default), `1` is an LCD font made of seven segments, like a digital clock. With the LCD font, `size` is a scale factor too: a digit is `8 × size` pixels high and `5 × size` wide, and the advance is `6 × size` pixels per character (`:` and `.` are narrower). The font has the digits `0`–`9`, `-` `_` `=` `°`, `:` and `.`, and the letters that can be shown with seven segments — `A b C c d E F g H h I J L n O o P r S t U u y`, upper and lower case being equivalent. Any other character leaves a blank. Anti-aliasing (`tft.smooth`) softens the tips of the segments at `size` 2 or more. Back to `0` each time a screen is opened with `tft.init` |
+| `tft.setGhost` | `color tft.setGhost` | Sets the colour of the unlit segments of the LCD font, drawn behind the lit ones to get the look of a real LCD display — a dark shade of the foreground colour on the background works well. `-1` draws no unlit segments, which is the default and again the value each time a screen is opened with `tft.init`. Has no effect on the 8×8 font |
 
 Everything drawn outside the canvas is clipped.
 
@@ -865,6 +867,65 @@ true tft.smooth
 }
 
 5000 wait
+```
+
+A digital clock with the LCD font, refreshed once a minute. The unlit segments are drawn in a very dark grey, and the date below uses the 8×8 font again. `now date-> ->vars` turns the record into the variables `year`, `month`, `day`, `hour`, `minute`... and `"D2" ->format` pads a number to two digits. The colours and the last minute displayed are global variables (their names start with `$`), because a variable without the `$` is local and wouldn't exist inside the code of the timer:
+
+```
+# Works unmodified on a Waveshare ESP32-S3-Touch-LCD-2
+
+[ controller: "st7789" width: 240 height: 320
+  sclk: 39 mosi: 38 miso: 40 dc: 42 cs: 45 rst: -1 backlight: 1
+  invert: true ] tft.init
+
+0 0 0 tft.color -> '$black'
+255 255 255 tft.color -> '$white'
+
+true tft.smooth
+
+# Unlit segments of the LCD font
+5 5 5 tft.color tft.setGhost
+
+$black tft.clear
+
+# Last minute displayed: -1 forces the first display
+-1 -> '$lastMinute'
+
+timer 'CLOCK_TIMER' every 1000 do
+{
+    DI
+
+    now date-> ->vars
+
+    # Redraw only when the minute changes
+    if (minute $lastMinute !=) then
+    {
+        minute -> '$lastMinute'
+
+        # Time, in the LCD font
+        1 tft.setFont
+        40 50
+        "{! hour \"D2\" ->format}:{! minute \"D2\" ->format}" eval
+        6 $white $black tft.drawString
+
+        # Date, back in the 8x8 font
+        0 tft.setFont
+        40 120
+        "{! day \"D2\" ->format}/{! month \"D2\" ->format}/{! year}" eval
+        2 $white $black tft.drawString
+
+        tft.refresh
+    }
+
+    EI
+}
+
+'CLOCK_TIMER' timer.start
+
+forever do
+{
+    250 wait
+}
 ```
 
 ### Errors

@@ -28,6 +28,12 @@ namespace MogwaiNanoTft
         /// <summary>When true, text drawn with a size of 2 or more is anti-aliased (smoothed edges).</summary>
         public bool Smooth;
 
+        /// <summary>Font used by DrawString and MeasureString: 0 = 8x8 bitmap font, 1 = LCD (7 segments) font.</summary>
+        public int Font;
+
+        /// <summary>Color of the unlit segments of the LCD font, or -1 to leave them out.</summary>
+        public int Ghost = -1;
+
         /// <summary>When true, every drawing call immediately sends its area to the screen.</summary>
         public bool AutoFlush;
 
@@ -758,11 +764,257 @@ namespace MogwaiNanoTft
             }
         }
 
+        // ------------------------------------------------------------------
+        // LCD font (7 segments). Size n gives digits 8*n pixels high and 5*n pixels wide.
+        // ------------------------------------------------------------------
+
+        private const int SegA = 1;
+        private const int SegB = 2;
+        private const int SegC = 4;
+        private const int SegD = 8;
+        private const int SegE = 16;
+        private const int SegF = 32;
+        private const int SegG = 64;
+
+        // Segments lit for a character (0 for a character the font doesn't have).
+        private static int LcdSegments(char c)
+        {
+            switch (c)
+            {
+                case '0': return SegA | SegB | SegC | SegD | SegE | SegF;
+                case '1': return SegB | SegC;
+                case '2': return SegA | SegB | SegD | SegE | SegG;
+                case '3': return SegA | SegB | SegC | SegD | SegG;
+                case '4': return SegB | SegC | SegF | SegG;
+                case '5': return SegA | SegC | SegD | SegF | SegG;
+                case '6': return SegA | SegC | SegD | SegE | SegF | SegG;
+                case '7': return SegA | SegB | SegC;
+                case '8': return SegA | SegB | SegC | SegD | SegE | SegF | SegG;
+                case '9': return SegA | SegB | SegC | SegD | SegF | SegG;
+
+                case '-': return SegG;
+                case '_': return SegD;
+                case '=': return SegD | SegG;
+                case '°': return SegA | SegB | SegF | SegG;       // degree sign
+
+                case 'A': case 'a': return SegA | SegB | SegC | SegE | SegF | SegG;
+                case 'B': case 'b': return SegC | SegD | SegE | SegF | SegG;
+                case 'C': return SegA | SegD | SegE | SegF;
+                case 'c': return SegD | SegE | SegG;
+                case 'D': case 'd': return SegB | SegC | SegD | SegE | SegG;
+                case 'E': case 'e': return SegA | SegD | SegE | SegF | SegG;
+                case 'F': case 'f': return SegA | SegE | SegF | SegG;
+                case 'G': case 'g': return SegA | SegC | SegD | SegE | SegF;
+                case 'H': return SegB | SegC | SegE | SegF | SegG;
+                case 'h': return SegC | SegE | SegF | SegG;
+                case 'I': case 'i': return SegE | SegF;
+                case 'J': case 'j': return SegB | SegC | SegD | SegE;
+                case 'L': case 'l': return SegD | SegE | SegF;
+                case 'N': case 'n': return SegC | SegE | SegG;
+                case 'O': return SegA | SegB | SegC | SegD | SegE | SegF;
+                case 'o': return SegC | SegD | SegE | SegG;
+                case 'P': case 'p': return SegA | SegB | SegE | SegF | SegG;
+                case 'R': case 'r': return SegE | SegG;
+                case 'S': case 's': return SegA | SegC | SegD | SegF | SegG;
+                case 'T': case 't': return SegD | SegE | SegF | SegG;
+                case 'U': return SegB | SegC | SegD | SegE | SegF;
+                case 'u': return SegC | SegD | SegE;
+                case 'Y': case 'y': return SegB | SegC | SegD | SegF | SegG;
+            }
+
+            return 0;
+        }
+
+        private static int LcdThickness(int n)
+        {
+            int t = n + n / 4;
+            return t < 1 ? 1 : t;
+        }
+
+        private static int LcdGap(int t)
+        {
+            int g = (t + 1) / 3;
+            return g < 1 ? 1 : g;
+        }
+
+        private static int LcdAdvance(char c, int n)
+        {
+            if (c == ':' || c == '.') return LcdThickness(n) + n;
+            return 6 * n;
+        }
+
+        // Horizontal segment: band of t rows starting at row y0, pointed at both ends.
+        // xs and xe are the x of the centers of the corners it joins.
+        private void LcdHSeg(int x, int y, int y0, int xs, int xe, int t, int gp, ushort color, bool aa)
+        {
+            for (int r = 0; r < t; r++)
+            {
+                int d = 2 * r - (t - 1);
+                if (d < 0) d = -d;
+                int off = d / 2;
+
+                int xa = xs + gp + off;
+                int xb = xe - gp - off;
+                if (xb < xa) continue;
+
+                FillRectRaw(x + xa, y + y0 + r, xb - xa + 1, 1, color);
+
+                if (aa && off > 0)
+                {
+                    BlendPixel(x + xa - 1, y + y0 + r, color, 128);
+                    BlendPixel(x + xb + 1, y + y0 + r, color, 128);
+                }
+            }
+        }
+
+        // Vertical segment: band of t columns starting at column x0, pointed at both ends.
+        // ys and ye are the y of the centers of the corners it joins.
+        private void LcdVSeg(int x, int y, int x0, int ys, int ye, int t, int gp, ushort color, bool aa)
+        {
+            for (int c = 0; c < t; c++)
+            {
+                int d = 2 * c - (t - 1);
+                if (d < 0) d = -d;
+                int off = d / 2;
+
+                int ya = ys + gp + off;
+                int yb = ye - gp - off;
+                if (yb < ya) continue;
+
+                FillRectRaw(x + x0 + c, y + ya, 1, yb - ya + 1, color);
+
+                if (aa && off > 0)
+                {
+                    BlendPixel(x + x0 + c, y + ya - 1, color, 128);
+                    BlendPixel(x + x0 + c, y + yb + 1, color, 128);
+                }
+            }
+        }
+
+        private void LcdSegments(int x, int y, int n, int mask, ushort color)
+        {
+            int t = LcdThickness(n);
+            int gp = LcdGap(t);
+            int w = 5 * n;
+            int h = 8 * n;
+            bool aa = Smooth && n >= 2;
+
+            int half = (t - 1) / 2;
+            int xl = half;                      // x of the center of the left column
+            int xr = w - t + half;              // x of the center of the right column
+            int yt = half;                      // y of the center of the top row
+            int ym = (h - t) / 2 + half;        // middle row
+            int yb = h - t + half;              // bottom row
+
+            if ((mask & SegA) != 0) LcdHSeg(x, y, 0, xl, xr, t, gp, color, aa);
+            if ((mask & SegG) != 0) LcdHSeg(x, y, (h - t) / 2, xl, xr, t, gp, color, aa);
+            if ((mask & SegD) != 0) LcdHSeg(x, y, h - t, xl, xr, t, gp, color, aa);
+            if ((mask & SegF) != 0) LcdVSeg(x, y, 0, yt, ym, t, gp, color, aa);
+            if ((mask & SegB) != 0) LcdVSeg(x, y, w - t, yt, ym, t, gp, color, aa);
+            if ((mask & SegE) != 0) LcdVSeg(x, y, 0, ym, yb, t, gp, color, aa);
+            if ((mask & SegC) != 0) LcdVSeg(x, y, w - t, ym, yb, t, gp, color, aa);
+        }
+
+        private void DrawLcdChar(int x, int y, char c, ushort fg, int bg, int n)
+        {
+            int t = LcdThickness(n);
+            int h = 8 * n;
+            int adv = LcdAdvance(c, n);
+
+            if (bg >= 0)
+            {
+                FillRectRaw(x, y, adv, h, (ushort)bg);
+            }
+
+            if (c == ':' || c == '.')
+            {
+                int dx = x + (adv - t) / 2;
+
+                if (c == ':')
+                {
+                    FillRectRaw(dx, y + h / 2 - (3 * h) / 16 - t / 2, t, t, fg);
+                    FillRectRaw(dx, y + h / 2 + (3 * h) / 16 - t / 2, t, t, fg);
+                }
+                else
+                {
+                    FillRectRaw(dx, y + h - t, t, t, fg);
+                }
+
+                return;
+            }
+
+            if (Ghost >= 0)
+            {
+                LcdSegments(x, y, n, 0x7F, (ushort)Ghost);
+            }
+
+            int mask = LcdSegments(c);
+            if (c == ' ') mask = 0;
+
+            if (mask != 0)
+            {
+                LcdSegments(x, y, n, mask, fg);
+            }
+        }
+
+        private void DrawStringLcd(int x, int y, string text, ushort fg, int bg, int n)
+        {
+            int h = 8 * n;
+            int cx = x;
+            int cy = y;
+            int maxX = x;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '\n')
+                {
+                    cx = x;
+                    cy += h + 2 * n;
+                    continue;
+                }
+                if (c == '\r') continue;
+
+                DrawLcdChar(cx, cy, c, fg, bg, n);
+                cx += LcdAdvance(c, n);
+                if (cx > maxX) maxX = cx;
+            }
+
+            Done(x - 2, y - 2, maxX + 1, cy + h + 1);
+        }
+
+        private int MeasureStringLcd(string text, int n)
+        {
+            int best = 0;
+            int cur = 0;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '\n')
+                {
+                    cur = 0;
+                }
+                else if (c != '\r')
+                {
+                    cur += LcdAdvance(c, n);
+                    if (cur > best) best = cur;
+                }
+            }
+            return best;
+        }
+
         /// <summary>Draws a text. bg = Transparent (-1) or an RGB565 color. '\n' starts a new line.</summary>
         public void DrawString(int x, int y, string text, ushort fg, int bg, int scale)
         {
             if (text == null) return;
             if (scale < 1) scale = 1;
+
+            if (Font == 1)
+            {
+                DrawStringLcd(x, y, text, fg, bg, scale);
+                return;
+            }
 
             int cx = x;
             int cy = y;
@@ -792,6 +1044,8 @@ namespace MogwaiNanoTft
         {
             if (text == null) return 0;
             if (scale < 1) scale = 1;
+
+            if (Font == 1) return MeasureStringLcd(text, scale);
 
             int best = 0;
             int cur = 0;

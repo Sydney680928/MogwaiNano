@@ -1,4 +1,4 @@
-// Copyright 2026 Stéphane Sibué
+// Copyright 2026 Stï¿½phane Sibuï¿½
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -168,6 +168,8 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterPrimitive("tft.scroll", new(TftManager.PrimitiveTftScroll));
             MogwaiNanoEngine.RegisterPrimitive("tft.drawBitmap", new(TftManager.PrimitiveTftDrawBitmap));
             MogwaiNanoEngine.RegisterPrimitive("tft.smooth", new(TftManager.PrimitiveTftSmooth));
+            MogwaiNanoEngine.RegisterPrimitive("tft.setFont", new(TftManager.PrimitiveTftSetFont));
+            MogwaiNanoEngine.RegisterPrimitive("tft.setGhost", new(TftManager.PrimitiveTftSetGhost));
             MogwaiNanoEngine.RegisterPrimitive("tft.drawString", new(TftManager.PrimitiveTftDrawString));
             MogwaiNanoEngine.RegisterPrimitive("tft.measureString", new(TftManager.PrimitiveTftMeasureString));
 

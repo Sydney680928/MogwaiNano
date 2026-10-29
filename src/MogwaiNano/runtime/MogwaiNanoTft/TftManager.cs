@@ -649,6 +649,51 @@ namespace MogwaiNanoTft
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
+        public static EvalResult PrimitiveTftSetFont(MogwaiNanoEngine engine, string name)
+        {
+            // font tft.setFont   (0 = 8x8 bitmap font, 1 = LCD 7-segment font)
+
+            int[] v;
+            var r = PopInts(engine, name, 1, out v);
+
+            if (r.IsError)
+                return r;
+
+            if (v[0] < 0 || v[0] > 1)
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name);
+
+            lock (_lock)
+            {
+                if (_display == null)
+                    return EvalResult.Failure(engine, TftIsClosedError, name);
+
+                _display.Font = v[0];
+            }
+
+            return EvalResult.NoError;
+        }
+
+        public static EvalResult PrimitiveTftSetGhost(MogwaiNanoEngine engine, string name)
+        {
+            // color tft.setGhost   (color of the unlit LCD segments, -1 = none)
+
+            int[] v;
+            var r = PopInts(engine, name, 1, out v);
+
+            if (r.IsError)
+                return r;
+
+            lock (_lock)
+            {
+                if (_display == null)
+                    return EvalResult.Failure(engine, TftIsClosedError, name);
+
+                _display.Ghost = v[0] < 0 ? -1 : (v[0] & 0xFFFF);
+            }
+
+            return EvalResult.NoError;
+        }
+
         public static EvalResult PrimitiveTftBacklight(MogwaiNanoEngine engine, string name)
         {
             // true tft.backlight
