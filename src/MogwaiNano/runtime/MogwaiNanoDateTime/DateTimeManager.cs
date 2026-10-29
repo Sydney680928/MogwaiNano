@@ -172,12 +172,11 @@ namespace MogwaiNanoDateTime
                 var t = new TimeSpan((long)ticks.DoubleValue);
 
                 var r = new MOGRecord(engine);
-                r.Items["totalDays"] = new MOGNumber(engine, t.TotalDays);
-                r.Items["totalHours"] = new MOGNumber(engine, t.TotalHours);
-                r.Items["totalMinutes"] = new MOGNumber(engine, t.TotalMinutes);
-                r.Items["totalSeconds"] = new MOGNumber(engine, t.TotalSeconds);
-                r.Items["totalMs"] = new MOGNumber(engine, t.TotalMilliseconds);
-
+                r.SetItem("totalDays", new MOGNumber(engine, t.TotalDays));
+                r.SetItem("totalHours", new MOGNumber(engine, t.TotalHours));
+                r.SetItem("totalMinutes", new MOGNumber(engine, t.TotalMinutes));
+                r.SetItem("totalSeconds", new MOGNumber(engine, t.TotalSeconds));
+                r.SetItem("totalMs", new MOGNumber(engine, t.TotalMilliseconds));
                 engine.StackPush(r);
 
                 return EvalResult.NoError;
@@ -274,7 +273,5 @@ namespace MogwaiNanoDateTime
             }
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
-
-
     }
 }
