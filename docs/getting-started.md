@@ -417,4 +417,4 @@ A good habit to lead a script with: it's safe to call at the top of anything, wh
 
 - Browse the [Device primitives reference](device-primitives.md) for the complete list of everything available in the device runtime
 - Check the [CHANGELOG](../CHANGELOG.md) for the full list of NANO-specific primitives (`gpio.*`, `timer.*`, `nano.*`, event handling)
-- I2C, SPI, PWM and ADC support is on the roadmap — GPIO is fully available today
+- Beyond GPIO and I2C, the device runtime also covers SPI, PWM and ADC, BLE peripheral (ESP32 only), colour [TFT displays](device-primitives.md#19-tft-display) and [touch panels](device-primitives.md#20-touch-panel) (ESP32 only), and real parallel [tasks](device-primitives.md#5-tasks) — the reference above describes each of them
