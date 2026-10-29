@@ -129,5 +129,152 @@ namespace MogwaiNanoDateTime
 
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
+
+        public static EvalResult PrimitiveToDuration(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber))
+            {
+                var ticks = engine.StackPop() as MOGNumber;
+                var ticksValue = (long)ticks.DoubleValue;
+
+                var ts = new TimeSpan(ticksValue);
+
+                var record = new MOGRecord(engine);
+                record.SetItem("days", new MOGNumber(engine, ts.Days));
+                record.SetItem("hours", new MOGNumber(engine, ts.Hours));
+                record.SetItem("minutes", new MOGNumber(engine, ts.Minutes));
+                record.SetItem("seconds", new MOGNumber(engine, ts.Seconds));
+                record.SetItem("milliseconds", new MOGNumber(engine, ts.Milliseconds));
+
+                engine.StackPush(record);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        public static EvalResult PrimitiveToDurations(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber))
+            {
+                var ticks = engine.StackPop() as MOGNumber;
+                var t = new TimeSpan((long)ticks.DoubleValue);
+
+                var r = new MOGRecord(engine);
+                r.Items["totalDays"] = new MOGNumber(engine, t.TotalDays);
+                r.Items["totalHours"] = new MOGNumber(engine, t.TotalHours);
+                r.Items["totalMinutes"] = new MOGNumber(engine, t.TotalMinutes);
+                r.Items["totalSeconds"] = new MOGNumber(engine, t.TotalSeconds);
+                r.Items["totalMs"] = new MOGNumber(engine, t.TotalMilliseconds);
+
+                engine.StackPush(r);
+
+                return EvalResult.NoError;
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        public static EvalResult PrimitiveFromDuration(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGRecord))
+            {
+                var record = engine.StackPop() as MOGRecord;
+
+                int days = 0;
+                int hours = 0;
+                int minutes = 0;
+                int seconds = 0;
+                int milliseconds = 0;
+
+                if (record.GetItem("days") is MOGNumber d)
+                    days = (int)d.Value;
+
+                if (record.GetItem("hours") is MOGNumber h)
+                    hours = (int)h.Value;
+
+                if (record.GetItem("minutes") is MOGNumber mm)
+                    minutes = (int)mm.Value;
+
+                if (record.GetItem("seconds") is MOGNumber ss)
+                    seconds = (int)ss.Value;
+
+                if (record.GetItem("ms") is MOGNumber ms)
+                    milliseconds = (int)ms.Value;
+
+                try
+                {
+                    var dt = new TimeSpan(days, hours, minutes, seconds, milliseconds);
+                    engine.StackPush(new MOGNumber(engine, dt.Ticks));
+                    return EvalResult.NoError;
+                }
+                catch
+                {
+
+                }
+
+                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "day: month: year: keys are mandatories");
+            }
+
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        public static EvalResult PrimitiveDateTimeDiff(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(2);
+
+            if (s.Length < 2)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+            
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var v2 = engine.StackPop() as MOGNumber;
+                var v1 = engine.StackPop() as MOGNumber;     
+                var diff = v1.DoubleValue - v2.DoubleValue;
+
+                engine.StackPush(new MOGNumber(engine, diff));
+                
+                return EvalResult.NoError;
+            }
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+        public static EvalResult PrimitiveDateTimeAdd(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(2);
+
+            if (s.Length < 2)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var v2 = engine.StackPop() as MOGNumber;
+                var v1 = engine.StackPop() as MOGNumber;
+                var diff = v1.DoubleValue + v2.DoubleValue;
+
+                engine.StackPush(new MOGNumber(engine, diff));
+
+                return EvalResult.NoError;
+            }
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+        }
+
+
     }
 }
