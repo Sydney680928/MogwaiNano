@@ -31,14 +31,16 @@ namespace MogwaiNano.Engine
 {
     public class MogwaiNanoEngine
     {
-        private const int IDLE_EVERY_N_ITERATIONS = 5;
-
         private static int _engineIdCounter = 0;
+
+        private const int DELAY_BETWEEN_IDLE = 1000;
+        private static Stopwatch _idleStopwatch = Stopwatch.StartNew();   
 
         private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
 
         private static ArrayList _assemblies = new();
         private static readonly object AssemblyLoadLock = new();
+
 
         public delegate EvalResult PrimitiveDelegate(MogwaiNanoEngine engine, string name);
 
@@ -535,12 +537,10 @@ namespace MogwaiNano.Engine
 
         public void Idle()
         {
-            _iterationCount++;
-
-            if (_iterationCount % IDLE_EVERY_N_ITERATIONS == 0)
+            if (_idleStopwatch.ElapsedMilliseconds >= DELAY_BETWEEN_IDLE)
             {
-                _iterationCount = 0;
                 Thread.Sleep(1);
+                _idleStopwatch.Restart();
             }
         }
 
@@ -1239,7 +1239,7 @@ namespace MogwaiNano.Engine
 
             try
             {
-                var n = new MOGNumber(engine, (float)Math.Floor((double)number.Value));
+                var n = new MOGNumber(engine, Math.Floor(number.Value));
                 engine.StackPush(n);
 
                 return EvalResult.NoError;
@@ -2602,7 +2602,7 @@ namespace MogwaiNano.Engine
 
                 EvalResult result = EvalResult.NoError;
 
-                for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += direction)
+                for (double i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += direction)
                 {
                     if (engine.HaltRequested)
                         return EvalResult.Failure(engine, Error.HaltEncounteredError, "for");
@@ -2658,7 +2658,7 @@ namespace MogwaiNano.Engine
 
                 EvalResult result = EvalResult.NoError;
 
-                for (float i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += step.Value)
+                for (double i = start.Value; direction > 0 ? i <= end.Value : i >= end.Value; i += step.Value)
                 {
                     if (engine.HaltRequested)
                         return EvalResult.Failure(engine, Error.HaltEncounteredError, "for");

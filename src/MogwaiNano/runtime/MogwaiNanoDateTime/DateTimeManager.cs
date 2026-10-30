@@ -71,8 +71,7 @@ namespace MogwaiNanoDateTime
             if (s[0] == typeof(MOGNumber))
             {
                 var ticks = engine.StackPop() as MOGNumber;
-                var ticksValue = (long)ticks.DoubleValue;
-                var dt = new DateTime(ticksValue);
+                var dt = new DateTime((long)ticks.Value);
 
                 var record = new MOGRecord(engine);
                 record.SetItem("year", new MOGNumber(engine, dt.Year));
@@ -140,9 +139,7 @@ namespace MogwaiNanoDateTime
             if (s[0] == typeof(MOGNumber))
             {
                 var ticks = engine.StackPop() as MOGNumber;
-                var ticksValue = (long)ticks.DoubleValue;
-
-                var ts = new TimeSpan(ticksValue);
+                var ts = new TimeSpan((long)ticks.Value);
 
                 var record = new MOGRecord(engine);
                 record.SetItem("days", new MOGNumber(engine, ts.Days));
@@ -169,7 +166,7 @@ namespace MogwaiNanoDateTime
             if (s[0] == typeof(MOGNumber))
             {
                 var ticks = engine.StackPop() as MOGNumber;
-                var t = new TimeSpan((long)ticks.DoubleValue);
+                var t = new TimeSpan((long)ticks.Value);
 
                 var r = new MOGRecord(engine);
                 r.SetItem("totalDays", new MOGNumber(engine, t.TotalDays));
@@ -231,46 +228,6 @@ namespace MogwaiNanoDateTime
                 return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "day: month: year: keys are mandatories");
             }
 
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        public static EvalResult PrimitiveDateTimeDiff(MogwaiNanoEngine engine, string name)
-        {
-            var s = engine.StackSign(2);
-
-            if (s.Length < 2)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-            
-            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
-            {
-                var v2 = engine.StackPop() as MOGNumber;
-                var v1 = engine.StackPop() as MOGNumber;     
-                var diff = v1.DoubleValue - v2.DoubleValue;
-
-                engine.StackPush(new MOGNumber(engine, diff));
-                
-                return EvalResult.NoError;
-            }
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        public static EvalResult PrimitiveDateTimeAdd(MogwaiNanoEngine engine, string name)
-        {
-            var s = engine.StackSign(2);
-
-            if (s.Length < 2)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
-            {
-                var v2 = engine.StackPop() as MOGNumber;
-                var v1 = engine.StackPop() as MOGNumber;
-                var diff = v1.DoubleValue + v2.DoubleValue;
-
-                engine.StackPush(new MOGNumber(engine, diff));
-
-                return EvalResult.NoError;
-            }
             return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
     }

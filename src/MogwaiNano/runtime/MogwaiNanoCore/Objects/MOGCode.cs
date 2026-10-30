@@ -225,6 +225,7 @@ namespace MogwaiNano.Objects
                             break;
 
                         Engine.Idle();
+
                     }
                 }
                 else

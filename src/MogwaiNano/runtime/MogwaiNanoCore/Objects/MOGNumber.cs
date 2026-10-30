@@ -18,31 +18,16 @@ namespace MogwaiNano.Objects
 {
     public class MOGNumber : MOGObject
     {
-        private float _value;
-        private double _doubleValue;
-
-        public float Value { 
-            
-            get => _value;
-
-            set
-            {
-                _doubleValue = value;
-                _value = value;
-            }
-        }
-
-        public double DoubleValue => _doubleValue;
+        public double Value { get; set; }
 
         public MOGNumber(MogwaiNanoEngine engine, double value) : base(engine, engine.TypeNumber)
         {
-            _value = (float)value;
-            _doubleValue = value;
+            Value = value;
         }
 
         public override MOGObject Clone()
         {
-            var obj = new MOGNumber(Engine, _doubleValue);
+            var obj = new MOGNumber(Engine, Value);
             obj.DebugInfo = DebugInfo;
             return obj;
         }

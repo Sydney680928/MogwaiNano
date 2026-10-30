@@ -243,8 +243,6 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterPrimitive("->duration", new(DateTimeManager.PrimitiveToDuration));
             MogwaiNanoEngine.RegisterPrimitive("->durations", new(DateTimeManager.PrimitiveToDurations));
             MogwaiNanoEngine.RegisterPrimitive("duration->", new(DateTimeManager.PrimitiveFromDuration));
-            MogwaiNanoEngine.RegisterPrimitive("date-", new(DateTimeManager.PrimitiveDateTimeDiff));
-            MogwaiNanoEngine.RegisterPrimitive("date+", new(DateTimeManager.PrimitiveDateTimeAdd));
 
             MogwaiNanoEngine.Skills.Add("DATE-TIME");
 
