@@ -36,7 +36,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MogaiNanoPwm\MogaiNanoPwm.nfproj" />
     <ProjectReference Include="..\MogwaiNanoAdc\MogwaiNanoAdc.nfproj" />
     <ProjectReference Include="..\MogwaiNanoBlePeripheral\MogwaiNanoBlePeripheral.nfproj" />
     <ProjectReference Include="..\MogwaiNanoCore\MogwaiNanoCore.nfproj" />
@@ -46,6 +45,7 @@
     <ProjectReference Include="..\MogwaiNanoSsd1306\MogwaiNanoSsd1306.nfproj" />
     <ProjectReference Include="..\MogwaiNanoTft\MogwaiNanoTft.nfproj" />
     <ProjectReference Include="..\MogwaiNanoTouch\MogwaiNanoTouch.nfproj" />
+    <ProjectReference Include="..\MowgaiNanoPwm\MogwaiNanoPwm.nfproj" />
   </ItemGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets')" />
   <ProjectExtensions>

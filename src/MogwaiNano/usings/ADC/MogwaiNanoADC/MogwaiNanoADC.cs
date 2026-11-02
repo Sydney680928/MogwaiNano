@@ -42,9 +42,9 @@ namespace MogwaiNanoADC
             Primitives.Add("adc2.resolutionInBits", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetResolutionInBits));
             Primitives.Add("adc2.maxValue", new MogwaiNanoEngine.PrimitiveDelegate(PrimitiveAdcGetMaxValue));
 
-            _adcAlreadyOpenedError = new Error("ADC.1", "adc already opened error");
-            _adcOpenError = new Error("ADC.2", "adc open error");
-            _adcUnknownNameError = new Error("ADC.3", "adc unknown name error");
+            _adcAlreadyOpenedError = new Error("ADC2.1", "adc already opened error");
+            _adcOpenError = new Error("ADC2.2", "adc open error");
+            _adcUnknownNameError = new Error("ADC2.3", "adc unknown name error");
 
             Errors.Add(_adcAlreadyOpenedError);
             Errors.Add(_adcOpenError);

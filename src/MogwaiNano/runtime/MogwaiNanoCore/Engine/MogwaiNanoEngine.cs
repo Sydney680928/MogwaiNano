@@ -6095,36 +6095,54 @@ namespace MogwaiNano.Engine
 
                 for (int i = 0; i < lines.Length; i++)
                 {
-                    var filename = lines[i].Trim();
-                    var assemblyName = filename.ToUpper();
+                    var assemblyName = lines[i].Trim();
 
                     if (!_assemblies.Contains(assemblyName))
                     {
-                        // L'assembly n'est pas encore chargé, on la charge
+                        // On vérifie que cette assembly n'est pas déjà chargée dans l'application
 
-                        Debug.WriteLine($"LOAD ASSEMBLY: {filename}");
+                        var isLoaded = false;
 
                         try
                         {
-                            var f = Path.Combine(usingPath, filename);
-                            var rawAssembly = File.ReadAllBytes(f);
-
-                            GC.Run(true);
-
-                            lastLoadedAssembly = Assembly.Load(rawAssembly);
-
+                            var assembly = Assembly.Load(assemblyName);
                             _assemblies.Add(assemblyName);
-
-                            Thread.Sleep(1000);
+                            isLoaded = true;
+                            Debug.WriteLine($"ASSEMBLY ALREADY LOADED: {assemblyName}");
                         }
-                        catch (Exception ex)
+                        catch
                         {
-                            return EvalResult.Failure(this, Error.UsingError, primitiveName, ex.Message);
+
+                        }
+
+                        if (!isLoaded)
+                        {
+                            // L'assembly n'est pas encore chargée, on la charge
+
+                            Debug.WriteLine($"LOAD ASSEMBLY: {assemblyName}");
+
+                            try
+                            {
+                                var f = Path.Combine(usingPath, $"{assemblyName}.pe");
+                                var rawAssembly = File.ReadAllBytes(f);
+
+                                GC.Run(true);
+
+                                lastLoadedAssembly = Assembly.Load(rawAssembly);
+
+                                _assemblies.Add(assemblyName);
+
+                                Thread.Sleep(1000);
+                            }
+                            catch (Exception ex)
+                            {
+                                return EvalResult.Failure(this, Error.UsingError, primitiveName, ex.Message);
+                            }
                         }
                     }
                     else
                     {
-                        Debug.WriteLine($"ASSEMBLY ALREADY LOADED: {filename}");
+                        Debug.WriteLine($"ASSEMBLY ALREADY LOADED: {assemblyName}");
                     }
 
                     if (i == lines.Length - 1)
