@@ -28,6 +28,10 @@ namespace MogwaiNanoTft
         /// <summary>When true, text drawn with a size of 2 or more is anti-aliased (smoothed edges).</summary>
         public bool Smooth;
 
+        /// <summary>When true (default), anti-aliased pixels are blended in linear light (gamma-correct), which gives
+        /// more even edges than blending the stored values directly.</summary>
+        public bool LinearBlend = true;
+
         /// <summary>Font used by DrawString and MeasureString: 0 = 8x8 bitmap font, 1 = LCD (7 segments) font.</summary>
         public int Font;
 
@@ -642,7 +646,47 @@ namespace MogwaiNanoTft
             return (_glyph[row] >> col) & 1;
         }
 
+        // Linearization tables for gamma-correct blending (gamma 2.0, integer maths only).
+        // Index = the 5-bit (red, blue) or 6-bit (green) value stored in RGB565, value = linear light, 0..65025.
+        private static readonly ushort[] Lin5 = BuildLinear(5);
+        private static readonly ushort[] Lin6 = BuildLinear(6);
+
+        private static ushort[] BuildLinear(int bits)
+        {
+            int n = 1 << bits;
+            ushort[] t = new ushort[n];
+
+            for (int i = 0; i < n; i++)
+            {
+                // expand to 8 bits (replicating the high bits, so that the maximum is exactly 255), then square
+                int v8 = (i << (8 - bits)) | (i >> (2 * bits - 8));
+                t[i] = (ushort)(v8 * v8);
+            }
+
+            return t;
+        }
+
+        // Index of the table entry closest to the linear value lin (the table is increasing).
+        private static int FromLinear(ushort[] t, int lin)
+        {
+            int lo = 0;
+            int hi = t.Length - 1;
+
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) >> 1;
+                if (t[mid] <= lin) lo = mid;
+                else hi = mid - 1;
+            }
+
+            if (lo < t.Length - 1 && lin - t[lo] > t[lo + 1] - lin) lo++;
+
+            return lo;
+        }
+
         // Blends fg over the pixel already in the canvas. alpha: 0 (nothing) to 256 (opaque).
+        // With LinearBlend the mix is done in linear light (gamma-correct), otherwise directly on the stored values.
+        // Both paths round to nearest instead of truncating.
         private void BlendPixel(int x, int y, ushort fg, int alpha)
         {
             if (alpha <= 0) return;
@@ -660,9 +704,27 @@ namespace MogwaiNanoTft
             int d = (_fb[i] << 8) | _fb[i + 1];
             int inv = 256 - alpha;
 
-            int r = ((((fg >> 11) & 0x1F) * alpha) + (((d >> 11) & 0x1F) * inv)) >> 8;
-            int g = ((((fg >> 5) & 0x3F) * alpha) + (((d >> 5) & 0x3F) * inv)) >> 8;
-            int b = (((fg & 0x1F) * alpha) + ((d & 0x1F) * inv)) >> 8;
+            int fr = (fg >> 11) & 0x1F;
+            int fgr = (fg >> 5) & 0x3F;
+            int fb = fg & 0x1F;
+            int dr = (d >> 11) & 0x1F;
+            int dg = (d >> 5) & 0x3F;
+            int db = d & 0x1F;
+
+            int r, g, b;
+
+            if (LinearBlend)
+            {
+                r = FromLinear(Lin5, (Lin5[fr] * alpha + Lin5[dr] * inv + 128) >> 8);
+                g = FromLinear(Lin6, (Lin6[fgr] * alpha + Lin6[dg] * inv + 128) >> 8);
+                b = FromLinear(Lin5, (Lin5[fb] * alpha + Lin5[db] * inv + 128) >> 8);
+            }
+            else
+            {
+                r = (fr * alpha + dr * inv + 128) >> 8;
+                g = (fgr * alpha + dg * inv + 128) >> 8;
+                b = (fb * alpha + db * inv + 128) >> 8;
+            }
 
             int v = (r << 11) | (g << 5) | b;
             _fb[i] = (byte)(v >> 8);
