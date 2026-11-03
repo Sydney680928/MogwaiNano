@@ -265,7 +265,7 @@ Resuming or stepping is not done from the code: on MOGWAI NANO it is done from M
 | `->durations` | Converts a number of ticks into a record that gives the total for each unit: `totalDays:`, `totalHours:`, `totalMinutes:`, `totalSeconds:` and `totalMs:` |
 | `duration->` | The opposite of `->duration`: converts a record with the keys `days:`, `hours:`, `minutes:`, `seconds:` and `milliseconds:` into a number of ticks. It doesn't accept the `total…:` keys of `->durations` |
 
-A point in time is a plain `.number`, so it can be stored, compared and subtracted like any other. A tick is a .NET tick, that is 100 nanoseconds, counted from 1 January 0001 like `DateTime.Ticks`, on desktop MOGWAI and on NANO alike. On desktop MOGWAI a number is always a `double`; on NANO, these primitives use the `double` value of the number, so they behave identically on both (see the *Types* section below); `setDateTime`, which sets the device's clock, and `date+` and `date-`, which add and subtract two numbers on their `double` values (what `+` and `-` already do on desktop, where a number is always a `double`), are NANO-only and described in the [Device Primitives Reference](device-primitives.md#6-stopwatch-and-datetime).
+A point in time is a plain `.number`, so it can be stored, compared and subtracted like any other. A tick is a .NET tick, that is 100 nanoseconds, counted from 1 January 0001 like `DateTime.Ticks`, on desktop MOGWAI and on NANO alike. A number is a `double` on desktop MOGWAI and on NANO alike, so these primitives behave identically on both; `setDateTime`, which sets the device's clock, is NANO-only and described in the [Device Primitives Reference](device-primitives.md#6-stopwatch-and-datetime).
 
 ## System primitives
 
@@ -293,7 +293,7 @@ Only the matching hook runs for a given program end — never more than one.
 
 | Type | Type literal | Description |
 |---|---|---|
-| `MOGNumber` | `.number` | Numeric value. Can be written in decimal or hexadecimal (`0xFF`). On desktop MOGWAI, a number is a `double`. On NANO, a number carries both a `float` and a `double` value: most primitives use the `float`, to take advantage of the ESP32's hardware FPU, while the date and time primitives use the `double`, which has the precision a number of ticks requires and is what a desktop number holds (see the [Device Primitives Reference](device-primitives.md#6-stopwatch-and-datetime)) |
+| `MOGNumber` | `.number` | Numeric value, a `double` — on desktop MOGWAI and on NANO alike. Can be written in decimal or hexadecimal (`0xFF`) |
 | `MOGString` | `.string` | Text, delimited with `"..."` |
 | `MOGBoolean` | `.boolean` | `true`/`false` |
 | `MOGName` | `.name` | An identifier/name value, delimited with `'...'` — used for variable names, function names, timer names |

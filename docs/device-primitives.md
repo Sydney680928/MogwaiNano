@@ -73,7 +73,7 @@ For Studio-side `nano.*` commands (run from your PC to control a device), see th
 | `->data` | 🔗 | `v1 v2 ... vN N ->data` → `.data` | Pops `N` numbers (each `0`-`255`) and builds a `MOGData` from them, in push order |
 | `->bcd` | ⚙️ | `n ->bcd` | Converts a decimal number to BCD encoding (e.g. `35 ->bcd` → `0x35`) |
 | `bcd->` | ⚙️ | `n bcd->` | Converts a BCD-encoded number back to decimal (e.g. `0x35 bcd->` → `35`) |
-| `->format` | 🔗 | `n "spec" ->format` → `.string` | Converts a number to a string using a .NET **standard** numeric format specifier — nanoFramework only supports `D`/`F`/`G`/`N`/`X` (with an optional precision digit), not custom format strings like `"000"`. E.g. `50 "D3" ->format` → `"050"`. Since `D` and `X` only apply to integers in .NET while `MOGNumber` is `float`-backed, the number is automatically cast to an integer first when the specifier is `D` or `X` (truncating any decimal part); `F`/`G`/`N` work directly on the float value with no cast |
+| `->format` | 🔗 | `n "spec" ->format` → `.string` | Converts a number to a string using a .NET **standard** numeric format specifier — nanoFramework only supports `D`/`F`/`G`/`N`/`X` (with an optional precision digit), not custom format strings like `"000"`. E.g. `50 "D3" ->format` → `"050"`. Since `D` and `X` only apply to integers in .NET while `MOGNumber` is `double`-backed, the number is automatically cast to an integer first when the specifier is `D` or `X` (truncating any decimal part); `F`/`G`/`N` work directly on the double value with no cast |
 | `->num` | 🔗 | `"str" ->num` → `.number` | Converts a string to a number; raises an error if it isn't a valid one |
 | `->str` | 🔗 | `v ->str` → `.string` | Converts an object to a string |
 | `->utf8` | 🔗 | `data ->utf8` → `.string` | Converts a `MOGData` buffer to a string, decoding its bytes as UTF-8 |
@@ -313,11 +313,11 @@ task 'TSK2' do
 
 ### Date and time
 
-Primitives to read and set the device's date and time. `now`, `->date`, `date->`, `->duration`, `->durations` and `duration->` are 🔗 **Shared** with the desktop MOGWAI engine and work the same way; `setDateTime`, `date+` and `date-` are ⚙️ **NANO-only**. A point in time is represented as a **number of ticks** — a plain `.number`, so it can be stored, compared and subtracted like any other. A tick is a .NET tick, that is 100 nanoseconds, counted from 1 January 0001 like `DateTime.Ticks` on desktop .NET, which makes the order of magnitude the same on the device and on the PC (about `6.39e17` in October 2026).
+Primitives to read and set the device's date and time. `now`, `->date`, `date->`, `->duration`, `->durations` and `duration->` are 🔗 **Shared** with the desktop MOGWAI engine and work the same way; `setDateTime` is ⚙️ **NANO-only**. A point in time is represented as a **number of ticks** — a plain `.number`, so it can be stored, compared and subtracted like any other. A tick is a .NET tick, that is 100 nanoseconds, counted from 1 January 0001 like `DateTime.Ticks` on desktop .NET, which makes the order of magnitude the same on the device and on the PC (about `6.39e17` in October 2026).
 
-> **The device's clock is in UTC.** `now`, `->date` and `setDateTime` all work in UTC, with no time zone and no daylight saving time: in France, `now ->date` shows 19:25 when it is 20:25 on the wall clock in winter, 2 hours less in summer. To display the local time, add the offset yourself, for example `now [ hours: 1 ] duration-> date+ ->date` for UTC+1, and give `setDateTime` a UTC date and time.
+> **The device's clock is in UTC.** `now`, `->date` and `setDateTime` all work in UTC, with no time zone and no daylight saving time: in France, `now ->date` shows 19:25 when it is 20:25 on the wall clock in winter, 2 hours less in summer. To display the local time, add the offset yourself, for example `now [ hours: 1 ] duration-> + ->date` for UTC+1, and give `setDateTime` a UTC date and time.
 
-A `.number` carries both a `float` and a `double` value. Most primitives use the `float` one, which suits the ESP32's hardware FPU; **every time primitive uses the `double` one**, which has the precision a number of ticks requires. Nothing has to be done in a script for this: the choice is made by the primitive being called. One consequence: `?` prints the `float` value of a number, which has only about 7 significant digits, so `now ?` on the device shows a rounded value (`6.39288977E+17`, where the PC shows `6.392890223484232E+17`). The number itself is accurate: read it with `->date`, or `->duration` for a difference.
+A `.number` is a `double`, as on desktop MOGWAI, which has the precision a number of ticks requires. Nothing has to be done in a script for this.
 
 | Primitive | Origin | Signature | Description |
 |---|---|---|---|
@@ -327,8 +327,6 @@ A `.number` carries both a `float` and a `double` value. Most primitives use the
 | `->duration` | 🔗 | `ticks ->duration` → `.record` | Converts a number of ticks, typically the difference between two dates, into a duration split into its components: a record with the keys `days:`, `hours:`, `minutes:`, `seconds:` and `milliseconds:`. A negative number gives negative components |
 | `->durations` | 🔗 | `ticks ->durations` → `.record` | Converts a number of ticks into a record that gives the **total** for each unit, not the components: the keys `totalDays:`, `totalHours:`, `totalMinutes:`, `totalSeconds:` and `totalMs:` |
 | `duration->` | 🔗 | `record duration->` → `.number` | The opposite of `->duration`: converts a record with the keys `days:`, `hours:`, `minutes:`, `seconds:` and `milliseconds:` into a number of ticks. It only accepts that "simple" form, not the `total…:` keys of `->durations` |
-| `date+` | ⚙️ | `a b date+` → `.number` | Adds two numbers, like `+`, but using their `double` values. Not needed on desktop MOGWAI, where every number is a `double` and `+` already does this |
-| `date-` | ⚙️ | `a b date-` → `.number` | Subtracts two numbers, like `-`, but using their `double` values: `10 20 date-` pushes `-10`. Not needed on desktop MOGWAI, where every number is a `double` and `-` already does this |
 | `setDateTime` | ⚙️ | `record setDateTime` | Sets the device's date and time from a record. The keys `year:`, `month:` and `day:` are required; `hour:`, `minute:` and `second:` are optional and are `0` when missing |
 
 ```
@@ -338,14 +336,14 @@ now ->date ?d          # the current date and time, one key per line
 now ->date date-> ?    # back to a number of ticks
 ```
 
-`+` and `-` work on the `float` value of a number, which doesn't have the precision of a number of ticks. To add to or subtract from a point in time, use `date+` and `date-` instead: they work on the `double` value, and the result they push is a number that can be used as a precise number of ticks — passed to `->date` or `->duration`, for instance.
+To add to or subtract from a point in time, use `+` and `-` like on any other number: the result is a number that can be used as a precise number of ticks — passed to `->date` or `->duration`, for instance.
 
 A duration is a different thing from a date: `->duration` and `->durations` describe a number of ticks as an amount of time, `duration->` goes back. `->duration` gives the components of a "simple" duration (days, hours, minutes, seconds, milliseconds), `->durations` gives the total in each unit.
 
 How long before Christmas 2026? Build the date of Christmas from a record (the keys left out, `hour:` and the following, are `0`), then subtract `now` from it and turn the result into a duration:
 
 ```
-now [ day: 25 month: 12 year: 2026 ] date-> swap date- ->duration ?
+now [ day: 25 month: 12 year: 2026 ] date-> swap - ->duration ?
 ```
 
 ```
@@ -357,13 +355,13 @@ now [ day: 25 month: 12 year: 2026 ] date-> swap date- ->duration ?
 The same difference, as a total in each unit (the total number of hours, of minutes...):
 
 ```
-now [ day: 25 month: 12 year: 2026 ] date-> swap date- ->durations ?d
+now [ day: 25 month: 12 year: 2026 ] date-> swap - ->durations ?d
 ```
 
-`duration->` turns a duration back into ticks, which `date+` can then add to a date. In one hour and a half from now:
+`duration->` turns a duration back into ticks, which `+` can then add to a date. In one hour and a half from now:
 
 ```
-now [ hours: 1 minutes: 30 ] duration-> date+ ->date ?d
+now [ hours: 1 minutes: 30 ] duration-> + ->date ?d
 ```
 
 
