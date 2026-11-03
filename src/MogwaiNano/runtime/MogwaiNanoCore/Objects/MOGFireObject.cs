@@ -30,6 +30,11 @@ namespace MogwaiNano.Objects
             Function = function;
         }
 
+        public virtual void OnDequeued() 
+        {
+
+        }
+
         public override MOGObject Clone()
         {
             throw new NotImplementedException();

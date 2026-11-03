@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Stéphane Sibué
+// Copyright 2026 Stéphane Sibué
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ namespace MogwaiNano.Engine
         private static ArrayList _assemblies = new();
         private static readonly object AssemblyLoadLock = new();
 
-
         public delegate EvalResult PrimitiveDelegate(MogwaiNanoEngine engine, string name);
 
         public static Hashtable Primitives = new(150);
@@ -83,6 +82,7 @@ namespace MogwaiNano.Engine
         private object _lastResultLock = new();
         private Parser _parser;
         private bool _debugMode;
+        private bool _dispatching;
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -1629,7 +1629,14 @@ namespace MogwaiNano.Engine
 
             while (stopwatch.Elapsed.TotalMilliseconds <= v.Value)
             {
-                Thread.Sleep(0);
+                if (engine._dispatching || !engine.HasWaitingFireObjects)
+                {
+                    Thread.Sleep(1);
+                }
+                else
+                {
+                    Thread.Sleep(0);
+                }
 
                 if (engine.HaltRequested)
                     return EvalResult.Failure(engine, Error.HaltEncounteredError, name);
@@ -2455,12 +2462,6 @@ namespace MogwaiNano.Engine
                 if (engine.HaltRequested)
                     return EvalResult.Failure(engine, Error.HaltEncounteredError, "repeat");
 
-                if (engine.BreakRequested)
-                {
-                    engine.BreakRequested = false;
-                    break;
-                }
-
                 if (engine.ExitRequested)
                     break;
 
@@ -2468,6 +2469,12 @@ namespace MogwaiNano.Engine
 
                 if (result.IsError)
                     return result;
+
+                if (engine.BreakRequested)
+                {
+                    engine.BreakRequested = false;
+                    break;
+                }
             }
 
             return EvalResult.NoError;
@@ -2564,6 +2571,15 @@ namespace MogwaiNano.Engine
                 if (conditionResult.IsError)
                     return conditionResult;
 
+                if (engine.ExitRequested)
+                    break;
+
+                if (engine.BreakRequested)
+                {
+                    engine.BreakRequested = false;
+                    break;
+                }
+
                 var conditionValue = engine.StackPop() as MOGBoolean;
 
                 if (conditionValue == null)
@@ -2607,12 +2623,6 @@ namespace MogwaiNano.Engine
                     if (engine.HaltRequested)
                         return EvalResult.Failure(engine, Error.HaltEncounteredError, "for");
 
-                    if (engine.BreakRequested)
-                    {
-                        engine.BreakRequested = false;
-                        break;
-                    }
-
                     if (engine.ExitRequested)
                         break;
 
@@ -2626,6 +2636,12 @@ namespace MogwaiNano.Engine
 
                     if (result != EvalResult.NoError)
                         break;
+
+                    if (engine.BreakRequested)
+                    {
+                        engine.BreakRequested = false;
+                        break;
+                    }
                 }
 
                 return result;
@@ -2663,12 +2679,6 @@ namespace MogwaiNano.Engine
                     if (engine.HaltRequested)
                         return EvalResult.Failure(engine, Error.HaltEncounteredError, "for");
 
-                    if (engine.BreakRequested)
-                    {
-                        engine.BreakRequested = false;
-                        break;
-                    }
-
                     if (engine.ExitRequested)
                         break;
 
@@ -2682,6 +2692,12 @@ namespace MogwaiNano.Engine
 
                     if (result != EvalResult.NoError)
                         break;
+
+                    if (engine.BreakRequested)
+                    {
+                        engine.BreakRequested = false;
+                        break;
+                    }
                 }
 
                 return result;
@@ -2711,6 +2727,9 @@ namespace MogwaiNano.Engine
 
                 if (engine.HaltRequested)
                     return EvalResult.Failure(engine, Error.HaltEncounteredError, "forever do");
+
+                if (engine.ExitRequested)
+                    break;
 
                 if (engine.BreakRequested)
                 {
@@ -2753,7 +2772,7 @@ namespace MogwaiNano.Engine
                         if (engine.HaltRequested)
                             return EvalResult.Failure(engine, Error.HaltEncounteredError, "foreach");
 
-                        if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
+                        if (engine.ExitRequested)
                             break;
 
                         result = engine.VarWrite(varName.Value, item as MOGObject);
@@ -2765,6 +2784,12 @@ namespace MogwaiNano.Engine
 
                         if (result.IsError)
                             break;
+
+                        if (engine.BreakRequested)
+                        {
+                            engine.BreakRequested = false;
+                            break;
+                        }
                     }
 
                     return result;
@@ -2782,7 +2807,7 @@ namespace MogwaiNano.Engine
                         if (engine.HaltRequested)
                             return EvalResult.Failure(engine, Error.HaltEncounteredError, "foreach");
 
-                        if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
+                        if (engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
                         result = engine.VarWrite(varName.Value, new MOGNumber(engine, (byte)item));
@@ -2794,6 +2819,12 @@ namespace MogwaiNano.Engine
 
                         if (result != EvalResult.NoError)
                             break;
+
+                        if (engine.BreakRequested)
+                        {
+                            engine.BreakRequested = false;
+                            break;
+                        }
                     }
 
                     return result;
@@ -2811,7 +2842,7 @@ namespace MogwaiNano.Engine
                         if (engine.HaltRequested)
                             return EvalResult.Failure(engine, Error.HaltEncounteredError, "foreach");
 
-                        if (engine.BreakRequested || engine.ExitRequested) // || Engine.ReturnRequested)
+                        if (engine.ExitRequested) // || Engine.ReturnRequested)
                             break;
 
                         result = engine.VarWrite(varName.Value, new MOGString(engine, item.ToString()));
@@ -2823,6 +2854,12 @@ namespace MogwaiNano.Engine
 
                         if (result != EvalResult.NoError)
                             break;
+
+                        if (engine.BreakRequested)
+                        {
+                            engine.BreakRequested = false;
+                            break;
+                        }
                     }
 
                     return result;
@@ -2910,16 +2947,19 @@ namespace MogwaiNano.Engine
                     if (engine.HaltRequested)
                         return EvalResult.Failure(engine, Error.HaltEncounteredError, "during");
 
-                    if (engine.BreakRequested || engine.ExitRequested) // || engine.ReturnRequested)
-                    {
-                        engine.BreakRequested = false;
+                    if (engine.ExitRequested)
                         break;
-                    }
 
                     result = code.Execute();
 
                     if (result != EvalResult.NoError)
                         break;
+
+                    if (engine.BreakRequested)
+                    {
+                        engine.BreakRequested = false;
+                        break;
+                    }
                 }
 
                 stopWatch.Stop();
@@ -3028,11 +3068,11 @@ namespace MogwaiNano.Engine
                 var function = engine.StackPop() as MOGFunction;
 
                 var timerName = Guid.NewGuid().ToString();
-                var result = engine.CreateNewTimer(name, (int)interval.Value, false, function, true);
+                var result = engine.CreateNewTimer(timerName, (int)interval.Value, false, function, true);
 
                 if (result == EvalResult.NoError)
                 {
-                    var timer = engine.GetTimer(name);
+                    var timer = engine.GetTimer(timerName);
 
                     if (timer != null)
                     {
@@ -5746,23 +5786,38 @@ namespace MogwaiNano.Engine
 
         public EvalResult ExecuteWaitingFireObjects()
         {
-            var result = EvalResult.NoError;
+            if (DisableInterrupts || _dispatching || PauseRequested || _fireObjectsQueue.Count == 0)
+                return EvalResult.NoError;
 
-            if (!DisableInterrupts && _fireObjectsQueue.Count > 0)
+            MOGFireObject fireObject;
+
+            lock (_fireObjectsQueueLock)
+                fireObject = _fireObjectsQueue.Dequeue() as MOGFireObject;
+
+            if (fireObject == null)
+                return EvalResult.NoError;
+
+            fireObject.OnDequeued();
+
+            _dispatching = true;
+            AddNewStack();
+
+            var savedBreak = BreakRequested;
+            //var savedReturn = ReturnRequested;
+            BreakRequested = false;
+            //ReturnRequested = false;
+
+            try
             {
-                MOGFireObject fireObject = null;
-
-                lock (_fireObjectsQueueLock)
-                    fireObject = _fireObjectsQueue.Dequeue() as MOGFireObject;
-
-                AddNewStack();
-
-                result = fireObject.Function.Execute();
-
-                RemoveLastStack();
+                return fireObject.Function.Execute();
             }
-
-            return result;
+            finally
+            {
+                BreakRequested = savedBreak;
+                //ReturnRequested = savedReturn;
+                RemoveLastStack();
+                _dispatching = false;
+            }
         }
 
         #endregion

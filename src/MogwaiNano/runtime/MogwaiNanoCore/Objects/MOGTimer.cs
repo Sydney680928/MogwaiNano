@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using MogwaiNano.Engine;
+using System.Diagnostics;
 using System.Threading;
 
 namespace MogwaiNano.Objects
@@ -20,6 +21,7 @@ namespace MogwaiNano.Objects
     public class MOGTimer : MOGFireObject
     {
         private Timer _timer;
+        private int _pending;
 
         public int Interval { get; init; }
 
@@ -35,6 +37,8 @@ namespace MogwaiNano.Objects
             IsCyclic = isCyclic;
             IsLaterTimer = isLaterTimer;
         }
+
+        public override void OnDequeued() => Interlocked.Exchange(ref _pending, 0);
 
         public EvalResult Stop()
         {
@@ -57,8 +61,9 @@ namespace MogwaiNano.Objects
 
         private void TimerCallback(object state)
         {
-            Engine.RegisterFireObject(this);
-
+            if (Interlocked.Exchange(ref _pending, 1) == 0)
+                Engine.RegisterFireObject(this);
+            
             if (IsLaterTimer)
             {
                 // On supprime le timer qui est à usage unique
