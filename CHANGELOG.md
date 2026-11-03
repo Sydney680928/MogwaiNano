@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+### Fixed
+
+### Removed
+
+## [0.10.0] - 2026-11-03
+
+### Added
+
 - **Date and time primitives** — a first set of primitives to work with the current date and time. A point in time is represented as a number of ticks (a plain number, so it can be stored, compared and subtracted like any other). `now`, `->date`, `date->`, `->duration`, `->durations` and `duration->` also exist in the desktop MOGWAI engine and work the same way; `setDateTime`, `date+` and `date-` are NANO-only. See the [Device Primitives Reference](docs/device-primitives.md#6-stopwatch-and-datetime) and the [Shared Primitives Reference](docs/shared-primitives.md)
   - `now` — pushes the current date and time, as a number of ticks
   - `->date` — converts a number of ticks (such as the value returned by `now`) into a record with the keys `year:`, `month:`, `day:`, `hour:`, `minute:`, `second:`, `dayOfWeek:` and `dayOfYear:`: `now ->date`
@@ -39,8 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`while` could fail with a type error after `mogwai.exit` or `break`** — if one of them happened while the condition was being evaluated, the condition left no value on the stack, and `while` tried to read a boolean from it. `while` now checks for both right after evaluating the condition and leaves the loop cleanly
 - **A handler could leave its own stack behind** — if an event, timer or posted block failed with an exception, the stack created for it was never removed, and the following code ran on the wrong stack. The stack is now always removed when the handler ends, whatever the outcome
 - **`LATER` (`after <ms> do { ... }`) used the name `LATER` for its timer instead of a unique one** — the first call worked, but the second one failed because a timer with that name already existed, and a call could start the timer of an earlier one. Each call now creates its own timer, with a unique name
-
-### Removed
 
 ## [0.9.0] - 2026-10-23
 
@@ -359,7 +367,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Sydney680928/MogwaiNano/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.10.0
 [0.9.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Sydney680928/MogwaiNano/releases/tag/v0.7.0
