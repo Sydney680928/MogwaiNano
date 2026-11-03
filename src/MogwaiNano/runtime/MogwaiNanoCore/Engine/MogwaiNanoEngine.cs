@@ -2837,7 +2837,7 @@ namespace MogwaiNano.Engine
 
                     EvalResult result = EvalResult.NoError;
 
-                    foreach (var item in @string.Value)
+                    foreach (char item in @string.Value)
                     {
                         if (engine.HaltRequested)
                             return EvalResult.Failure(engine, Error.HaltEncounteredError, "foreach");
