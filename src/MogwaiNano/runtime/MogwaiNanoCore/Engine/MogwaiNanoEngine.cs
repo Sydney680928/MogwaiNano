@@ -5780,6 +5780,9 @@ namespace MogwaiNano.Engine
         {
             lock (_fireObjectsQueueLock)
                 _fireObjectsQueue.Clear();
+
+            foreach (var key in _events.Keys)
+                (_events[key] as MOGEvent)?.ResetPending();
         }
 
         public bool HasWaitingFireObjects => !DisableInterrupts && _fireObjectsQueue.Count > 0;
@@ -5916,7 +5919,8 @@ namespace MogwaiNano.Engine
                 {
                     if (_events.Contains(name))
                     {
-                        var @event = _events[name] as MOGEvent;
+                        var registeredEvent = _events[name] as MOGEvent;
+                        var @event = registeredEvent;
                         var primitiveSto = new MOGPrimitive(this, "STO");
 
                         @event = @event.Clone() as MOGEvent;
@@ -5930,6 +5934,19 @@ namespace MogwaiNano.Engine
                         @event.Function.Items.Insert(0, primitiveSto);
                         @event.Function.Items.Insert(0, new MOGName(this, "eventData"));
                         @event.Function.Items.Insert(0, eventData);
+
+                        // Bounded queue: at most MOGEvent.MaxPending occurrences of the same event are waiting.
+                        // When full, the newest occurrence is dropped.
+
+                        if (!registeredEvent.TryReserve())
+                        {
+                            var dropped = registeredEvent.Dropped;
+
+                            if (dropped == 1 || dropped % 50 == 0)
+                                Delegate?.DebugMessage(this, $"Event '{name}' queue is full: {dropped} occurrence(s) dropped.");
+
+                            return EvalResult.NoError;
+                        }
 
                         RegisterFireObject(@event);
                     }
