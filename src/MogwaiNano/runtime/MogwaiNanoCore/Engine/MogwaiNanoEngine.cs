@@ -6139,8 +6139,11 @@ namespace MogwaiNano.Engine
                 {
                     // using déjà chargé, pas besoin de plus
 
+                    Delegate?.DebugMessage(this, $"Using '{usingName}' ready.");
                     return EvalResult.NoError;
                 }
+
+                Delegate?.DebugMessage(this, $"Load using '{usingName}'...");
 
                 // Step 1, get manifest file from using name
 
@@ -6149,7 +6152,7 @@ namespace MogwaiNano.Engine
                 var manifestEntries = new ArrayList();
 
                 if (!File.Exists(manifestFile))
-                    return EvalResult.Failure(this, Error.UsingError, primitiveName, "manifest file not found !");
+                    return EvalResult.Failure(this, Error.UsingError, primitiveName, $"Manifest file not found for using '{usingName}' !");
 
                 string[] lines = null;
 
@@ -6160,7 +6163,7 @@ namespace MogwaiNano.Engine
                 }
                 catch (Exception ex)
                 {
-                    return EvalResult.Failure(this, Error.UsingError, primitiveName, "unable to read manifest file !", ex.Message);
+                    return EvalResult.Failure(this, Error.UsingError, primitiveName, $"Unable to read manifest file for using '{usingName}' !", ex.Message);
                 }
 
                 Assembly lastLoadedAssembly = null;
@@ -6180,7 +6183,6 @@ namespace MogwaiNano.Engine
                             var assembly = Assembly.Load(assemblyName);
                             _assemblies.Add(assemblyName);
                             isLoaded = true;
-                            Debug.WriteLine($"ASSEMBLY ALREADY LOADED: {assemblyName}");
                         }
                         catch
                         {
@@ -6191,20 +6193,16 @@ namespace MogwaiNano.Engine
                         {
                             // L'assembly n'est pas encore chargée, on la charge
 
-                            Debug.WriteLine($"LOAD ASSEMBLY: {assemblyName}");
+                            Delegate?.DebugMessage(this, $"Loading assembly {assemblyName}...");
 
                             try
                             {
                                 var f = Path.Combine(usingPath, $"{assemblyName}.pe");
                                 var rawAssembly = File.ReadAllBytes(f);
 
-                                GC.Run(true);
-
                                 lastLoadedAssembly = Assembly.Load(rawAssembly);
 
                                 _assemblies.Add(assemblyName);
-
-                                Thread.Sleep(1000);
                             }
                             catch (Exception ex)
                             {
@@ -6212,17 +6210,13 @@ namespace MogwaiNano.Engine
                             }
                         }
                     }
-                    else
-                    {
-                        Debug.WriteLine($"ASSEMBLY ALREADY LOADED: {assemblyName}");
-                    }
 
                     if (i == lines.Length - 1)
                     {
                         // Dernière ligne, on va chercher les plugins dans l'assembly
 
                         if (lastLoadedAssembly == null)
-                            return EvalResult.Failure(this, Error.UsingError, primitiveName, "unable to load assembly for last line of manifest file !");
+                            return EvalResult.Failure(this, Error.UsingError, primitiveName, "Unable to load assembly for last line of manifest file !");
 
                         foreach (Type type in lastLoadedAssembly.GetTypes())
                         {
@@ -6242,17 +6236,16 @@ namespace MogwaiNano.Engine
 
                             if (typeof(IPlugin).IsInstanceOfType(instance))
                             {
-                                Debug.WriteLine($"PLUGIN FOUND: {type.FullName}");
-
                                 var plugin = (IPlugin)instance;
 
                                 try
                                 {
                                     plugin.Initialize(this);
+                                    Delegate?.DebugMessage(this, $"Using '{plugin.Name}' initialized.");
                                 }
                                 catch (Exception ex)
                                 {
-                                    return EvalResult.Failure(this, Error.UsingError, primitiveName, $"plugin '{plugin.Name}' initialization failed", ex.Message);
+                                    return EvalResult.Failure(this, Error.UsingError, primitiveName, $"Using '{plugin.Name}' initialization failed", ex.Message);
                                 }
 
                                 // Chargement des primitives du plugin dans l'interpréteur
@@ -6266,11 +6259,11 @@ namespace MogwaiNano.Engine
                                             var @delegate = plugin.Primitives[primitive] as PrimitiveDelegate;
                                             Primitives.Add(primitive, @delegate);
 
-                                            Debug.WriteLine($"ADD PRIMITIVE: {primitive} from plugin '{plugin.Name}'");
+                                            Delegate?.DebugMessage(this, $"Register primitive '{primitive}'.");
                                         }
                                         else
                                         {
-                                            Debug.WriteLine($"PRIMITIVE ALREADY EXISTS: {primitive} from plugin '{plugin.Name}'");
+                                            Delegate?.DebugMessage(this, $"Primitive '{primitive}' already exists.");
                                         }
                                     }
                                 }
@@ -6284,6 +6277,8 @@ namespace MogwaiNano.Engine
                                 }
 
                                 Usings[usingName] = plugin;
+
+                                Delegate?.DebugMessage(this, $"Using '{plugin.Name}' ready.");
 
                                 return EvalResult.NoError;
                             }
