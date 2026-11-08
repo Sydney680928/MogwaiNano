@@ -39,7 +39,7 @@ namespace MogwaiNanoCore
             
             MogwaiNanoLedSettings?.Invoke(AppGlobal.NanoParameters.OnboardLedGpio);
 
-            MogwaiNano.AppGlobal.SetRuntimeState(1);
+            AppGlobal.SetRuntimeState(1);
 
             Power.OnRebootEvent += Power_OnRebootEvent;
 
@@ -82,11 +82,13 @@ namespace MogwaiNanoCore
             var @delegate = new MogwaiNanoDelegate(AppGlobal.MogwaiNanoEngine);
             AppGlobal.MogwaiNanoEngine.Delegate = @delegate;
 
-            Debug.WriteLine($"Memory: {GC.Run(true)} bytes free.");
+            var memoryLeft = GC.Run(true);
+            AppGlobal.MogwaiNanoEngine.IntialMemoryLeft = memoryLeft;   
 
+            Debug.WriteLine($"Memory: {memoryLeft} bytes free.");
             Debug.WriteLine("Ready.");
 
-            MogwaiNano.AppGlobal.SetRuntimeState(2);
+            AppGlobal.SetRuntimeState(2);
 
             Thread.Sleep(1000);
 

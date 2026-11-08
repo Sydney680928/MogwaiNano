@@ -42,6 +42,7 @@
     <ProjectReference Include="..\MogwaiNanoDateTime\MogwaiNanoDateTime.nfproj" />
     <ProjectReference Include="..\MogwaiNanoEsp32LED\MogwaiNanoEsp32LED.nfproj" />
     <ProjectReference Include="..\MogwaiNanoGpio\MogwaiNanoGpio.nfproj" />
+    <ProjectReference Include="..\MogwaiNanoSpi\MogwaiNanoSpi.nfproj" />
     <ProjectReference Include="..\MogwaiNanoSsd1306\MogwaiNanoSsd1306.nfproj" />
     <ProjectReference Include="..\MogwaiNanoTft\MogwaiNanoTft.nfproj" />
     <ProjectReference Include="..\MogwaiNanoTouch\MogwaiNanoTouch.nfproj" />

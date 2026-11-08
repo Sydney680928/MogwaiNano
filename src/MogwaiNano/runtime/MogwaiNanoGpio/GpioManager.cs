@@ -14,7 +14,6 @@
 
 using MogwaiNano.Engine;
 using MogwaiNano.Objects;
-using System;
 using System.Collections;
 using System.Device.Gpio;
 
@@ -137,7 +136,7 @@ namespace MogwaiNanoGpio
                 var record = new MOGRecord(engine);
                 record.SetItem("pin", new MOGNumber(engine, e.PinNumber));
                 record.SetItem("eventType", new MOGNumber(engine, eventType));
-                
+
                 engine.FireEvent("GPIO_PIN_CHANGED", record);
             }
         }
@@ -146,14 +145,14 @@ namespace MogwaiNanoGpio
 
         public static EvalResult PrimitiveGpioSetModeInputPullDown(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.InputPullDown);
 
-        public static EvalResult PrimitiveGpioSetModeInputPullUp(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.InputPullUp);    
-        
+        public static EvalResult PrimitiveGpioSetModeInputPullUp(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.InputPullUp);
+
         public static EvalResult PrimitiveGpioSetModeOutput(MogwaiNanoEngine engine, string name) => SetPinMode(engine, name, PinMode.Output);
 
         public static EvalResult PrimitiveGpioPinWriteHigh(MogwaiNanoEngine engine, string name) => GpioPinWrite(engine, name, PinValue.High);
 
         public static EvalResult PrimitiveGpioPinWriteLow(MogwaiNanoEngine engine, string name) => GpioPinWrite(engine, name, PinValue.Low);
-        
+
         public static EvalResult PrimitiveGpioPinRead(MogwaiNanoEngine engine, string name)
         {
             var s = engine.StackSign(1);

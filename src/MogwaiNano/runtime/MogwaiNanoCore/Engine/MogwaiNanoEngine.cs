@@ -17,9 +17,7 @@ using MogwaiNano.Objects;
 using nanoFramework.Runtime.Native;
 using System;
 using System.Collections;
-using System.Device.Adc;
 using System.Device.I2c;
-using System.Device.Spi;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -34,7 +32,9 @@ namespace MogwaiNano.Engine
         private static int _engineIdCounter = 0;
 
         private const int DELAY_BETWEEN_IDLE = 1000;
-        private static Stopwatch _idleStopwatch = Stopwatch.StartNew();   
+        private static Stopwatch _idleStopwatch = Stopwatch.StartNew(); 
+        
+        private const uint MINIMAL_MEMORY_LEFT = 1024 * 200; // 200 KB    
 
         private static readonly char[] _invalidChars = { ' ', '\'', '!', '{', '}', '«', '»', '(', ')', '[', ']', '"', ':', '\r', '\n', '\t' };
 
@@ -83,6 +83,7 @@ namespace MogwaiNano.Engine
         private Parser _parser;
         private bool _debugMode;
         private bool _dispatching;
+        private bool _pauseRequested;
 
         public readonly MOGType TypeNumber;
         public readonly MOGType TypeString;
@@ -119,8 +120,6 @@ namespace MogwaiNano.Engine
 
         public Hashtable I2cDevices { get; } = new(2);     
 
-        public Hashtable SpiDevices { get; } = new(2);
-
         public Hashtable Tasks { get; } = new(2);
 
         public bool KeepAlive { get; set; } = false;
@@ -150,8 +149,6 @@ namespace MogwaiNano.Engine
 
         public bool ExitRequested { get; set; }
 
-        private bool _pauseRequested;
-
         public bool PauseRequested
         { 
             get => _pauseRequested;
@@ -172,6 +169,8 @@ namespace MogwaiNano.Engine
         public bool DebugMode => _debugMode;
 
         public string DebugCommand { get; set; }
+
+        internal uint IntialMemoryLeft { get; set; }
 
         public static Version Version => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
@@ -199,7 +198,7 @@ namespace MogwaiNano.Engine
             }
         }
 
-        public static ArrayList Skills { get; set; } = new ArrayList { "I2C", "SPI", "UNITS", "TASKS", "EVENTS", "TIMERS" };
+        public static ArrayList Skills { get; set; } = new ArrayList { "I2C", "UNITS", "TASKS", "EVENTS", "TIMERS" };
 
         public bool FrugalMode { get; set; } = false;
 
@@ -480,14 +479,6 @@ namespace MogwaiNano.Engine
             Primitives.Add("i2c.register.read", new PrimitiveDelegate(PrimitiveI2cRegisterRead));
             Primitives.Add("i2c.scan", new PrimitiveDelegate(PrimitiveI2cScan));
 
-            Primitives.Add("spi.open", new PrimitiveDelegate(PrimitiveSpiOpen));
-            Primitives.Add("spi.close", new PrimitiveDelegate(PrimitiveSpiClose));
-            Primitives.Add("spi.read", new PrimitiveDelegate(PrimitiveSpiRead));
-            Primitives.Add("spi.write", new PrimitiveDelegate(PrimitiveSpiWrite));
-            Primitives.Add("spi.transfer", new PrimitiveDelegate(PrimitiveSpiTransfer));
-            Primitives.Add("spi.minClockFrequency", new PrimitiveDelegate(PrimitiveSpiMinClockFrequency));
-            Primitives.Add("spi.maxClockFrequency", new PrimitiveDelegate(PrimitiveSpiMaxClockFrequency));
-
             Primitives.Add("stopwatch.create", new PrimitiveDelegate(PrimitiveStopwatchCreate));
             Primitives.Add("stopwatch.start", new PrimitiveDelegate(PrimitiveStopwatchStart));
             Primitives.Add("stopwatch.stop", new PrimitiveDelegate(PrimitiveStopwatchStop));
@@ -563,6 +554,23 @@ namespace MogwaiNano.Engine
 
         public EvalResult Run(string code, bool debugMode = false, bool codeIsCanonical = false)
         {
+            if (IntialMemoryLeft < MINIMAL_MEMORY_LEFT)
+            {
+                if (Delegate != null)
+                    Delegate.ProgramStart(this, code);
+
+                ProgramDidStart?.Invoke(this);
+
+                LastResult = EvalResult.Failure(this, Error.FatalError, $"Not enough memory to run the program.");
+
+                if (Delegate != null)
+                    Delegate.ProgramEnd(this, LastResult);
+
+                ProgramDidEnd?.Invoke(this, LastResult);
+
+                return LastResult;
+            }
+
             try
             {
                 IsRunning = true;
@@ -891,8 +899,7 @@ namespace MogwaiNano.Engine
                 CleanupStopwatchs();
 
                 CleanupI2cDevices();
-                CleanupSpiDevices();
-
+                
                 _stacks.Clear();
                 _currentStack = new MOGStack();
                 _stacks.Add(_currentStack);
@@ -5286,294 +5293,6 @@ namespace MogwaiNano.Engine
 
         #endregion
 
-        #region SPI
-
-        private static EvalResult PrimitiveSpiOpen(MogwaiNanoEngine engine, string name)
-        {
-            // 'name' bus csPin frequency mode spi.open
-
-            var s = engine.StackSign(5);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGNumber) || s[2] != typeof(MOGNumber) || s[3] != typeof(MOGNumber) || s[4] != typeof(MOGName))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var mode = engine.StackPop() as MOGNumber;
-            var frequency = engine.StackPop() as MOGNumber;
-            var csPin = engine.StackPop() as MOGNumber;
-            var bus = engine.StackPop() as MOGNumber;
-            var deviceName = engine.StackPop() as MOGName;
-
-            int modeNumber = (int)mode.Value;
-
-            if (modeNumber < 0 || modeNumber > 3)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "SPI mode number must be between 0 and 3");
-
-            int csPinNumber = (int)csPin.Value;
-
-            if (csPinNumber < 0)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "SPI csPin number must be a positive value");
-
-            int busNumber = (int)bus.Value;
-
-            if (busNumber < 1 || busNumber > 2)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "SPI bus number must be between 1 and 2");
-
-            int frequencyNumber = (int)frequency.Value;
-            var spiInfo = SpiDevice.GetBusInfo(busNumber);
-
-            if (frequencyNumber < spiInfo.MinClockFrequency || frequencyNumber > spiInfo.MaxClockFrequency)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "SPI frequency must be between the minimum and maximum clock frequency of the bus");
-
-            if (engine.SpiDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(engine, Error.SpiDeviceAlreadyOpenedError, name, $"SPI device {deviceName} is already opened");
-
-            try
-            {
-                var settings = new SpiConnectionSettings(busNumber, csPinNumber)
-                {
-                    ClockFrequency = frequencyNumber,
-                    DataBitLength = 8,
-                    Mode = (SpiMode)modeNumber
-                };
-
-                engine.SpiDevices[deviceName.Value] = SpiDevice.Create(settings);
-            }
-            catch (Exception ex)
-            {
-                return EvalResult.Failure(engine, Error.SpiDeviceOpenError, name, $"failed to open SPI device {deviceName}", ex.Message);
-            }
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveSpiClose(MogwaiNanoEngine engine, string name)
-        {
-            // name spi.close   
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGName))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var deviceName = engine.StackPop() as MOGName;
-
-            if (!engine.SpiDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(engine, Error.SpiUnknownDeviceNameError, name);
-
-            var spiDevice = engine.SpiDevices[deviceName.Value] as SpiDevice;
-            engine.SpiDevices.Remove(deviceName.Value);
-            spiDevice.Dispose();
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveSpiWrite(MogwaiNanoEngine engine, string name)
-        {
-            // name data spi.write
-
-            var s = engine.StackSign(2);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGData) && s[1] == typeof(MOGName))
-            {
-                var data = engine.StackPop() as MOGData;
-                var deviceName = engine.StackPop() as MOGName;
-
-                if (!engine.SpiDevices.Contains(deviceName.Value))
-                    return EvalResult.Failure(engine, Error.SpiUnknownDeviceNameError, name);
-
-                var spiDevice = engine.SpiDevices[deviceName.Value] as SpiDevice;
-
-                try
-                {
-                    spiDevice.Write(data.ToSpanByte());
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.SpiWriteError, name, $"failed to write to SPI device '{deviceName}'", ex.Message);
-                }
-            }
-            else if (s[0] == typeof(MOGRef) && s[1] == typeof(MOGName))
-            {
-                var @ref = engine.StackPop() as MOGRef;
-                var deviceName = engine.StackPop() as MOGName;
-
-                var value = engine.VarRead(@ref.Value, false);
-
-                if (value == null)
-                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
-
-                engine.StackPush(deviceName);
-                engine.StackPush(value);
-
-                var r = PrimitiveSpiWrite(engine, name);
-
-                if (r.IsError)
-                    return r;
-
-                engine.StackDrop();
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSpiTransfer(MogwaiNanoEngine engine, string name)
-        {
-            // name data spi.transfert
-
-            var s = engine.StackSign(2);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] == typeof(MOGData) && s[1] == typeof(MOGName))
-            {
-                var data = engine.StackPop() as MOGData;
-                var deviceName = engine.StackPop() as MOGName;
-
-                if (!engine.SpiDevices.Contains(deviceName.Value))
-                    return EvalResult.Failure(engine, Error.SpiUnknownDeviceNameError, name);
-
-                var spiDevice = engine.SpiDevices[deviceName.Value] as SpiDevice;
-                SpanByte readBuffer = new byte[data.Items.Length];
-
-                try
-                {
-                    spiDevice.TransferFullDuplex(data.ToSpanByte(), readBuffer);
-
-                    var reponse = new MOGData(engine, readBuffer.ToArray());
-                    engine.StackPush(reponse);
-
-                    return EvalResult.NoError;
-                }
-                catch (Exception ex)
-                {
-                    return EvalResult.Failure(engine, Error.SpiTransferError, name, $"failed to transfert to SPI device '{deviceName}'", ex.Message);
-                }
-            }
-            else if (s[0] == typeof(MOGRef) && s[1] == typeof(MOGName))
-            {
-                var @ref = engine.StackPop() as MOGRef;
-                var deviceName = engine.StackPop() as MOGName;
-
-                var value = engine.VarRead(@ref.Value, false);
-
-                if (value == null)
-                    return EvalResult.Failure(engine, Error.UnknownNameError, name.ToString());
-
-                engine.StackPush(deviceName);
-                engine.StackPush(value);
-
-                var r = PrimitiveSpiTransfer(engine, name);
-
-                if (r.IsError)
-                    return r;
-
-                engine.StackDrop();
-
-                return EvalResult.NoError;
-            }
-
-            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-        }
-
-        private static EvalResult PrimitiveSpiMinClockFrequency(MogwaiNanoEngine engine, string name)
-        {
-            // bus spi.minClockFrequency
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var bus = engine.StackPop() as MOGNumber;
-            var busNumber = (int)bus.Value;
-
-            var busInfo = SpiDevice.GetBusInfo(busNumber);
-
-            engine.StackPush(new MOGNumber(engine, busInfo.MinClockFrequency));
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveSpiMaxClockFrequency(MogwaiNanoEngine engine, string name)
-        {
-            // bus spi.maxClockFrequency
-
-            var s = engine.StackSign(1);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var bus = engine.StackPop() as MOGNumber;
-            var busNumber = (int)bus.Value;
-
-            var busInfo = SpiDevice.GetBusInfo(busNumber);
-
-            engine.StackPush(new MOGNumber(engine, busInfo.MaxClockFrequency));
-
-            return EvalResult.NoError;
-        }
-
-        private static EvalResult PrimitiveSpiRead(MogwaiNanoEngine engine, string name)
-        {
-            // name length spi.read
-
-            var s = engine.StackSign(2);
-
-            if (s.Length == 0)
-                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
-
-            if (s[0] != typeof(MOGNumber) || s[1] != typeof(MOGName))
-                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
-
-            var length = engine.StackPop() as MOGNumber;
-            var deviceName = engine.StackPop() as MOGName;
-
-            if (!engine.SpiDevices.Contains(deviceName.Value))
-                return EvalResult.Failure(engine, Error.SpiUnknownDeviceNameError, name);
-
-            if (length.Value < 0 || length.Value > 4096)
-                return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "SPI read length must be between 0 and 4096");
-
-            var spiDevice = engine.SpiDevices[deviceName.Value] as SpiDevice;
-
-            try
-            {
-                byte[] buffer = new byte[(int)length.Value];
-                var span = new SpanByte(buffer);
-                spiDevice.Read(span);
-
-                var mogData = new MOGData(engine, buffer);
-                engine.StackPush(mogData);
-
-                return EvalResult.NoError;
-            }
-            catch (Exception ex)
-            {
-                return EvalResult.Failure(engine, Error.SpiReadError, name, $"failed to read from SPI device '{deviceName.Value}'", ex.Message);
-            }
-        }
-
-        #endregion
-
         #endregion
 
         #region STACK
@@ -5993,21 +5712,6 @@ namespace MogwaiNano.Engine
             }
 
             I2cDevices.Clear();
-        }
-
-        #endregion
-
-        #region SPI
-
-        public void CleanupSpiDevices()
-        {
-            foreach (var key in SpiDevices.Keys)
-            {
-                var spiDevice = SpiDevices[key] as SpiDevice;
-                spiDevice.Dispose();
-            }
-
-            SpiDevices.Clear();
         }
 
         #endregion

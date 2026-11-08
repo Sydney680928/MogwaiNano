@@ -29,6 +29,7 @@ using System.Threading;
 using static MogwaiNano.Engine.MogwaiNanoEngine;
 using MogwaiNanoAdc;
 using MogwaiNanoDateTime;
+using MogwaiNanoSpi;
 
 namespace MogwaiNanoEsp32
 {
@@ -84,6 +85,27 @@ namespace MogwaiNanoEsp32
             MogwaiNanoEngine.RegisterExternalError(AdcManager.AdcUnknownNameError);
 
             MogwaiNanoEngine.Skills.Add("ADC");
+
+            #endregion
+
+            #region SPI
+
+            MogwaiNanoEngine.RegisterPrimitive("spi.open", new PrimitiveDelegate(SpiManager.PrimitiveSpiOpen));
+            MogwaiNanoEngine.RegisterPrimitive("spi.close", new PrimitiveDelegate(SpiManager.PrimitiveSpiClose));
+            MogwaiNanoEngine.RegisterPrimitive("spi.read", new PrimitiveDelegate(SpiManager.PrimitiveSpiRead));
+            MogwaiNanoEngine.RegisterPrimitive("spi.write", new PrimitiveDelegate(SpiManager.PrimitiveSpiWrite));
+            MogwaiNanoEngine.RegisterPrimitive("spi.transfer", new PrimitiveDelegate(SpiManager.PrimitiveSpiTransfer));
+            MogwaiNanoEngine.RegisterPrimitive("spi.minClockFrequency", new PrimitiveDelegate(SpiManager.PrimitiveSpiMinClockFrequency));
+            MogwaiNanoEngine.RegisterPrimitive("spi.maxClockFrequency", new PrimitiveDelegate(SpiManager.PrimitiveSpiMaxClockFrequency));
+
+            MogwaiNanoEngine.RegisterExternalError(SpiManager.SpiDeviceAlreadyOpenedError);
+            MogwaiNanoEngine.RegisterExternalError(SpiManager.SpiDeviceOpenError);
+            MogwaiNanoEngine.RegisterExternalError(SpiManager.SpiUnknownDeviceNameError);
+            MogwaiNanoEngine.RegisterExternalError(SpiManager.SpiWriteError);
+            MogwaiNanoEngine.RegisterExternalError(SpiManager.SpiReadError);
+            MogwaiNanoEngine.RegisterExternalError(SpiManager.SpiTransferError);    
+
+            MogwaiNanoEngine.Skills.Add("SPI");
 
             #endregion
 
@@ -266,6 +288,7 @@ namespace MogwaiNanoEsp32
                     LedManager.Cleanup(engine);
                     PwmManager.Cleanup(engine);
                     AdcManager.Cleanup(engine);
+                    SpiManager.Cleanup(engine); 
                 }
 
             };
