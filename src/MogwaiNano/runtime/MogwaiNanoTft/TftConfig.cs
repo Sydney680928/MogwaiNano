@@ -1,4 +1,4 @@
-﻿namespace MogwaiNanoTft
+namespace MogwaiNanoTft
 {
     /// <summary>Configuration of a SPI TFT display, filled from the record given to tft.init.</summary>
     public class TftConfig
@@ -15,8 +15,19 @@
 
         public int Width;
         public int Height;
+        /// <summary>
+        /// Native offsets of the visible area inside the controller memory, in rotation 0 (portrait).
+        /// They are swapped automatically (x and y exchanged) in the odd rotations (landscape).
+        /// Ignored when Offsets is given.
+        /// </summary>
         public int XOffset;
         public int YOffset;
+
+        /// <summary>
+        /// Optional explicit offsets: 8 values x0,y0,x1,y1,x2,y2,x3,y3 (one pair per rotation 0..3).
+        /// When present, they replace the automatic calculation from XOffset/YOffset.
+        /// </summary>
+        public int[] Offsets;
 
         public bool Invert;
         public bool Bgr;
@@ -31,6 +42,28 @@
         public int CmdRaset = 0x2B;
         public int CmdRamwr = 0x2C;
         public int CmdMadctl = 0x36;
+
+        /// <summary>Offsets of the visible area for the given rotation (0..3).</summary>
+        public void GetOffsets(int rotation, out int x, out int y)
+        {
+            rotation &= 3;
+
+            if (Offsets != null)
+            {
+                x = Offsets[rotation * 2];
+                y = Offsets[rotation * 2 + 1];
+            }
+            else if ((rotation & 1) == 0)
+            {
+                x = XOffset;
+                y = YOffset;
+            }
+            else
+            {
+                x = YOffset;
+                y = XOffset;
+            }
+        }
     }
 
     /// <summary>Built-in controller profiles.</summary>

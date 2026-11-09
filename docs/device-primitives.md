@@ -752,7 +752,7 @@ Names and argument order follow the `ssd1306.*` family where they overlap, with 
 
 | Primitive | Signature | Description |
 |---|---|---|
-| `tft.init` | `record tft.init` | Opens the screen described by the record (see below), clears it to black and switches the backlight on. Raises `TFT.3` if a screen is already open, `TFT.1` if the initialization fails |
+| `tft.init` | `record tft.init` | Opens the screen described by the record (see below), clears it to black and switches the backlight on. Raises `TFT.3` if a screen is already open, `TFT.1` if the initialization fails — the message of `TFT.1` names the step that failed (for example `at: create spi device (bus 1, cs 42)`) |
 | `tft.close` | `tft.close` | Switches the backlight off and releases the screen. Does nothing if no screen is open |
 | `tft.setRotation` | `n tft.setRotation` | Sets the rotation: `0` is the display's native orientation (portrait for a 240×320 panel), `1` to `3` turn it by 90° steps. **Clears the canvas to black** |
 | `tft.width` | `tft.width` → `.number` | Width in pixels in the current rotation |
@@ -808,7 +808,7 @@ The font covers ASCII and the characters used in French: `é è ê ë à â ä �
 |---|---|---|---|
 | `width:`, `height:` | number | — (mandatory) | Size of the display in its native orientation |
 | `sclk:`, `mosi:`, `dc:`, `cs:` | number | — (mandatory) | Pins: SPI clock, SPI data out, data/command select and chip select |
-| `miso:` | number | `-1` | SPI data in, if the display has it wired |
+| `miso:` | number | — (mandatory) | SPI data in. Mandatory even though most small displays have no data-out wire: the SPI driver of the ESP32 refuses to open the bus when no MISO pin is mapped, so give it any spare GPIO — it is only ever read, never driven |
 | `rst:` | number | `-1` | Hardware reset pin. `-1` means none: the initialization table then starts with a software reset |
 | `backlight:` | number | `-1` | Backlight pin, driven high when the screen is on. `-1` means none |
 | `spiBus:` | number | `1` | SPI bus. Only bus `1` is supported |
@@ -818,7 +818,8 @@ The font covers ASCII and the characters used in French: `é è ê ë à â ä �
 | `rotations:` | list | — | Four numbers: the memory-access-control value of rotations `0` to `3`. Replaces the profile's one when both are given |
 | `invert:` | boolean | `false` | Colour inversion, **for the built-in profile only** (IPS panels such as the one of the Waveshare ESP32-S3-Touch-LCD-2 need `true`). With a custom `init:`, put the inversion command in the table |
 | `bgr:` | boolean | `false` | Red and blue swapped, for the panels that need it. Applies with any initialization |
-| `xOffset:`, `yOffset:` | number | `0` | Added to the position of the window sent to the display, for a panel smaller than the controller's memory (such as a 240×240 or 135×240 ST7789). Applied as given in every rotation, which some panels don't want |
+| `xOffset:`, `yOffset:` | number | `0` | Position of the visible area inside the controller's memory, in rotation `0` (the native orientation), for a panel smaller than the controller's memory (such as a 240×240, 135×240 or 172×320 ST7789). In the rotations `1` and `3` (landscape) the two values are swapped automatically, so a panel whose area is simply shifted works in the four rotations with the same two numbers — `xOffset: 34 yOffset: 0` for the 172×320 panel of the Waveshare ESP32-S3-LCD-1.47. Ignored when `offsets:` is given |
+| `offsets:` | list | — | Explicit offsets, for the panels whose offsets are not simply swapped between rotations: eight numbers, the x and y of rotations `0` to `3` in that order (`x0 y0 x1 y1 x2 y2 x3 y3`), or four lists of two numbers. Replaces the automatic calculation from `xOffset:` and `yOffset:`. Anything but four pairs of numbers raises `MW.22` |
 | `casetCommand:`, `rasetCommand:`, `ramwrCommand:`, `madctlCommand:` | number | `42`, `43`, `44`, `54` | Command codes for the column address, row address, memory write and memory access control, for a controller that doesn't use the usual ones (`0x2A`, `0x2B`, `0x2C`, `0x36`) |
 
 A missing or invalid key raises `MW.22`, naming the key. Either `controller:`, or both `init:` and `rotations:`, must be given.
@@ -860,6 +861,14 @@ The whole configuration of the Waveshare ESP32-S3-Touch-LCD-2, then a few drawin
 60 160 30 255 255 0 tft.color tft.drawFilledCircle
 
 tft.refresh
+```
+
+A smaller panel — the Waveshare ESP32-S3-LCD-1.47, a 172×320 ST7789 whose visible area sits in the middle of the controller's 240×320 memory, 34 pixels from each side of the width. `xOffset:` and `yOffset:` give the offsets in the native orientation and are swapped automatically in the landscape rotations, so the same record works in the four rotations. The panel has no data-out wire, so `miso:` is given any spare GPIO (here `2`):
+
+```
+[ controller: "st7789" width: 172 height: 320
+  sclk: 40 mosi: 45 miso: 2 dc: 41 cs: 42 rst: 39 backlight: 48
+  xOffset: 34 yOffset: 0 invert: true ] tft.init
 ```
 
 A text console that scrolls like an 8-bit home computer, under a fixed title. Each new line is written at the bottom of the screen; once the screen is full, `tft.scroll` moves the area below the title up by one line (8 pixels at `size` 1) first. `&curY 8 +` adds 8 to `curY` in place:
@@ -973,7 +982,7 @@ forever do
 
 Wrong arguments raise the usual `MW.20` (too few arguments), `MW.21` (wrong type) and `MW.22` (wrong value).
 
-**Tested on** the Waveshare ESP32-S3-Touch-LCD-2 (ST7789, 240×320), in the four rotations. Other ST7789 panels should work given the right size and rotation values. Other controllers, and panels that need `xOffset:`/`yOffset:`, have not been tried.
+**Tested on** the Waveshare ESP32-S3-Touch-LCD-2 (ST7789, 240×320) and the Waveshare ESP32-S3-LCD-1.47 (ST7789, 172×320, with `xOffset:`/`yOffset:`), in the four rotations. Other ST7789 panels should work given the right size, offsets and rotation values. Other controllers, and a panel that needs `offsets:` (offsets that are not simply swapped between rotations), have not been tried.
 
 ---
 

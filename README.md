@@ -92,14 +92,15 @@ A classic ESP32 is not a supported target: see [Memory considerations](#memory-c
 
 ### Tested display boards
 
-The TFT and touch primitives ([TFT display](docs/device-primitives.md#19-tft-display), [Touch panel](docs/device-primitives.md#20-touch-panel)) are configured by a record, so they aren't tied to one board — these are the ones they have been validated on, both on an ESP32-S3 with PSRAM (`ESP32_S3_OCTAL`):
+The TFT and touch primitives ([TFT display](docs/device-primitives.md#19-tft-display), [Touch panel](docs/device-primitives.md#20-touch-panel)) are configured by a record, so they aren't tied to one board — these are the ones they have been validated on, all on an ESP32-S3 with PSRAM (`ESP32_S3_OCTAL`):
 
 | Board | Display | Touch | Status |
 |---|---|---|---|
 | Waveshare ESP32-S3-Touch-LCD-2 | ST7789, 240×320 (SPI) | CST816D (I2C) | ✅ Tested — display and touch, in the four rotations |
+| Waveshare ESP32-S3-LCD-1.47 (USB-A dongle) | ST7789, 172×320 (SPI) | — | ✅ Tested — display, in the four rotations, with the panel offsets (`xOffset:`/`yOffset:`) |
 | Waveshare ESP32-S3-Touch-LCD-7 | 800×480 RGB display (parallel RGB interface) | GT911 (I2C) | ⚠️ Touch panel tested (full area, multi-touch). The display isn't supported: the RGB interface isn't available |
 
-Other ST7789 displays should work with the right size and rotation values; other SPI controllers can be described with a custom initialization table, and the FT6x36 and custom touch layouts are written but untried. We'd like to hear how it goes on other boards.
+Other ST7789 displays should work with the right size, offsets and rotation values; other SPI controllers can be described with a custom initialization table, and the FT6x36 and custom touch layouts are written but untried. We'd like to hear how it goes on other boards.
 
 ## MOGWAI NANO Studio
 

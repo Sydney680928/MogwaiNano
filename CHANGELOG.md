@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A new board for the TFT primitives: the Waveshare ESP32-S3-LCD-1.47 (ESP32 only)** — a USB-A dongle with a 172×320 ST7789 display, validated in the four rotations. The visible area of this panel sits in the middle of the ST7789's 240×320 memory, which `tft.init` now handles (see `xOffset:`/`yOffset:` and `offsets:` below). Its record: `[ controller: "st7789" width: 172 height: 320 sclk: 40 mosi: 45 miso: 2 dc: 41 cs: 42 rst: 39 backlight: 48 xOffset: 34 yOffset: 0 invert: true ] tft.init` (the backlight is on GPIO 48 and the RGB LED on GPIO 38; the ESP32-S3-LCD-1.47**B** is a different board, wired differently, and hasn't been tried). See the [Device Primitives Reference](docs/device-primitives.md#19-tft-display)
+- **`offsets:` for `tft.init` (ESP32 only)** — an explicit list of window offsets, one x and y pair per rotation (`x0 y0 x1 y1 x2 y2 x3 y3`, or four lists of two numbers), for the panels whose offsets are not simply swapped between rotations. It replaces the automatic calculation from `xOffset:` and `yOffset:`. Not tried on real hardware
+
 ### Updated
+
+- **`xOffset:` and `yOffset:` now follow the rotation (ESP32 only)** — they are the offsets of the visible area in rotation `0`, and are swapped automatically in the rotations `1` and `3`. They used to be applied as given in every rotation, which was wrong for any panel with a non-zero offset in landscape. **This changes the behaviour of a record that gave offsets**: the record of a panel that needed different values per rotation should now use `offsets:`. Records without offsets, such as the one of the Waveshare ESP32-S3-Touch-LCD-2, are not affected
+- **`miso:` is now mandatory in `tft.init` (ESP32 only)** — the SPI driver of the ESP32 refuses to open the bus when no MISO pin is mapped, even for a display that has no data-out wire, and failed with an `ArgumentException` that said nothing about the cause. `tft.init` now asks for `miso:` and names it when it is missing (`MW.22`): give it any spare GPIO, it is only ever read, never driven. **A record without `miso:` must now add one**
+- **The `TFT.1` message of `tft.init` names the step that failed (ESP32 only)** — for example `at: open dc pin 41` or `at: create spi device (bus 1, cs 42)`. The exception of a failing initialization carries no text of its own on the device, so a wrong pin used to be hard to find
 
 ### Fixed
 

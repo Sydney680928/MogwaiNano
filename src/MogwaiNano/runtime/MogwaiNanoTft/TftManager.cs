@@ -111,12 +111,14 @@ namespace MogwaiNanoTft
 
                     SpiTftDriver driver = null;
                     Display display = null;
+                    string step = "spi pin functions";
 
                     try
                     {
                         if (ConfigureSpiPins != null)
                             ConfigureSpiPins(cfg.SpiBus, cfg.Sclk, cfg.Mosi, cfg.Miso);
 
+                        step = "driver";
                         driver = new SpiTftDriver(cfg);
                         display = new Display(driver);
                         display.Initialize();
@@ -134,7 +136,9 @@ namespace MogwaiNanoTft
                         }
                         catch (Exception) { }
 
-                        return EvalResult.Failure(engine, TftInitError, name, "failed to initialize tft display", ex.Message);
+                        string where = (driver != null && driver.Step != null) ? driver.Step : step;
+
+                        return EvalResult.Failure(engine, TftInitError, name, "failed to initialize tft display", "at: " + where + " " + ex.Message);
                     }
                 }
 
@@ -273,7 +277,7 @@ namespace MogwaiNanoTft
             cfg.SpiBus = rd.Int("spiBus", false, 1);
             cfg.Sclk = rd.Int("sclk", true, -1);
             cfg.Mosi = rd.Int("mosi", true, -1);
-            cfg.Miso = rd.Int("miso", false, -1);
+            cfg.Miso = rd.Int("miso", true, -1);   // mandatory: the SPI driver of the platform needs a MISO pin, even for a write-only display (use any spare GPIO)
             cfg.Dc = rd.Int("dc", true, -1);
             cfg.Cs = rd.Int("cs", true, -1);
             cfg.Rst = rd.Int("rst", false, -1);
@@ -291,6 +295,7 @@ namespace MogwaiNanoTft
             string controller = rd.Str("controller");
             MOGData init = rd.Data("init");
             MOGList rotations = rd.List("rotations");
+            MOGList offsets = rd.List("offsets");
 
             if (rd.Problem != null)
                 return EvalResult.Failure(engine, Error.BadArgumentValueError, name, rd.Problem);
@@ -320,6 +325,46 @@ namespace MogwaiNanoTft
                     return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "rotations: must be a list of 4 numbers");
 
                 cfg.Rotations = values;
+            }
+
+            if (offsets != null)
+            {
+                // offsets: 4 pairs (one per rotation), either as 4 sub-lists of 2 numbers or as a flat list of 8 numbers
+                int[] values = new int[8];
+                int count = 0;
+                bool ok = true;
+
+                foreach (var item in offsets.Items)
+                {
+                    var n = item as MOGNumber;
+
+                    if (n != null)
+                    {
+                        if (count >= 8) { ok = false; break; }
+                        values[count++] = (int)n.Value;
+                        continue;
+                    }
+
+                    var sub = item as MOGList;
+
+                    if (sub == null) { ok = false; break; }
+
+                    foreach (var subItem in sub.Items)
+                    {
+                        var sn = subItem as MOGNumber;
+
+                        if (sn == null || count >= 8) { ok = false; break; }
+
+                        values[count++] = (int)sn.Value;
+                    }
+
+                    if (!ok) break;
+                }
+
+                if (!ok || count != 8)
+                    return EvalResult.Failure(engine, Error.BadArgumentValueError, name, "offsets: must be 4 pairs of numbers (x y for each rotation)");
+
+                cfg.Offsets = values;
             }
 
             if (controller != null)

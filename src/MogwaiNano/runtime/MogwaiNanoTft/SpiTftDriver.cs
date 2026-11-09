@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Device.Gpio;
 using System.Device.Spi;
 using System.Threading;
@@ -21,6 +21,8 @@ namespace MogwaiNanoTft
         private GpioPin _rst;
         private GpioPin _bl;
         private bool _dcHigh;
+        private int _xOff;
+        private int _yOff;
 
         public SpiTftDriver(TftConfig config)
         {
@@ -32,18 +34,24 @@ namespace MogwaiNanoTft
         public int NativeHeight { get { return _cfg.Height; } }
         public int MaxTransferSize { get { return TransferChunk; } }
 
+        /// <summary>Step being executed by Initialize (for diagnostics: exception messages are empty on nanoFramework).</summary>
+        public string Step;
+
         public void Initialize()
         {
             if (_cfg.Backlight >= 0)
             {
+                Step = "open backlight pin " + _cfg.Backlight;
                 _bl = _gpio.OpenPin(_cfg.Backlight, PinMode.Output);
                 _bl.Write(PinValue.Low);
             }
 
+            Step = "open dc pin " + _cfg.Dc;
             _dc = _gpio.OpenPin(_cfg.Dc, PinMode.Output);
             _dc.Write(PinValue.Low);
             _dcHigh = false;
 
+            Step = "create spi device (bus " + _cfg.SpiBus + ", cs " + _cfg.Cs + ")";
             var settings = new SpiConnectionSettings(_cfg.SpiBus, _cfg.Cs)
             {
                 ClockFrequency = _cfg.ClockHz,
@@ -54,6 +62,7 @@ namespace MogwaiNanoTft
 
             if (_cfg.Rst >= 0)
             {
+                Step = "open rst pin " + _cfg.Rst;
                 _rst = _gpio.OpenPin(_cfg.Rst, PinMode.Output);
                 _rst.Write(PinValue.High);
                 Thread.Sleep(10);
@@ -63,7 +72,10 @@ namespace MogwaiNanoTft
                 Thread.Sleep(120);
             }
 
+            Step = "run init table";
             RunInitTable(_cfg.InitTable);
+
+            Step = "after init table";
         }
 
         private void RunInitTable(byte[] table)
@@ -105,12 +117,14 @@ namespace MogwaiNanoTft
 
             WriteCommand((byte)_cfg.CmdMadctl);
             WriteData(new byte[] { (byte)madctl });
+
+            _cfg.GetOffsets(rotation, out _xOff, out _yOff);
         }
 
         public void SetWindow(int x0, int y0, int x1, int y1)
         {
-            x0 += _cfg.XOffset; x1 += _cfg.XOffset;
-            y0 += _cfg.YOffset; y1 += _cfg.YOffset;
+            x0 += _xOff; x1 += _xOff;
+            y0 += _yOff; y1 += _yOff;
 
             WriteCommand((byte)_cfg.CmdCaset);
             WriteData(new byte[] { (byte)(x0 >> 8), (byte)x0, (byte)(x1 >> 8), (byte)x1 });
