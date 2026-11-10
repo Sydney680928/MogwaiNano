@@ -31,6 +31,8 @@ namespace MogwaiNano.Engine
     {
         private static int _engineIdCounter = 0;
 
+        private static Random _randomGenerator = new();
+
         private const int DELAY_BETWEEN_IDLE = 1000;
         private static Stopwatch _idleStopwatch = Stopwatch.StartNew(); 
         
@@ -345,6 +347,14 @@ namespace MogwaiNano.Engine
             Primitives.Add("/", new PrimitiveDelegate(PrimitiveMathDivision));
             Primitives.Add("floor", new PrimitiveDelegate(PrimitiveMathFloor));
             Primitives.Add("mod", new PrimitiveDelegate(PrimitiveMathModulo));
+            Primitives.Add("abs", new PrimitiveDelegate(PrimitiveMathAbs));
+            Primitives.Add("ceil", new PrimitiveDelegate(PrimitiveMathCeil));
+            Primitives.Add("round", new PrimitiveDelegate(PrimitiveMathRound));
+            Primitives.Add("sqrt", new PrimitiveDelegate(PrimitiveMathSqrt));
+            Primitives.Add("pow", new PrimitiveDelegate(PrimitiveMathPow));
+            Primitives.Add("exp", new PrimitiveDelegate(PrimitiveMathExp));
+            Primitives.Add("PI", new PrimitiveDelegate(PrimitiveMathPI));
+            Primitives.Add("rand", new PrimitiveDelegate(PrimitiveRand));
 
             Primitives.Add("->data", new PrimitiveDelegate(PrimitiveToData));
             Primitives.Add("->bcd", new PrimitiveDelegate(PrimitiveDecimalToBcd));
@@ -1255,6 +1265,166 @@ namespace MogwaiNano.Engine
             {
                 return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
             }
+        }
+
+        private static EvalResult PrimitiveMathCeil(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var number = engine.StackPop() as MOGNumber;
+
+            try
+            {
+                var n = new MOGNumber(engine, Math.Ceiling(number.Value));
+                engine.StackPush(n);
+
+                return EvalResult.NoError;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
+            }
+        }
+
+        private static EvalResult PrimitiveMathAbs(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var number = engine.StackPop() as MOGNumber;
+
+            try
+            {
+                var n = new MOGNumber(engine, Math.Abs(number.Value));
+                engine.StackPush(n);
+
+                return EvalResult.NoError;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
+            }
+        }
+
+        private static EvalResult PrimitiveMathRound(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var number = engine.StackPop() as MOGNumber;
+
+            try
+            {
+                var n = new MOGNumber(engine, Math.Round(number.Value));
+                engine.StackPush(n);
+
+                return EvalResult.NoError;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
+            }
+        }
+
+        private static EvalResult PrimitiveMathSqrt(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var number = engine.StackPop() as MOGNumber;
+
+            try
+            {
+                var n = new MOGNumber(engine, Math.Sqrt(number.Value));
+                engine.StackPush(n);
+
+                return EvalResult.NoError;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
+            }
+        }
+
+        private static EvalResult PrimitiveMathExp(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(1);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] != typeof(MOGNumber))
+                return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
+
+            var number = engine.StackPop() as MOGNumber;
+
+            try
+            {
+                var n = new MOGNumber(engine, Math.Exp(number.Value));
+                engine.StackPush(n);
+
+                return EvalResult.NoError;
+            }
+            catch (Exception ex)
+            {
+                return EvalResult.Failure(engine, Error.MathematicalError, name, ex.Message);
+            }
+        }
+
+        private static EvalResult PrimitiveMathPI(MogwaiNanoEngine engine, string name)
+        {
+            var n = new MOGNumber(engine, Math.PI);
+            engine.StackPush(n);
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveRand(MogwaiNanoEngine engine, string name)
+        {
+            var n = new MOGNumber(engine, _randomGenerator.NextDouble());
+            engine.StackPush(n);
+            return EvalResult.NoError;
+        }
+
+        private static EvalResult PrimitiveMathPow(MogwaiNanoEngine engine, string name)
+        {
+            var s = engine.StackSign(2);
+
+            if (s.Length == 0)
+                return EvalResult.Failure(engine, Error.TooFewArgumentsError, name);
+
+            if (s[0] == typeof(MOGNumber) && s[1] == typeof(MOGNumber))
+            {
+                var n1 = engine.StackPop() as MOGNumber;
+                var n0 = engine.StackPop() as MOGNumber;
+
+                n0.Value = Math.Pow(n0.Value, n1.Value);
+                engine.StackPush(n0);
+
+                return EvalResult.NoError;
+            }
+ 
+            return EvalResult.Failure(engine, Error.BadArgumentTypeError, name);
         }
 
         private static EvalResult PrimitiveMathModulo(MogwaiNanoEngine engine, string name)
